@@ -14,8 +14,6 @@ if(NOT TARGET Boost::ut)
     FetchContent_MakeAvailable(boost_ut)
 endif()
 
-find_package(PkgConfig REQUIRED)
-
 add_executable(tests_unit_ds_mysql
     main.cpp
     test_ddl.cpp

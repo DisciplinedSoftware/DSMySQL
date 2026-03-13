@@ -41,6 +41,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -Wpedantic
         -Werror
     )
+elseif(MSVC)
+    add_compile_options(
+        /W4       # High warning level
+        /WX       # Warnings as errors
+        /permissive-  # Strict standards conformance
+    )
 endif()
 
 # Coverage flags
@@ -61,8 +67,30 @@ include(FetchContent)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # MySQL client library
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(MYSQL REQUIRED mysqlclient)
+if(WIN32)
+    # On Windows, search common MySQL Server installation paths.
+    # Override by passing -DMYSQL_ROOT_DIR=<path> to cmake.
+    set(MYSQL_ROOT_DIR "" CACHE PATH "MySQL installation root (e.g. C:/Program Files/MySQL/MySQL Server 8.0)")
+    if(NOT MYSQL_ROOT_DIR)
+        file(GLOB _mysql_dirs "C:/Program Files/MySQL/MySQL Server *")
+        if(_mysql_dirs)
+            list(SORT _mysql_dirs ORDER DESCENDING)
+            list(GET _mysql_dirs 0 MYSQL_ROOT_DIR)
+            set(MYSQL_ROOT_DIR "${MYSQL_ROOT_DIR}" CACHE PATH "" FORCE)
+        else()
+            message(FATAL_ERROR "MySQL not found. Set -DMYSQL_ROOT_DIR=<path> to the MySQL installation directory.")
+        endif()
+    endif()
+
+    find_path(MYSQL_INCLUDE_DIR mysql.h PATHS "${MYSQL_ROOT_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+    find_library(MYSQL_LIBRARY libmysql PATHS "${MYSQL_ROOT_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+    set(MYSQL_INCLUDE_DIRS "${MYSQL_INCLUDE_DIR}")
+    set(MYSQL_LIBRARIES "${MYSQL_LIBRARY}")
+    message(STATUS "MySQL found at: ${MYSQL_ROOT_DIR}")
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(MYSQL REQUIRED mysqlclient)
+endif()
 
 # Note: Boost.PFR is header-only and doesn't have a standard CMake config package yet,
 # so we fetch it directly without find_package. Once Boost.PFR is officially integrated

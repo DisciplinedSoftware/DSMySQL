@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  tests:
+  tests-gcc:
     runs-on: ubuntu-latest
 
     env:
@@ -71,3 +71,73 @@ jobs:
 
       - name: Integration tests
         run: ctest --preset release -R tests_integration_ds_mysql
+
+  tests-clang:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y software-properties-common ca-certificates gpg wget
+          # Kitware APT repo for CMake 3.31+
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
+            | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build clang-15 \
+            libmysqlclient-dev pkg-config
+
+      - name: Configure
+        run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON -DBUILD_INTEGRATION_TESTS=OFF -DBUILD_EXAMPLES=OFF
+        env:
+          CXX: clang++-15
+          CC: clang-15
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Unit tests
+        run: ctest --preset release -R tests_unit_ds_mysql
+
+  tests-msvc:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          choco install cmake ninja --no-progress -y
+        shell: pwsh
+
+      - name: Detect MySQL root
+        shell: pwsh
+        run: |
+          $dirs = Get-ChildItem "C:\Program Files\MySQL" -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like "MySQL Server *" } |
+            Sort-Object Name -Descending
+          if (-not $dirs) { throw "MySQL installation not found" }
+          $root = $dirs[0].FullName
+          echo "MYSQL_ROOT_DIR=$root" >> $env:GITHUB_ENV
+          echo "$root\lib" >> $env:GITHUB_PATH
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DBUILD_INTEGRATION_TESTS=OFF `
+            -DBUILD_EXAMPLES=OFF `
+            "-DMYSQL_ROOT_DIR=$env:MYSQL_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build build --config Release -j4
+
+      - name: Unit tests
+        run: ctest --build-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
