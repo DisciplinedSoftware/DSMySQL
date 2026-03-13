@@ -1,0 +1,8 @@
+build/
+build-coverage/
+.env
+compile_commands.json
+*.o
+*.a
+*.so
+*.so.*

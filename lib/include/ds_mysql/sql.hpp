@@ -1,0 +1,4309 @@
+#pragma once
+
+#include <array>
+#include <boost/pfr.hpp>
+#include <cassert>
+#include <chrono>
+#include <concepts>
+#include <cstddef>
+#include <format>
+#include <iomanip>
+#include <map>
+#include <optional>
+#include <ranges>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include "ds_mysql/col.hpp"
+#include "ds_mysql/database_name.hpp"
+#include "ds_mysql/schema_generator.hpp"
+#include "ds_mysql/sql_temporal.hpp"
+#include "ds_mysql/varchar_field.hpp"
+
+namespace ds_mysql {
+
+template <std::size_t N>
+struct fixed_string {
+    std::array<char, N> value{};
+
+    constexpr fixed_string(char const (&str)[N]) {
+        for (std::size_t i = 0; i < N; ++i) {
+            value[i] = str[i];
+        }
+    }
+
+    [[nodiscard]] constexpr std::string_view view() const {
+        return {value.data(), N - 1};
+    }
+
+    [[nodiscard]] constexpr operator std::string_view() const {
+        return view();
+    }
+};
+
+template <std::size_t N>
+fixed_string(char const (&)[N]) -> fixed_string<N>;
+
+enum class sql_date_part {
+    year,
+    quarter,
+    month,
+    week,
+    day,
+    hour,
+    minute,
+    second,
+};
+
+enum class sql_cast_type {
+    signed_integer,
+    unsigned_integer,
+    decimal,
+    double_precision,
+    float_precision,
+    char_type,
+    binary,
+    date,
+    datetime,
+    timestamp,
+    time,
+    json,
+};
+
+template <typename... Cols>
+struct grouping_set {};
+
+template <typename T>
+struct is_grouping_set : std::false_type {};
+
+template <typename... Cols>
+struct is_grouping_set<grouping_set<Cols...>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_grouping_set_v = is_grouping_set<T>::value;
+
+// ===================================================================
+// Shared SQL detail helpers
+// ===================================================================
+
+namespace sql_detail {
+
+[[nodiscard]] constexpr uint32_t normalize_fractional_second_precision(uint32_t precision) {
+    return precision <= 6U ? precision : 6U;
+}
+
+inline std::string escape_sql_string(std::string_view s) {
+    std::string result;
+    result.reserve(s.size());
+    for (char const c : s) {
+        if (c == '\'') {  // Double the quote character for SQL escaping
+            result += '\'';
+        }
+        result += c;
+    }
+    return result;
+}
+
+inline std::string format_datetime(std::chrono::system_clock::time_point tp, uint32_t fractional_second_precision = 0) {
+    auto const precision = normalize_fractional_second_precision(fractional_second_precision);
+    auto const micros = std::chrono::floor<std::chrono::microseconds>(tp);
+    auto const secs = std::chrono::floor<std::chrono::seconds>(micros);
+    if (precision == 0U) {
+        return std::format("'{:%Y-%m-%d %H:%M:%S}'", secs);
+    }
+
+    constexpr std::array<uint32_t, 7> divisors{1000000U, 100000U, 10000U, 1000U, 100U, 10U, 1U};
+    auto const fractional_us =
+        static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::microseconds>(micros - secs).count());
+    auto const scaled_fraction = fractional_us / divisors[precision];
+    return std::format("'{:%Y-%m-%d %H:%M:%S}.{:0{}d}'", secs, scaled_fraction, precision);
+}
+
+/**
+ * to_sql_value — convert a typed C++ value to its SQL literal representation.
+ *
+ * Handles: column_field<T> wrappers, std::optional<T>, sql_datetime, bool,
+ * integral types, floating-point types, varchar_field<N>, std::string, and
+ * std::chrono::system_clock::time_point.
+ */
+template <typename T>
+std::string to_sql_value(T const& v) {
+    if constexpr (ColumnFieldType<T>) {
+        return to_sql_value(v.value);
+    } else if constexpr (is_optional_v<T>) {
+        if (!v.has_value()) {
+            return "NULL";
+        }
+        return to_sql_value(v.value());
+    } else if constexpr (std::same_as<T, sql_datetime>) {
+        if (v.is_now()) {
+            auto const precision = normalize_fractional_second_precision(v.fractional_second_precision());
+            if (precision == 0U) {
+                return "NOW()";
+            }
+            return "NOW(" + std::to_string(precision) + ")";
+        }
+        return format_datetime(v.time_point(), v.fractional_second_precision());
+    } else if constexpr (std::same_as<T, sql_timestamp>) {
+        if (v.is_now()) {
+            auto const precision = normalize_fractional_second_precision(v.fractional_second_precision());
+            if (precision == 0U) {
+                return "CURRENT_TIMESTAMP";
+            }
+            return "CURRENT_TIMESTAMP(" + std::to_string(precision) + ")";
+        }
+        return format_datetime(v.time_point(), v.fractional_second_precision());
+    } else if constexpr (std::same_as<T, std::chrono::system_clock::time_point>) {
+        return format_datetime(v);
+    } else if constexpr (std::same_as<T, bool>) {
+        return v ? "1" : "0";
+    } else if constexpr (std::integral<T>) {
+        return std::to_string(v);
+    } else if constexpr (std::floating_point<T>) {
+        return std::to_string(v);
+    } else if constexpr (is_varchar_field_v<T>) {
+        return "'" + escape_sql_string(v.view()) + "'";
+    } else if constexpr (std::same_as<T, std::string>) {
+        return "'" + escape_sql_string(v) + "'";
+    } else {
+        static_assert(false,
+                      "to_sql_value: unsupported type. "
+                      "Supported: column_field<T>, optional<T>, sql_datetime, sql_timestamp, bool, "
+                      "integral types, floating-point types, varchar_field<N>, std::string, "
+                      "std::chrono::system_clock::time_point");
+    }
+}
+
+}  // namespace sql_detail
+
+// ===================================================================
+// where_condition — a typed SQL WHERE fragment
+//
+// Stores the column name (as a compile-time std::string_view),
+// the operator literal (e.g. " = ", " IS NULL"), and the serialized
+// value — building the final SQL string lazily via build_sql().
+//
+// Produced exclusively by the typed predicate free functions below.
+//
+//   .where(equal<symbol::ticker>("AAPL"))        ← typed predicate
+//   .having(count() > 5)                         ← aggregate predicate
+// ===================================================================
+
+struct where_condition {
+    std::string_view col_name;  // compile-time column name; empty for composed/raw conditions
+    std::string_view op;        // operator literal (" = ", " IS NULL", etc.)
+    std::string value;          // serialized RHS value, or full SQL for composed/raw conditions
+
+    where_condition() = default;
+    where_condition(std::string_view col_name_, std::string_view op_, std::string value_)
+        : col_name(col_name_), op(op_), value(std::move(value_)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        if (col_name.empty())
+            return value;
+        std::string s;
+        s.reserve(col_name.size() + op.size() + value.size());
+        s += col_name;
+        s += op;
+        s += value;
+        return s;
+    }
+};
+
+// ===================================================================
+// WHERE predicates
+//
+//   equal<Col>(value)                    — col = val
+//   not_equal<Col>(value)                — col != val
+//   less_than<Col>(value)                — col < val
+//   greater_than<Col>(value)             — col > val
+//   less_than_or_equal<Col>(value)       — col <= val
+//   greater_than_or_equal<Col>(value)    — col >= val
+//   is_null<Col>()                       — col IS NULL
+//   is_not_null<Col>()                   — col IS NOT NULL
+//   like<Col>(pattern)                   — col LIKE 'pattern'
+//   and_(a, b)                           — (a AND b)
+//   or_(a, b)                            — (a OR b)
+//   not_(cond)                           — NOT (cond)
+// ===================================================================
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition equal(Col const& value) {
+    return {column_traits<Col>::column_name(), " = ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition not_equal(Col const& value) {
+    return {column_traits<Col>::column_name(), " != ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition less_than(Col const& value) {
+    return {column_traits<Col>::column_name(), " < ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition greater_than(Col const& value) {
+    return {column_traits<Col>::column_name(), " > ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition less_than_or_equal(Col const& value) {
+    return {column_traits<Col>::column_name(), " <= ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition greater_than_or_equal(Col const& value) {
+    return {column_traits<Col>::column_name(), " >= ", sql_detail::to_sql_value(value.value)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition is_null() {
+    return {column_traits<Col>::column_name(), " IS NULL", {}};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition is_not_null() {
+    return {column_traits<Col>::column_name(), " IS NOT NULL", {}};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition like(std::string_view pattern) {
+    auto escaped = sql_detail::escape_sql_string(pattern);
+    std::string rhs;
+    rhs.reserve(2 + escaped.size());
+    rhs += '\'';
+    rhs += std::move(escaped);
+    rhs += '\'';
+    return {column_traits<Col>::column_name(), " LIKE ", std::move(rhs)};
+}
+
+[[nodiscard]] inline where_condition and_(where_condition a, where_condition b) {
+    auto as = a.build_sql();
+    auto bs = b.build_sql();
+    std::string s;
+    s.reserve(1 + as.size() + 5 + bs.size() + 1);
+    s += '(';
+    s += std::move(as);
+    s += " AND ";
+    s += std::move(bs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+[[nodiscard]] inline where_condition or_(where_condition a, where_condition b) {
+    auto as = a.build_sql();
+    auto bs = b.build_sql();
+    std::string s;
+    s.reserve(1 + as.size() + 4 + bs.size() + 1);
+    s += '(';
+    s += std::move(as);
+    s += " OR ";
+    s += std::move(bs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+[[nodiscard]] inline where_condition not_(where_condition cond) {
+    auto cs = cond.build_sql();
+    std::string s;
+    s.reserve(5 + cs.size() + 1);
+    s += "NOT (";
+    s += std::move(cs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+// ===================================================================
+// Operator overloads for natural WHERE composition
+//
+// &, |, and ! can be overloaded safely for a DSL type like where_condition
+// because they carry no implicit short-circuit or sequencing expectations.
+//
+// &&  and || are intentionally NOT overloaded: their overloaded forms lose
+// short-circuit evaluation (both operands are always evaluated), which
+// contradicts the expectation all C++ readers have of those operators. The
+// C++ Core Guidelines (ES.62) explicitly discourage this.  The bitwise
+// spelling (&, |) is unambiguous in a query-building context and has the
+// correct relative precedence: ! > & > |, matching NOT > AND > OR.
+//
+//   !a            → NOT (a)
+//   a & b         → (a AND b)       — & binds tighter than |
+//   a | b         → (a OR b)
+//   (a | b) & c   → ((a OR b) AND c) — parentheses work naturally
+// ===================================================================
+
+[[nodiscard]] inline where_condition operator!(where_condition cond) {
+    return not_(std::move(cond));
+}
+
+[[nodiscard]] inline where_condition operator&(where_condition a, where_condition b) {
+    return and_(std::move(a), std::move(b));
+}
+
+[[nodiscard]] inline where_condition operator|(where_condition a, where_condition b) {
+    return or_(std::move(a), std::move(b));
+}
+
+// ===================================================================
+// WHERE predicates (continued)
+//
+//   in<Col>({v1, v2, ...})               — col IN (v1, v2, ...)
+//   not_in<Col>({v1, v2, ...})           — col NOT IN (v1, v2, ...)
+//   between<Col>(low, high)              — col BETWEEN low AND high
+//   not_like<Col>(pattern)               — col NOT LIKE 'pattern'
+//   in_subquery<Col>(query)              — col IN (SELECT ...)
+//   not_in_subquery<Col>(query)          — col NOT IN (SELECT ...)
+//   exists(query)                       — EXISTS (SELECT ...)
+//   not_exists(query)                   — NOT EXISTS (SELECT ...)
+// ===================================================================
+
+// Concept for any query that can produce SQL — used for subquery predicates.
+// Forward-declared here so subquery predicates can reference it before the full
+// SELECT builder is defined.
+template <typename Q>
+concept AnySelectQuery = requires(Q const& q) {
+    { q.build_sql() } -> std::convertible_to<std::string>;
+};
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition in(std::initializer_list<typename Col::value_type> values) {
+    std::ostringstream ss;
+    ss << '(';
+    bool first = true;
+    for (auto const& v : values) {
+        if (!first) {
+            ss << ", ";
+        }
+        ss << sql_detail::to_sql_value(v);
+        first = false;
+    }
+    ss << ')';
+    return {column_traits<Col>::column_name(), " IN ", ss.str()};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition not_in(std::initializer_list<typename Col::value_type> values) {
+    std::ostringstream ss;
+    ss << '(';
+    bool first = true;
+    for (auto const& v : values) {
+        if (!first) {
+            ss << ", ";
+        }
+        ss << sql_detail::to_sql_value(v);
+        first = false;
+    }
+    ss << ')';
+    return {column_traits<Col>::column_name(), " NOT IN ", ss.str()};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition between(Col const& low, Col const& high) {
+    auto low_val = sql_detail::to_sql_value(low.value);
+    auto high_val = sql_detail::to_sql_value(high.value);
+    std::string rhs;
+    rhs.reserve(low_val.size() + 5 + high_val.size());
+    rhs += std::move(low_val);
+    rhs += " AND ";
+    rhs += std::move(high_val);
+    return {column_traits<Col>::column_name(), " BETWEEN ", std::move(rhs)};
+}
+
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition not_like(std::string_view pattern) {
+    auto escaped = sql_detail::escape_sql_string(pattern);
+    std::string rhs;
+    rhs.reserve(2 + escaped.size());
+    rhs += '\'';
+    rhs += std::move(escaped);
+    rhs += '\'';
+    return {column_traits<Col>::column_name(), " NOT LIKE ", std::move(rhs)};
+}
+
+// null_safe_equal<Col>(value) — col <=> val (MySQL NULL-safe equality)
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition null_safe_equal(Col const& value) {
+    return {column_traits<Col>::column_name(), " <=> ", sql_detail::to_sql_value(value.value)};
+}
+
+// regexp<Col>(pattern) — col REGEXP 'pattern'
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition regexp(std::string_view pattern) {
+    auto escaped = sql_detail::escape_sql_string(pattern);
+    std::string rhs;
+    rhs.reserve(2 + escaped.size());
+    rhs += '\'';
+    rhs += std::move(escaped);
+    rhs += '\'';
+    return {column_traits<Col>::column_name(), " REGEXP ", std::move(rhs)};
+}
+
+template <ColumnFieldType Col, AnySelectQuery Query>
+[[nodiscard]] where_condition in_subquery(Query const& subquery) {
+    auto sub = subquery.build_sql();
+    std::string rhs;
+    rhs.reserve(2 + sub.size());
+    rhs += '(';
+    rhs += std::move(sub);
+    rhs += ')';
+    return {column_traits<Col>::column_name(), " IN ", std::move(rhs)};
+}
+
+template <ColumnFieldType Col, AnySelectQuery Query>
+[[nodiscard]] where_condition not_in_subquery(Query const& subquery) {
+    auto sub = subquery.build_sql();
+    std::string rhs;
+    rhs.reserve(2 + sub.size());
+    rhs += '(';
+    rhs += std::move(sub);
+    rhs += ')';
+    return {column_traits<Col>::column_name(), " NOT IN ", std::move(rhs)};
+}
+
+template <AnySelectQuery Query>
+[[nodiscard]] where_condition exists(Query const& subquery) {
+    auto sub = subquery.build_sql();
+    std::string s;
+    s.reserve(8 + sub.size() + 1);
+    s += "EXISTS (";
+    s += std::move(sub);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+template <AnySelectQuery Query>
+[[nodiscard]] where_condition not_exists(Query const& subquery) {
+    auto sub = subquery.build_sql();
+    std::string s;
+    s.reserve(12 + sub.size() + 1);
+    s += "NOT EXISTS (";
+    s += std::move(sub);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+// ===================================================================
+// col_expr<Col> / col_ref<Col> — natural operator syntax for WHERE clauses
+//
+// col_ref<Col> is an inline constexpr variable template that exposes
+// comparison and predicate operators, each returning a where_condition.
+// The resulting where_condition values compose with &, |, ! (see above).
+//
+// Single-column predicates:
+//   col_ref<trade::code> == "AAPL"             → equal<trade::code>("AAPL")
+//   col_ref<trade::id> != 0u                   → not_equal<trade::id>(0u)
+//   col_ref<trade::id> < 100u                  → less_than<trade::id>(100u)
+//   col_ref<trade::id> > 0u                    → greater_than<trade::id>(0u)
+//   col_ref<trade::id> <= 100u                 → less_than_or_equal<trade::id>(100u)
+//   col_ref<trade::id> >= 1u                   → greater_than_or_equal<trade::id>(1u)
+//   col_ref<trade::name>.is_null()             → is_null<trade::name>()
+//   col_ref<trade::name>.is_not_null()         → is_not_null<trade::name>()
+//   col_ref<trade::code>.like("AAPL%")         → like<trade::code>("AAPL%")
+//   col_ref<trade::code>.not_like("X%")        → not_like<trade::code>("X%")
+//   col_ref<trade::id>.between(1u, 10u)        → between<trade::id>(1u, 10u)
+//   col_ref<trade::code>.in({"AAPL", "GOOGL"}) → in<trade::code>({"AAPL", "GOOGL"})
+//   col_ref<trade::code>.not_in({"X", "Y"})    → not_in<trade::code>({"X", "Y"})
+//
+// Composing with &, |, !:
+//   col_ref<trade::code> == "AAPL" | col_ref<trade::code> == "GOOGL"
+//   col_ref<trade::id> >= 1u & col_ref<trade::id> <= 100u
+//   !(col_ref<trade::code> == "AAPL")
+//   (col_ref<trade::code> == "AAPL" | col_ref<trade::code> == "GOOGL") &
+//       col_ref<trade::type> == "Stock"
+//
+// Note: the exact syntax `Col = value` (e.g. `trade::code = "AAPL"`) is not
+// achievable in C++ — `trade::code` is a type alias, not an object, so no
+// operator can be invoked on it directly.
+// ===================================================================
+
+template <ColumnFieldType Col>
+struct col_expr {
+    using value_type = typename Col::value_type;
+
+    // Operators accept value_type directly; callers must construct explicitly
+    // (e.g. col_ref<trade::code> == varchar_field<32>{"AAPL"}).
+    [[nodiscard]] where_condition operator==(value_type const& val) const {
+        return equal<Col>(Col{val});
+    }
+    [[nodiscard]] where_condition operator!=(value_type const& val) const {
+        return not_equal<Col>(Col{val});
+    }
+    [[nodiscard]] where_condition operator<(value_type const& val) const {
+        return less_than<Col>(Col{val});
+    }
+    [[nodiscard]] where_condition operator>(value_type const& val) const {
+        return greater_than<Col>(Col{val});
+    }
+    [[nodiscard]] where_condition operator<=(value_type const& val) const {
+        return less_than_or_equal<Col>(Col{val});
+    }
+    [[nodiscard]] where_condition operator>=(value_type const& val) const {
+        return greater_than_or_equal<Col>(Col{val});
+    }
+
+    [[nodiscard]] where_condition is_null() const noexcept {
+        return ds_mysql::is_null<Col>();
+    }
+    [[nodiscard]] where_condition is_not_null() const noexcept {
+        return ds_mysql::is_not_null<Col>();
+    }
+
+    [[nodiscard]] where_condition like(std::string_view pattern) const {
+        return ds_mysql::like<Col>(pattern);
+    }
+    [[nodiscard]] where_condition not_like(std::string_view pattern) const {
+        return ds_mysql::not_like<Col>(pattern);
+    }
+    [[nodiscard]] where_condition between(value_type const& low, value_type const& high) const {
+        return ds_mysql::between<Col>(Col{low}, Col{high});
+    }
+    [[nodiscard]] where_condition in(std::initializer_list<value_type> vals) const {
+        return ds_mysql::in<Col>(vals);
+    }
+    [[nodiscard]] where_condition not_in(std::initializer_list<value_type> vals) const {
+        return ds_mysql::not_in<Col>(vals);
+    }
+
+    [[nodiscard]] where_condition regexp(std::string_view pattern) const {
+        return ds_mysql::regexp<Col>(pattern);
+    }
+
+    [[nodiscard]] where_condition null_safe_equal(value_type const& val) const {
+        return ds_mysql::null_safe_equal<Col>(Col{val});
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition in_subquery(Query const& subquery) const {
+        return ds_mysql::in_subquery<Col>(subquery);
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition not_in_subquery(Query const& subquery) const {
+        return ds_mysql::not_in_subquery<Col>(subquery);
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition eq_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " = ", std::move(rhs)};
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition ne_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " != ", std::move(rhs)};
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition lt_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " < ", std::move(rhs)};
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition gt_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " > ", std::move(rhs)};
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition le_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " <= ", std::move(rhs)};
+    }
+
+    template <AnySelectQuery Query>
+    [[nodiscard]] where_condition ge_subquery(Query const& subquery) const {
+        auto sub = subquery.build_sql();
+        std::string rhs;
+        rhs.reserve(2 + sub.size());
+        rhs += '(';
+        rhs += std::move(sub);
+        rhs += ')';
+        return {column_traits<Col>::column_name(), " >= ", std::move(rhs)};
+    }
+};
+
+// col_ref<Col> — inline variable for natural operator-based WHERE expressions.
+template <ColumnFieldType Col>
+inline constexpr col_expr<Col> col_ref{};
+
+// ===================================================================
+// DDL Command Builders — CREATE TABLE, DROP TABLE, CREATE DATABASE, etc.
+//
+// Entry points are free functions:
+//   create_database<DB>()                                         — CREATE DATABASE db
+//   create_database<DB>().if_not_exists()                         — CREATE DATABASE IF NOT EXISTS db
+//   create_table<T>()                                              — CREATE TABLE T (...)
+//   create_table<T>().if_not_exists()                             — CREATE TABLE IF NOT EXISTS T (...)
+//   create_temporary_table<T>()                                   — CREATE TEMPORARY TABLE T (...)
+//   create_temporary_table<T>().if_not_exists()                   — CREATE TEMPORARY TABLE IF NOT EXISTS T (...)
+//   drop_table<T>()                                               — DROP TABLE T
+//   drop_table<T>().if_exists()                                   — DROP TABLE IF EXISTS T
+//   drop_temporary_table<T>()                                     — DROP TEMPORARY TABLE T
+//   drop_temporary_table<T>().if_exists()                         — DROP TEMPORARY TABLE IF EXISTS T
+//   create_table<NewT>().as(select_query)                         — CREATE TABLE NewT AS <select>
+//   create_table<NewT>().if_not_exists().as(select_query)         — CREATE TABLE IF NOT EXISTS NewT AS <select>
+//   create_temporary_table<NewT>().as(select_query)               — CREATE TEMPORARY TABLE NewT AS <select>
+//   create_temporary_table<NewT>().if_not_exists().as(select_query) — CREATE TEMPORARY TABLE IF NOT EXISTS NewT AS
+//   <select>
+//   create_table<NewT>().like<SourceT>()                          — CREATE TABLE NewT LIKE SourceT
+//   create_table<NewT>().if_not_exists().like<SourceT>()          — CREATE TABLE IF NOT EXISTS NewT LIKE SourceT
+//
+// Commands can be sequenced with .then():
+//   create_database<DB>().then().create_table<T>().if_not_exists()
+//   drop_table<T>().if_exists().then().create_table<T>().if_not_exists()
+//
+// All stages terminate with .build_sql() -> std::string.
+// Note: use<DB>() (MySQL extension) is in sql_extension.hpp.
+// ===================================================================
+
+namespace ddl_detail {
+
+template <typename T, std::size_t... Is>
+void append_column_defs(std::ostringstream& sql, std::index_sequence<Is...>) {
+    std::size_t count = 0;
+    (
+        [&] {
+            using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            if (count > 0) {
+                sql << ",\n";
+            }
+            std::string_view field_name = field_schema<T, Is>::name();
+            std::string sql_type_override = field_sql_type_override<T, Is>();
+            std::string sql_type = sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
+            sql << "    " << field_name << " " << sql_type;
+            if constexpr (!is_field_nullable_v<field_type>) {
+                sql << " NOT NULL";
+            }
+            if (Is == 0) {
+                sql << " PRIMARY KEY AUTO_INCREMENT";
+            }
+            ++count;
+        }(),
+        ...);
+
+    // Emit FOREIGN KEY constraints for fields that have them declared.
+    (
+        [&] {
+            if constexpr (has_foreign_key_v<T, Is>) {
+                sql << ",\n    FOREIGN KEY (" << field_schema<T, Is>::name() << ") REFERENCES "
+                    << foreign_key_schema<T, Is>::referenced_table() << "("
+                    << foreign_key_schema<T, Is>::referenced_column() << ")";
+                if constexpr (!foreign_key_schema<T, Is>::on_delete().empty()) {
+                    sql << " ON DELETE " << foreign_key_schema<T, Is>::on_delete();
+                }
+                if constexpr (!foreign_key_schema<T, Is>::on_update().empty()) {
+                    sql << " ON UPDATE " << foreign_key_schema<T, Is>::on_update();
+                }
+            }
+        }(),
+        ...);
+}
+
+template <typename T>
+std::string make_column_defs() {
+    std::ostringstream sql;
+    append_column_defs<T>(sql, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+    return sql.str();
+}
+
+template <typename T>
+concept BuildsSql = requires(T const& t) {
+    { t.build_sql() } -> std::convertible_to<std::string>;
+};
+
+// Forward declarations
+class ddl_continuation;
+template <typename T>
+class create_table_builder;
+template <typename T>
+class create_table_cond_builder;
+template <typename T>
+class create_table_as_builder;
+template <typename T, typename SourceT>
+class create_table_like_builder;
+template <typename T>
+class drop_table_builder;
+template <typename T>
+class drop_table_cond_builder;
+template <typename T>
+class create_database_builder;
+template <typename T>
+class create_database_if_not_exists_builder;
+template <typename T>
+class drop_database_builder;
+template <typename T>
+class drop_database_if_exists_builder;
+class create_database_named_builder;
+class create_database_named_if_not_exists_builder;
+class drop_database_named_builder;
+class drop_database_named_if_exists_builder;
+template <typename T>
+class use_builder;  // defined in sql_extension.hpp
+
+// ---------------------------------------------------------------
+// ddl_continuation — returned by .then(), allows chaining
+// ---------------------------------------------------------------
+class ddl_continuation {
+public:
+    explicit ddl_continuation(std::string sql) : sql_(std::move(sql)) {
+    }
+
+    template <typename T>
+    [[nodiscard]] create_table_builder<T> create_table() const;
+
+    template <typename T>
+    [[nodiscard]] create_table_builder<T> create_temporary_table() const;
+
+    template <typename T>
+    [[nodiscard]] drop_table_builder<T> drop_table() const;
+
+    template <typename T>
+    [[nodiscard]] drop_table_builder<T> drop_temporary_table() const;
+
+    template <Database T>
+    [[nodiscard]] create_database_builder<T> create_database() const;
+
+    [[nodiscard]] create_database_named_builder create_database(database_name const& name) const;
+
+    template <Database T>
+    [[nodiscard]] drop_database_builder<T> drop_database() const;
+
+    [[nodiscard]] drop_database_named_builder drop_database(database_name const& name) const;
+
+    // Defined in sql_extension.hpp — include it to enable this chain.
+    template <Database T>
+    [[nodiscard]] use_builder<T> use() const;
+
+    template <typename T>
+    [[nodiscard]] auto create_view() const;
+
+    template <typename T>
+    [[nodiscard]] auto drop_view() const;
+
+    template <typename From, typename To>
+    [[nodiscard]] auto rename_table() const;
+
+private:
+    std::string sql_;
+};
+
+template <typename T>
+class create_view_as_builder;
+
+template <typename T>
+class create_view_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_view_builder(std::string prior = {}, bool or_replace = false)
+        : prior_sql_(std::move(prior)), or_replace_(or_replace) {
+    }
+
+    [[nodiscard]] create_view_builder or_replace() const {
+        return create_view_builder{prior_sql_, true};
+    }
+
+    template <BuildsSql SelectQuery>
+    [[nodiscard]] create_view_as_builder<T> as(SelectQuery const& query) const {
+        return create_view_as_builder<T>{prior_sql_, or_replace_, query.build_sql()};
+    }
+
+private:
+    std::string prior_sql_;
+    bool or_replace_;
+};
+
+template <typename T>
+class create_view_as_builder {
+public:
+    using ddl_tag_type = void;
+
+    create_view_as_builder(std::string prior, bool or_replace, std::string select_sql)
+        : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_(std::move(select_sql)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto view_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(prior_sql_.size() + 20 + view_name.size() + select_sql_.size());
+        s += prior_sql_;
+        s += "CREATE ";
+        if (or_replace_) {
+            s += "OR REPLACE ";
+        }
+        s += "VIEW ";
+        s += view_name;
+        s += " AS ";
+        s += select_sql_;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+    bool or_replace_;
+    std::string select_sql_;
+};
+
+template <typename T>
+class drop_view_cond_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_view_cond_builder(std::string prefix) : prefix_(std::move(prefix)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prefix_ + "IF EXISTS " + std::string(table_name_for<T>::value().to_string_view()) + ";\n";
+    }
+
+private:
+    std::string prefix_;
+};
+
+template <typename T>
+class drop_view_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_view_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] drop_view_cond_builder<T> if_exists() const {
+        return drop_view_cond_builder<T>{prior_sql_ + "DROP VIEW "};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "DROP VIEW " + std::string(table_name_for<T>::value().to_string_view()) + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+template <typename From, typename To>
+class rename_table_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit rename_table_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "RENAME TABLE " + std::string(table_name_for<From>::value().to_string_view()) + " TO " +
+               std::string(table_name_for<To>::value().to_string_view()) + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+template <typename Table, ColumnDescriptor... Cols>
+class create_index_builder {
+public:
+    using ddl_tag_type = void;
+
+    create_index_builder(std::string name, std::string prior = {}, bool unique = false)
+        : prior_sql_(std::move(prior)), name_(std::move(name)), unique_(unique) {
+    }
+
+    [[nodiscard]] create_index_builder unique() const {
+        return create_index_builder{name_, prior_sql_, true};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::ostringstream ss;
+        ss << prior_sql_ << "CREATE ";
+        if (unique_) {
+            ss << "UNIQUE ";
+        }
+        ss << "INDEX " << name_ << " ON " << table_name_for<Table>::value().to_string_view() << " (";
+        bool first = true;
+        ((ss << (first ? "" : ", ") << column_traits<Cols>::column_name(), first = false), ...);
+        ss << ");\n";
+        return ss.str();
+    }
+
+private:
+    std::string prior_sql_;
+    std::string name_;
+    bool unique_;
+};
+
+template <typename Table>
+class drop_index_builder {
+public:
+    using ddl_tag_type = void;
+
+    drop_index_builder(std::string name, std::string prior = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "DROP INDEX " + name_ + " ON " +
+               std::string(table_name_for<Table>::value().to_string_view()) + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+    std::string name_;
+};
+
+template <typename Table>
+class alter_table_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit alter_table_builder(std::string prior = {}, std::vector<std::string> actions = {})
+        : prior_sql_(std::move(prior)), actions_(std::move(actions)) {
+    }
+
+    template <ColumnDescriptor Col>
+    [[nodiscard]] alter_table_builder add_column(std::string sql_type, bool not_null = true) const {
+        auto copy = *this;
+        std::string action = "ADD COLUMN " + std::string(column_traits<Col>::column_name()) + " " + std::move(sql_type);
+        if (not_null) {
+            action += " NOT NULL";
+        }
+        copy.actions_.push_back(std::move(action));
+        return copy;
+    }
+
+    template <ColumnDescriptor Col>
+    [[nodiscard]] alter_table_builder drop_column() const {
+        auto copy = *this;
+        copy.actions_.push_back("DROP COLUMN " + std::string(column_traits<Col>::column_name()));
+        return copy;
+    }
+
+    template <ColumnDescriptor Col>
+    [[nodiscard]] alter_table_builder rename_column(std::string new_name) const {
+        auto copy = *this;
+        copy.actions_.push_back("RENAME COLUMN " + std::string(column_traits<Col>::column_name()) + " TO " +
+                                std::move(new_name));
+        return copy;
+    }
+
+    template <ColumnDescriptor Col>
+    [[nodiscard]] alter_table_builder modify_column(std::string sql_type, bool not_null = true) const {
+        auto copy = *this;
+        std::string action =
+            "MODIFY COLUMN " + std::string(column_traits<Col>::column_name()) + " " + std::move(sql_type);
+        if (not_null) {
+            action += " NOT NULL";
+        }
+        copy.actions_.push_back(std::move(action));
+        return copy;
+    }
+
+    template <typename NewTable>
+    [[nodiscard]] alter_table_builder rename_to() const {
+        auto copy = *this;
+        copy.actions_.push_back("RENAME TO " + std::string(table_name_for<NewTable>::value().to_string_view()));
+        return copy;
+    }
+
+    [[nodiscard]] alter_table_builder action(std::string sql_action) const {
+        auto copy = *this;
+        copy.actions_.push_back(std::move(sql_action));
+        return copy;
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::ostringstream ss;
+        ss << prior_sql_ << "ALTER TABLE " << table_name_for<Table>::value().to_string_view() << ' ';
+        bool first = true;
+        for (auto const& action : actions_) {
+            if (!first) {
+                ss << ", ";
+            }
+            ss << action;
+            first = false;
+        }
+        ss << ";\n";
+        return ss.str();
+    }
+
+private:
+    std::string prior_sql_;
+    std::vector<std::string> actions_;
+};
+
+// ---------------------------------------------------------------
+// create_table_cond_builder — after create_table<T>().if_not_exists()
+// ---------------------------------------------------------------
+template <typename T>
+class create_table_cond_builder {
+public:
+    using ddl_tag_type = void;
+
+    create_table_cond_builder(std::string create_prefix, std::string cols)
+        : create_prefix_(std::move(create_prefix)), column_defs_(std::move(cols)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    template <BuildsSql SelectQuery>
+    [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const;
+
+    template <typename SourceT>
+    [[nodiscard]] create_table_like_builder<T, SourceT> like() const {
+        return create_table_like_builder<T, SourceT>{create_prefix_ + "IF NOT EXISTS "};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(create_prefix_.size() + 14 + table_name.size() + 4 + column_defs_.size() + 4);
+        s += create_prefix_;
+        s += "IF NOT EXISTS ";
+        s += table_name;
+        s += " (\n";
+        s += column_defs_;
+        s += "\n);\n";
+        return s;
+    }
+
+private:
+    std::string create_prefix_;
+    std::string column_defs_;
+};
+
+// ---------------------------------------------------------------
+// create_table_builder — after create_table<T>() or create_temporary_table<T>()
+// ---------------------------------------------------------------
+template <typename T>
+class create_table_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_table_builder(std::string prior = {}, bool temporary = false)
+        : prior_sql_(std::move(prior)), is_temporary_(temporary), column_defs_(ddl_detail::make_column_defs<T>()) {
+    }
+
+    [[nodiscard]] create_table_cond_builder<T> if_not_exists() const {
+        return create_table_cond_builder<T>{build_create_prefix(), column_defs_};
+    }
+
+    template <BuildsSql SelectQuery>
+    [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const {
+        return create_table_as_builder<T>{build_create_prefix(), query.build_sql(), false};
+    }
+
+    template <typename SourceT>
+    [[nodiscard]] create_table_like_builder<T, SourceT> like() const {
+        return create_table_like_builder<T, SourceT>{build_create_prefix()};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto prefix = build_create_prefix();
+        std::string s;
+        s.reserve(prefix.size() + table_name.size() + 4 + column_defs_.size() + 4);
+        s += prefix;
+        s += table_name;
+        s += " (\n";
+        s += column_defs_;
+        s += "\n);\n";
+        return s;
+    }
+
+private:
+    [[nodiscard]] std::string build_create_prefix() const {
+        return prior_sql_ + "CREATE " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
+    }
+
+    std::string prior_sql_;
+    bool is_temporary_;
+    std::string column_defs_;
+};
+
+// ---------------------------------------------------------------
+// create_table_like_builder — after create_table<NewT>().like<SourceT>() or
+//                                    create_table<NewT>().if_not_exists().like<SourceT>()
+// ---------------------------------------------------------------
+template <typename T, typename SourceT>
+class create_table_like_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_table_like_builder(std::string create_prefix) : create_prefix_(std::move(create_prefix)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto new_table = table_name_for<T>::value().to_string_view();
+        const auto src_table = table_name_for<SourceT>::value().to_string_view();
+        std::string s;
+        s.reserve(create_prefix_.size() + new_table.size() + 7 + src_table.size() + 2);
+        s += create_prefix_;
+        s += new_table;
+        s += " LIKE ";
+        s += src_table;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string create_prefix_;
+};
+
+// ---------------------------------------------------------------
+// drop_table_cond_builder — after drop_table<T>().if_exists()
+// ---------------------------------------------------------------
+template <typename T>
+class drop_table_cond_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_table_cond_builder(std::string drop_prefix) : drop_prefix_(std::move(drop_prefix)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(drop_prefix_.size() + 11 + table_name.size() + 2);
+        s += drop_prefix_;
+        s += "IF EXISTS ";
+        s += table_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string drop_prefix_;
+};
+
+// ---------------------------------------------------------------
+// drop_table_builder — after drop_table<T>() or drop_temporary_table<T>()
+// ---------------------------------------------------------------
+template <typename T>
+class drop_table_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_table_builder(std::string prior = {}, bool temporary = false)
+        : prior_sql_(std::move(prior)), is_temporary_(temporary) {
+    }
+
+    [[nodiscard]] drop_table_cond_builder<T> if_exists() const {
+        return drop_table_cond_builder<T>{build_drop_prefix()};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto prefix = build_drop_prefix();
+        std::string s;
+        s.reserve(prefix.size() + table_name.size() + 2);
+        s += prefix;
+        s += table_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    [[nodiscard]] std::string build_drop_prefix() const {
+        return prior_sql_ + "DROP " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
+    }
+
+    std::string prior_sql_;
+    bool is_temporary_;
+};
+
+// ---------------------------------------------------------------
+// create_database_if_not_exists_builder — after create_database<DB>().if_not_exists()
+// ---------------------------------------------------------------
+template <typename T>
+class create_database_if_not_exists_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_database_if_not_exists_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = database_name_for<T>::value();
+        std::string s;
+        s.reserve(prior_sql_.size() + 22 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "CREATE DATABASE IF NOT EXISTS ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
+// create_database_builder — after create_database<DB>()
+// ---------------------------------------------------------------
+template <typename T>
+class create_database_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_database_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] create_database_if_not_exists_builder<T> if_not_exists() const {
+        return create_database_if_not_exists_builder<T>{prior_sql_};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = database_name_for<T>::value();
+        std::string s;
+        s.reserve(prior_sql_.size() + 16 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "CREATE DATABASE ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
+// create_database_named_if_not_exists_builder — runtime database name
+// ---------------------------------------------------------------
+class create_database_named_if_not_exists_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_database_named_if_not_exists_builder(database_name name, std::string prior = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "CREATE DATABASE IF NOT EXISTS " + name_.to_string() + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+    database_name name_;
+};
+
+// ---------------------------------------------------------------
+// create_database_named_builder — runtime database name
+// ---------------------------------------------------------------
+class create_database_named_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_database_named_builder(database_name name, std::string prior = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    }
+
+    [[nodiscard]] create_database_named_if_not_exists_builder if_not_exists() const {
+        return create_database_named_if_not_exists_builder{name_, prior_sql_};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "CREATE DATABASE " + name_.to_string() + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+    database_name name_;
+};
+
+// ---------------------------------------------------------------
+// drop_database_if_exists_builder — after drop_database<DB>().if_exists()
+// ---------------------------------------------------------------
+template <typename T>
+class drop_database_if_exists_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_database_if_exists_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = database_name_for<T>::value();
+        std::string s;
+        s.reserve(prior_sql_.size() + 21 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "DROP DATABASE IF EXISTS ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
+// drop_database_builder — after drop_database<DB>()
+// ---------------------------------------------------------------
+template <typename T>
+class drop_database_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_database_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] drop_database_if_exists_builder<T> if_exists() const {
+        return drop_database_if_exists_builder<T>{prior_sql_};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = database_name_for<T>::value();
+        std::string s;
+        s.reserve(prior_sql_.size() + 14 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "DROP DATABASE ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
+// drop_database_named_if_exists_builder — runtime database name
+// ---------------------------------------------------------------
+class drop_database_named_if_exists_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_database_named_if_exists_builder(database_name name, std::string prior = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "DROP DATABASE IF EXISTS " + name_.to_string() + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+    database_name name_;
+};
+
+// ---------------------------------------------------------------
+// drop_database_named_builder — runtime database name
+// ---------------------------------------------------------------
+class drop_database_named_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit drop_database_named_builder(database_name name, std::string prior = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    }
+
+    [[nodiscard]] drop_database_named_if_exists_builder if_exists() const {
+        return drop_database_named_if_exists_builder{name_, prior_sql_};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return prior_sql_ + "DROP DATABASE " + name_.to_string() + ";\n";
+    }
+
+private:
+    std::string prior_sql_;
+    database_name name_;
+};
+
+// Out-of-line definitions for ddl_continuation
+template <typename T>
+[[nodiscard]] create_table_builder<T> ddl_continuation::create_table() const {
+    return create_table_builder<T>{sql_};
+}
+
+template <typename T>
+[[nodiscard]] create_table_builder<T> ddl_continuation::create_temporary_table() const {
+    return create_table_builder<T>{sql_, true};
+}
+
+template <typename T>
+[[nodiscard]] drop_table_builder<T> ddl_continuation::drop_table() const {
+    return drop_table_builder<T>{sql_};
+}
+
+template <typename T>
+[[nodiscard]] drop_table_builder<T> ddl_continuation::drop_temporary_table() const {
+    return drop_table_builder<T>{sql_, true};
+}
+
+template <Database T>
+[[nodiscard]] create_database_builder<T> ddl_continuation::create_database() const {
+    return create_database_builder<T>{sql_};
+}
+
+inline create_database_named_builder ddl_continuation::create_database(database_name const& name) const {
+    return create_database_named_builder{name, sql_};
+}
+
+template <Database T>
+[[nodiscard]] drop_database_builder<T> ddl_continuation::drop_database() const {
+    return drop_database_builder<T>{sql_};
+}
+
+inline drop_database_named_builder ddl_continuation::drop_database(database_name const& name) const {
+    return drop_database_named_builder{name, sql_};
+}
+
+template <typename T>
+auto ddl_continuation::create_view() const {
+    return create_view_builder<T>{sql_};
+}
+
+template <typename T>
+auto ddl_continuation::drop_view() const {
+    return drop_view_builder<T>{sql_};
+}
+
+template <typename From, typename To>
+auto ddl_continuation::rename_table() const {
+    return rename_table_builder<From, To>{sql_};
+}
+
+// ---------------------------------------------------------------
+// create_table_as_builder — after create_table<T>().as(query) or
+//                           create_table<T>().if_not_exists().as(query)
+// ---------------------------------------------------------------
+template <typename T>
+class create_table_as_builder {
+public:
+    using ddl_tag_type = void;
+
+    create_table_as_builder(std::string create_prefix, std::string select_sql, bool if_not_exists)
+        : create_prefix_(std::move(create_prefix)), select_sql_(std::move(select_sql)), if_not_exists_(if_not_exists) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string_view cond = if_not_exists_ ? std::string_view{"IF NOT EXISTS "} : std::string_view{};
+        std::string s;
+        s.reserve(create_prefix_.size() + cond.size() + table_name.size() + 5 + select_sql_.size() + 2);
+        s += create_prefix_;
+        s += cond;
+        s += table_name;
+        s += " AS ";
+        s += select_sql_;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string create_prefix_;
+    std::string select_sql_;
+    bool if_not_exists_;
+};
+
+// Out-of-line .as() definition for create_table_cond_builder (needs create_table_as_builder to be complete)
+template <typename T>
+template <BuildsSql SelectQuery>
+[[nodiscard]] create_table_as_builder<T> create_table_cond_builder<T>::as(SelectQuery const& query) const {
+    return create_table_as_builder<T>{create_prefix_, query.build_sql(), true};
+}
+
+}  // namespace ddl_detail
+
+template <typename T>
+[[nodiscard]] ddl_detail::create_table_builder<T> create_table() {
+    return ddl_detail::create_table_builder<T>{};
+}
+
+template <typename T>
+[[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table() {
+    return ddl_detail::create_table_builder<T>{{}, true};
+}
+
+template <typename T>
+[[nodiscard]] ddl_detail::drop_table_builder<T> drop_table() {
+    return ddl_detail::drop_table_builder<T>{};
+}
+
+template <typename T>
+[[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table() {
+    return ddl_detail::drop_table_builder<T>{{}, true};
+}
+
+template <typename T>
+[[nodiscard]] ddl_detail::create_view_builder<T> create_view() {
+    return ddl_detail::create_view_builder<T>{};
+}
+
+template <typename T>
+[[nodiscard]] ddl_detail::drop_view_builder<T> drop_view() {
+    return ddl_detail::drop_view_builder<T>{};
+}
+
+template <typename From, typename To>
+[[nodiscard]] ddl_detail::rename_table_builder<From, To> rename_table() {
+    return ddl_detail::rename_table_builder<From, To>{};
+}
+
+template <typename Table, ColumnDescriptor... Cols>
+[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(std::string name) {
+    return ddl_detail::create_index_builder<Table, Cols...>{std::move(name)};
+}
+
+template <typename Table>
+[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(std::string name) {
+    return ddl_detail::drop_index_builder<Table>{std::move(name)};
+}
+
+template <typename Table>
+[[nodiscard]] ddl_detail::alter_table_builder<Table> alter_table() {
+    return ddl_detail::alter_table_builder<Table>{};
+}
+
+/**
+ * create_database<DB>() — CREATE DATABASE <db> [IF NOT EXISTS].
+ *
+ * DB must inherit from database_schema.
+ *
+ * Example:
+ *   struct my_db : ds_mysql::database_schema {
+ *       struct symbol { ... };
+ *   };
+ *
+ *   db.execute(create_database<my_db>());
+ *   db.execute(create_database<my_db>().if_not_exists());
+ *   db.execute(create_database<my_db>().then().create_table<my_db::symbol>());
+ */
+template <Database T>
+[[nodiscard]] ddl_detail::create_database_builder<T> create_database() {
+    return ddl_detail::create_database_builder<T>{};
+}
+
+[[nodiscard]] inline ddl_detail::create_database_named_builder create_database(database_name const& name) {
+    return ddl_detail::create_database_named_builder{name};
+}
+
+/**
+ * drop_database<DB>() — DROP DATABASE <db> [IF EXISTS].
+ *
+ * DB must inherit from database_schema.
+ */
+template <Database T>
+[[nodiscard]] ddl_detail::drop_database_builder<T> drop_database() {
+    return ddl_detail::drop_database_builder<T>{};
+}
+
+[[nodiscard]] inline ddl_detail::drop_database_named_builder drop_database(database_name const& name) {
+    return ddl_detail::drop_database_named_builder{name};
+}
+
+// ===================================================================
+// DML Query Builders
+//
+// Entry points:
+//   describe<T>()
+//       → build_sql()                           — DESCRIBE T
+//
+//   insert_into<T>()
+//       .values(row)
+//       → build_sql()                           — INSERT INTO T (...) VALUES (...)
+//       → .on_duplicate_key_update(col1, ...)   — ... ON DUPLICATE KEY UPDATE ...
+//       .values(rows) where rows is std::ranges::input_range<T>
+//       → build_sql()                           — INSERT INTO T (...) VALUES (...), (...), ...
+//
+//   update<T>()
+//       .set(col1, col2, ...)
+//       → build_sql()                           — UPDATE T SET ...
+//       .where(cond) → build_sql()              — UPDATE T SET ... WHERE cond
+//
+//   delete_from<T>()
+//       → build_sql()                           — DELETE FROM T
+//       .where(cond) → build_sql()              — DELETE FROM T WHERE cond
+//
+//   count<T>()
+//       → build_sql()                           — SELECT COUNT(*) FROM T
+//       .where(cond) → build_sql()              — SELECT COUNT(*) FROM T WHERE cond
+//
+//   truncate_table<T>()
+//       → build_sql()                           — TRUNCATE TABLE T
+// ===================================================================
+
+namespace dml_detail {
+
+// FieldOf<Col, T> — true when Col is a ColumnFieldType that is a direct field of T.
+template <typename Col, typename T, std::size_t... Is>
+consteval bool is_field_of_impl(std::index_sequence<Is...>) {
+    return (std::same_as<boost::pfr::tuple_element_t<Is, T>, Col> || ...);
+}
+
+template <typename Col, typename T>
+concept FieldOf =
+    ColumnFieldType<Col> && is_field_of_impl<Col, T>(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+
+template <typename T, std::size_t... Is>
+std::string generate_values_impl(T const& row, std::index_sequence<Is...>) {
+    std::ostringstream values;
+    std::size_t count = 0;
+    (
+        [&] {
+            if (count > 0) {
+                values << ", ";
+            }
+            values << sql_detail::to_sql_value(boost::pfr::get<Is>(row));
+            ++count;
+        }(),
+        ...);
+    return values.str();
+}
+
+template <typename T>
+std::string generate_values(T const& row) {
+    return generate_values_impl(row, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+}
+
+template <typename T, std::size_t... Is>
+std::string generate_column_list_impl(std::index_sequence<Is...>) {
+    std::ostringstream columns;
+    std::size_t count = 0;
+    (
+        [&] {
+            if (count > 0) {
+                columns << ", ";
+            }
+            columns << field_schema<T, Is>::name();
+            ++count;
+        }(),
+        ...);
+    return columns.str();
+}
+
+template <typename T>
+std::string const& generate_column_list() {
+    static const std::string cached =
+        generate_column_list_impl<T>(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+    return cached;
+}
+
+// ---------------------------------------------------------------
+// describe_builder
+// ---------------------------------------------------------------
+template <typename T>
+class describe_builder {
+public:
+    // MySQL DESCRIBE returns: Field, Type, Null, Key, Default (nullable), Extra.
+    using result_row_type =
+        std::tuple<std::string, std::string, std::string, std::string, std::optional<std::string>, std::string>;
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(9 + table_name.size());
+        s += "DESCRIBE ";
+        s += table_name;
+        return s;
+    }
+};
+
+// ---------------------------------------------------------------
+// insert_into_values_builder / insert_into_builder
+// ---------------------------------------------------------------
+template <typename T>
+class insert_into_values_builder {
+public:
+    insert_into_values_builder(std::string column_list, std::string values, bool bulk = false)
+        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    }
+
+    // on_duplicate_key_update(col1, col2, ...) — appends ON DUPLICATE KEY UPDATE clause.
+    // Each argument must be a FieldOf<T> column_field instance carrying the new value.
+    template <FieldOf<T>... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] std::string on_duplicate_key_update(Cols const&... assignments) const {
+        std::ostringstream ss;
+        ss << build_sql() << " ON DUPLICATE KEY UPDATE ";
+        bool first = true;
+        (
+            [&](auto const& field) {
+                if (!first) {
+                    ss << ", ";
+                }
+                using C = std::decay_t<decltype(field)>;
+                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
+                first = false;
+            }(assignments),
+            ...);
+        return ss.str();
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        if (bulk_) {
+            s.reserve(12 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            s += "INSERT INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES ";
+            s += values_;
+        } else {
+            s.reserve(12 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            s += "INSERT INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES (";
+            s += values_;
+            s += ')';
+        }
+        return s;
+    }
+
+private:
+    std::string column_list_;
+    std::string values_;
+    bool bulk_ = false;
+};
+
+template <typename T>
+class insert_into_builder {
+public:
+    [[nodiscard]] insert_into_values_builder<T> values(T const& row) const {
+        return {dml_detail::generate_column_list<T>(), dml_detail::generate_values(row)};
+    }
+
+    template <std::ranges::input_range Rows>
+        requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
+    [[nodiscard]] insert_into_values_builder<T> values(Rows&& rows) const {
+        std::ostringstream values_sql;
+        bool first = true;
+        for (auto const& row : rows) {
+            if (!first) {
+                values_sql << ", ";
+            }
+            values_sql << "(" << dml_detail::generate_values(row) << ")";
+            first = false;
+        }
+        if (first) {
+            return {dml_detail::generate_column_list<T>(), {}};
+        }
+        return {dml_detail::generate_column_list<T>(), values_sql.str(), /*bulk=*/true};
+    }
+};
+
+// ---------------------------------------------------------------
+// update builders
+// ---------------------------------------------------------------
+
+template <typename T>
+class update_set_where_builder {
+public:
+    update_set_where_builder(std::string set, where_condition where) : set_(std::move(set)), where_(std::move(where)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        auto where_sql = where_.build_sql();
+        std::string s;
+        s.reserve(7 + table_name.size() + 5 + set_.size() + 7 + where_sql.size());
+        s += "UPDATE ";
+        s += table_name;
+        s += " SET ";
+        s += set_;
+        s += " WHERE ";
+        s += std::move(where_sql);
+        return s;
+    }
+
+private:
+    std::string set_;
+    where_condition where_;
+};
+
+template <typename T>
+class update_set_builder {
+public:
+    explicit update_set_builder(std::string set) : set_(std::move(set)) {
+    }
+
+    [[nodiscard]] update_set_where_builder<T> where(where_condition condition) const {
+        return {set_, std::move(condition)};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(7 + table_name.size() + 5 + set_.size());
+        s += "UPDATE ";
+        s += table_name;
+        s += " SET ";
+        s += set_;
+        return s;
+    }
+
+private:
+    std::string set_;
+};
+
+template <typename T>
+class update_builder {
+public:
+    template <FieldOf<T>... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] update_set_builder<T> set(Cols const&... assignments) const {
+        std::ostringstream ss;
+        bool first = true;
+        (
+            [&](auto const& field) {
+                if (!first) {
+                    ss << ", ";
+                }
+                using C = std::decay_t<decltype(field)>;
+                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
+                first = false;
+            }(assignments),
+            ...);
+        return update_set_builder<T>{ss.str()};
+    }
+};
+
+// ---------------------------------------------------------------
+// delete_from builders
+// ---------------------------------------------------------------
+template <typename T>
+class delete_from_where_builder {
+public:
+    delete_from_where_builder(std::string base_sql, where_condition where)
+        : base_sql_(std::move(base_sql)), where_(std::move(where)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        auto where_sql = where_.build_sql();
+        std::string s;
+        s.reserve(base_sql_.size() + 7 + where_sql.size());
+        s += base_sql_;
+        s += " WHERE ";
+        s += std::move(where_sql);
+        return s;
+    }
+
+private:
+    std::string base_sql_;
+    where_condition where_;
+};
+
+template <typename T>
+class delete_from_builder {
+public:
+    [[nodiscard]] delete_from_where_builder<T> where(where_condition condition) const {
+        return {build_sql(), std::move(condition)};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(12 + table_name.size());
+        s += "DELETE FROM ";
+        s += table_name;
+        return s;
+    }
+};
+
+// ---------------------------------------------------------------
+// truncate_table_builder
+// ---------------------------------------------------------------
+template <typename T>
+class truncate_table_builder {
+public:
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        s.reserve(15 + table_name.size());
+        s += "TRUNCATE TABLE ";
+        s += table_name;
+        return s;
+    }
+};
+
+}  // namespace dml_detail
+
+/**
+ * describe<T>() — DESCRIBE <table>.
+ */
+template <typename T>
+[[nodiscard]] dml_detail::describe_builder<T> describe() {
+    return {};
+}
+
+/**
+ * insert_into<T>() — INSERT INTO <table> (...) VALUES (...).
+ *
+ * Single-row insert:
+ *   insert_into<T>().values(row).build_sql()
+ *
+ * Bulk insert (multiple rows in one statement):
+ *   insert_into<T>().values(rows).build_sql()   // rows is std::ranges::input_range<T>
+ *
+ * Upsert (INSERT … ON DUPLICATE KEY UPDATE):
+ *   insert_into<T>().values(row).on_duplicate_key_update(T::col1{v1}, T::col2{v2}, ...)
+ *
+ * Example:
+ *   symbol row;
+ *   row.ticker_     = "AAPL";
+ *   row.instrument_ = "Stock";
+ *   db.execute(insert_into<symbol>().values(row));
+ *
+ *   // Upsert:
+ *   db.execute(insert_into<symbol>().values(row)
+ *       .on_duplicate_key_update(symbol::ticker{"AAPL"}, symbol::instrument{"Stock"}));
+ *
+ *   // Bulk:
+ *   db.execute(insert_into<symbol>().values(std::array{row1, row2}).build_sql());
+ */
+template <typename T>
+[[nodiscard]] dml_detail::insert_into_builder<T> insert_into() {
+    return {};
+}
+
+/**
+ * update<T>() — UPDATE <table> SET ... [WHERE ...].
+ *
+ * Advance with .set(col1, col2, ...) supplying typed column field instances,
+ * then optionally .where(cond).
+ *
+ * Example:
+ *   db.execute(update<symbol>().set(symbol::ticker{"MSFT"}).where(equal<symbol::id>(1u)));
+ */
+template <typename T>
+[[nodiscard]] dml_detail::update_builder<T> update() {
+    return {};
+}
+
+/**
+ * delete_from<T>() — DELETE FROM <table> [WHERE ...].
+ *
+ * Example:
+ *   db.execute(delete_from<symbol>().where(equal<symbol::id>(1u)));
+ */
+template <typename T>
+[[nodiscard]] dml_detail::delete_from_builder<T> delete_from() {
+    return {};
+}
+
+// ===================================================================
+// Aggregate projections — used with select<Proj...>().from<Table>()
+//
+//   count_all      — COUNT(*)       → uint64_t
+//   count_col<Col> — COUNT(col)     → uint64_t
+//   sum<Col>       — SUM(col)       → double
+//   avg<Col>       — AVG(col)       → double
+//   min_of<Col>    — MIN(col)       → value_type of Col
+//   max_of<Col>    — MAX(col)       → value_type of Col
+//
+// Aggregate tags also support typed comparison operators via free functions
+// (defined after projection_traits), enabling HAVING predicate syntax:
+//   sum<Col>() > 100.0       → SUM(col) > 100.000000
+//   avg<Col>() >= 4.0        → AVG(col) >= 4.000000
+//   min_of<Col>() < 100u     → MIN(col) < 100
+// For COUNT(*), prefer the count() factory which returns an agg_expr with
+// additional named methods (like .greater_than()).
+// ===================================================================
+
+struct count_all {};
+
+template <ColumnDescriptor Col>
+struct count_col {};
+
+template <ColumnDescriptor Col>
+struct sum {};
+
+template <ColumnDescriptor Col>
+struct avg {};
+
+template <ColumnDescriptor Col>
+struct min_of {};
+
+template <ColumnDescriptor Col>
+struct max_of {};
+
+// count_distinct<Col> — COUNT(DISTINCT col) → uint64_t
+template <ColumnDescriptor Col>
+struct count_distinct {};
+
+// group_concat<Col> — GROUP_CONCAT(col) → std::string  (MySQL-specific)
+template <ColumnDescriptor Col>
+struct group_concat {};
+
+// ===================================================================
+// aliased_projection — wraps any Projection with a SQL alias
+//
+// Uses a runtime string for the alias name, stored via a static helper.
+// For use with select builder's .with_alias<Index>("name") method.
+// ===================================================================
+
+// ===================================================================
+// coalesce<Col1, Col2> / ifnull<Col1, Col2>
+//
+//   select<coalesce_of<Col1, Col2>>()  → COALESCE(col1, col2)
+//   select<ifnull_of<Col1, Col2>>()    → IFNULL(col1, col2)
+// ===================================================================
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+struct coalesce_of {};
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+struct ifnull_of {};
+
+template <typename P>
+struct abs_of {};
+
+template <typename P>
+struct floor_of {};
+
+template <typename P>
+struct ceil_of {};
+
+template <typename P>
+struct upper_of {};
+
+template <typename P>
+struct lower_of {};
+
+template <typename P>
+struct trim_of {};
+
+template <typename P>
+struct length_of {};
+
+template <typename P, int Scale>
+struct round_to {};
+
+template <typename P, int Scale>
+struct format_to {};
+
+template <typename A, typename B>
+struct mod_of {};
+
+template <typename A, typename B>
+struct power_of {};
+
+template <typename... Ps>
+struct concat_of {};
+
+template <typename P, std::size_t Start, std::size_t Length>
+struct substring_of {};
+
+template <typename P, fixed_string Format>
+struct date_format_of {};
+
+template <sql_date_part Part, typename P>
+struct extract_of {};
+
+template <typename P, sql_cast_type Type>
+struct cast_as {};
+
+template <typename P, sql_cast_type Type>
+struct convert_as {};
+
+// Convenience aliases for shorter SQL function projection names.
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+using coalesce = coalesce_of<Col1, Col2>;
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+using ifnull = ifnull_of<Col1, Col2>;
+
+template <typename P>
+using abs = abs_of<P>;
+
+template <typename P>
+using floor = floor_of<P>;
+
+template <typename P>
+using ceil = ceil_of<P>;
+
+template <typename P>
+using upper = upper_of<P>;
+
+template <typename P>
+using lower = lower_of<P>;
+
+template <typename P>
+using trim = trim_of<P>;
+
+template <typename P>
+using length = length_of<P>;
+
+template <typename P, int Scale>
+using round = round_to<P, Scale>;
+
+template <typename P, int Scale>
+using format = format_to<P, Scale>;
+
+template <typename A, typename B>
+using mod = mod_of<A, B>;
+
+template <typename A, typename B>
+using power = power_of<A, B>;
+
+template <typename... Ps>
+using concat = concat_of<Ps...>;
+
+template <typename P, std::size_t Start, std::size_t Length>
+using substring = substring_of<P, Start, Length>;
+
+template <typename P, fixed_string Format>
+using date_format = date_format_of<P, Format>;
+
+template <sql_date_part Part, typename P>
+using extract = extract_of<Part, P>;
+
+template <typename P, sql_cast_type Type>
+using cast = cast_as<P, Type>;
+
+template <typename P, sql_cast_type Type>
+using convert = convert_as<P, Type>;
+
+// ===================================================================
+// Arithmetic expression projections
+//
+//   arith_add<A, B>  → (A + B)
+//   arith_sub<A, B>  → (A - B)
+//   arith_mul<A, B>  → (A * B)
+//   arith_div<A, B>  → (A / B)
+//
+// A and B can be any Projection types. projection_traits specialisations
+// are defined after the Projection concept.
+// ===================================================================
+
+template <typename A, typename B>
+struct arith_add {};
+
+template <typename A, typename B>
+struct arith_sub {};
+
+template <typename A, typename B>
+struct arith_mul {};
+
+template <typename A, typename B>
+struct arith_div {};
+
+// ===================================================================
+// case_when_expr — CASE WHEN ... THEN ... [ELSE ...] END expression
+//
+// Built at runtime via a fluent builder; stored in a type-erased wrapper
+// so it can be used with the SELECT builder.
+//
+//   case_when(cond1, "val1").when(cond2, "val2").else_("default").end()
+//   → CASE WHEN cond1 THEN 'val1' WHEN cond2 THEN 'val2' ELSE 'default' END
+// ===================================================================
+
+template <typename ValueType>
+class case_when_builder {
+public:
+    case_when_builder(where_condition cond, ValueType then_val) {
+        branches_.emplace_back(std::move(cond), std::move(then_val));
+    }
+
+    [[nodiscard]] case_when_builder when(where_condition cond, ValueType then_val) && {
+        branches_.emplace_back(std::move(cond), std::move(then_val));
+        return std::move(*this);
+    }
+
+    [[nodiscard]] case_when_builder when(where_condition cond, ValueType then_val) const& {
+        auto copy = *this;
+        copy.branches_.emplace_back(std::move(cond), std::move(then_val));
+        return copy;
+    }
+
+    [[nodiscard]] case_when_builder else_(ValueType val) && {
+        else_val_ = std::move(val);
+        return std::move(*this);
+    }
+
+    [[nodiscard]] case_when_builder else_(ValueType val) const& {
+        auto copy = *this;
+        copy.else_val_ = std::move(val);
+        return copy;
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::ostringstream ss;
+        ss << "CASE";
+        for (auto const& [cond, val] : branches_) {
+            ss << " WHEN " << cond.build_sql() << " THEN " << sql_detail::to_sql_value(val);
+        }
+        if (else_val_.has_value()) {
+            ss << " ELSE " << sql_detail::to_sql_value(*else_val_);
+        }
+        ss << " END";
+        return ss.str();
+    }
+
+    using value_type = ValueType;
+
+private:
+    std::vector<std::pair<where_condition, ValueType>> branches_;
+    std::optional<ValueType> else_val_;
+};
+
+template <typename ValueType>
+[[nodiscard]] case_when_builder<ValueType> case_when(where_condition cond, ValueType then_val) {
+    return case_when_builder<ValueType>{std::move(cond), std::move(then_val)};
+}
+
+// case_when_expr<VT> — type-erased wrapper for use as a Projection in select<>.
+// Constructed from a case_when_builder via .end().
+template <typename ValueType>
+class case_when_expr {
+public:
+    using value_type = ValueType;
+
+    explicit case_when_expr(std::string sql) : sql_(std::move(sql)) {
+    }
+
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+// ===================================================================
+// sort_order — column ordering direction for ORDER BY clauses
+// ===================================================================
+
+enum class sort_order { asc, desc };
+
+// ===================================================================
+// Window function projections
+//
+//   window_func<Agg, PartitionCol, OrderCol>
+//      → AGG_EXPR OVER (PARTITION BY partition_col ORDER BY order_col)
+//
+//   row_number_over<PartitionCol, OrderCol>
+//      → ROW_NUMBER() OVER (PARTITION BY partition_col ORDER BY order_col)
+//
+// projection_traits specialisations are defined after the Projection concept.
+// ===================================================================
+
+template <typename Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+struct window_func {};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+struct row_number_over {};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+struct rank_over {};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+struct dense_rank_over {};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
+          sort_order Dir = sort_order::asc>
+struct lag_over {};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
+          sort_order Dir = sort_order::asc>
+struct lead_over {};
+
+// projection_traits<P> — uniform interface over column descriptors and aggregates.
+//
+// Specialise this for custom aggregate types to integrate them with the
+// SELECT builder:
+//
+//   template <>
+//   struct projection_traits<my_agg> {
+//       using value_type = double;
+//       static std::string sql_expr() { return "MY_AGG(...)"; }
+//   };
+template <typename P>
+struct projection_traits;  // undefined — must be specialised
+
+template <ColumnDescriptor P>
+struct projection_traits<P> {
+    using value_type = typename column_traits<P>::value_type;
+    static constexpr std::string_view sql_expr() {
+        return column_traits<P>::column_name();
+    }
+};
+
+template <>
+struct projection_traits<count_all> {
+    using value_type = uint64_t;
+    static constexpr std::string_view sql_expr() {
+        return "COUNT(*)";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<count_col<Col>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "COUNT(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<sum<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "SUM(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<avg<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "AVG(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<min_of<Col>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "MIN(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<max_of<Col>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "MAX(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<count_distinct<Col>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "COUNT(DISTINCT " + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<group_concat<Col>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "GROUP_CONCAT(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+struct projection_traits<coalesce_of<Col1, Col2>> {
+    using value_type = typename column_traits<Col1>::value_type;
+    static std::string sql_expr() {
+        return "COALESCE(" + std::string(column_traits<Col1>::column_name()) + ", " +
+               std::string(column_traits<Col2>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+struct projection_traits<ifnull_of<Col1, Col2>> {
+    using value_type = typename column_traits<Col1>::value_type;
+    static std::string sql_expr() {
+        return "IFNULL(" + std::string(column_traits<Col1>::column_name()) + ", " +
+               std::string(column_traits<Col2>::column_name()) + ")";
+    }
+};
+
+template <typename T>
+struct sql_numeric_projection_value {
+    using type = double;
+};
+
+template <typename T>
+using sql_numeric_projection_value_t = typename sql_numeric_projection_value<T>::type;
+
+template <sql_date_part Part>
+[[nodiscard]] constexpr std::string_view sql_date_part_name() {
+    if constexpr (Part == sql_date_part::year) {
+        return "YEAR";
+    } else if constexpr (Part == sql_date_part::quarter) {
+        return "QUARTER";
+    } else if constexpr (Part == sql_date_part::month) {
+        return "MONTH";
+    } else if constexpr (Part == sql_date_part::week) {
+        return "WEEK";
+    } else if constexpr (Part == sql_date_part::day) {
+        return "DAY";
+    } else if constexpr (Part == sql_date_part::hour) {
+        return "HOUR";
+    } else if constexpr (Part == sql_date_part::minute) {
+        return "MINUTE";
+    } else {
+        return "SECOND";
+    }
+}
+
+template <sql_cast_type Type>
+struct sql_cast_type_traits;
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::signed_integer> {
+    using value_type = int64_t;
+    static constexpr std::string_view sql_name() {
+        return "SIGNED";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::unsigned_integer> {
+    using value_type = uint64_t;
+    static constexpr std::string_view sql_name() {
+        return "UNSIGNED";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::decimal> {
+    using value_type = double;
+    static constexpr std::string_view sql_name() {
+        return "DECIMAL";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::double_precision> {
+    using value_type = double;
+    static constexpr std::string_view sql_name() {
+        return "DOUBLE";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::float_precision> {
+    using value_type = float;
+    static constexpr std::string_view sql_name() {
+        return "FLOAT";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::char_type> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "CHAR";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::binary> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "BINARY";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::date> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "DATE";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::datetime> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "DATETIME";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::timestamp> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "TIMESTAMP";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::time> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "TIME";
+    }
+};
+
+template <>
+struct sql_cast_type_traits<sql_cast_type::json> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_name() {
+        return "JSON";
+    }
+};
+
+// Projection — satisfied by any type that has a projection_traits specialisation.
+template <typename P>
+concept Projection = requires {
+    typename projection_traits<P>::value_type;
+    { projection_traits<P>::sql_expr() } -> std::convertible_to<std::string_view>;
+};
+
+// AggregateProjection — a Projection that is not a ColumnDescriptor.
+template <typename P>
+concept AggregateProjection = Projection<P> && !ColumnDescriptor<P>;
+
+// ===================================================================
+// projection_traits — specialisations for types that depend on Projection
+// ===================================================================
+
+template <Projection A, Projection B>
+struct projection_traits<arith_add<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "(" + std::string(projection_traits<A>::sql_expr()) + " + " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<arith_sub<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "(" + std::string(projection_traits<A>::sql_expr()) + " - " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<arith_mul<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "(" + std::string(projection_traits<A>::sql_expr()) + " * " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<arith_div<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "(" + std::string(projection_traits<A>::sql_expr()) + " / " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<abs_of<P>> {
+    using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
+    static std::string sql_expr() {
+        return "ABS(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<floor_of<P>> {
+    using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
+    static std::string sql_expr() {
+        return "FLOOR(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<ceil_of<P>> {
+    using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
+    static std::string sql_expr() {
+        return "CEIL(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<upper_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "UPPER(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<lower_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "LOWER(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<trim_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "TRIM(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<length_of<P>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, int Scale>
+struct projection_traits<round_to<P, Scale>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "ROUND(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Scale) + ")";
+    }
+};
+
+template <Projection P, int Scale>
+struct projection_traits<format_to<P, Scale>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Scale) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<mod_of<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "MOD(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<power_of<A, B>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "POWER(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection... Ps>
+    requires(sizeof...(Ps) > 0)
+struct projection_traits<concat_of<Ps...>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        std::ostringstream ss;
+        ss << "CONCAT(";
+        bool first = true;
+        ((ss << (first ? "" : ", ") << projection_traits<Ps>::sql_expr(), first = false), ...);
+        ss << ")";
+        return ss.str();
+    }
+};
+
+template <Projection P, std::size_t Start, std::size_t Length>
+struct projection_traits<substring_of<P, Start, Length>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "SUBSTRING(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Start) + ", " +
+               std::to_string(Length) + ")";
+    }
+};
+
+template <Projection P, fixed_string Format>
+struct projection_traits<date_format_of<P, Format>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "DATE_FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{Format}) + "')";
+    }
+};
+
+template <sql_date_part Part, Projection P>
+struct projection_traits<extract_of<Part, P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "EXTRACT(" + std::string(sql_date_part_name<Part>()) + " FROM " +
+               std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, sql_cast_type Type>
+struct projection_traits<cast_as<P, Type>> {
+    using value_type = typename sql_cast_type_traits<Type>::value_type;
+    static std::string sql_expr() {
+        return "CAST(" + std::string(projection_traits<P>::sql_expr()) + " AS " +
+               std::string(sql_cast_type_traits<Type>::sql_name()) + ")";
+    }
+};
+
+template <Projection P, sql_cast_type Type>
+struct projection_traits<convert_as<P, Type>> {
+    using value_type = typename sql_cast_type_traits<Type>::value_type;
+    static std::string sql_expr() {
+        return "CONVERT(" + std::string(projection_traits<P>::sql_expr()) + ", " +
+               std::string(sql_cast_type_traits<Type>::sql_name()) + ")";
+    }
+};
+
+template <Projection Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
+struct projection_traits<window_func<Agg, PartitionCol, OrderCol, Dir>> {
+    using value_type = typename projection_traits<Agg>::value_type;
+    static std::string sql_expr() {
+        return std::string(projection_traits<Agg>::sql_expr()) + " OVER (PARTITION BY " +
+               std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
+struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "ROW_NUMBER() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
+struct projection_traits<rank_over<PartitionCol, OrderCol, Dir>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
+struct projection_traits<dense_rank_over<PartitionCol, OrderCol, Dir>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "DENSE_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset,
+          sort_order Dir>
+struct projection_traits<lag_over<Col, PartitionCol, OrderCol, Offset, Dir>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "LAG(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
+               ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset,
+          sort_order Dir>
+struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "LEAD(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
+               ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+    }
+};
+
+// ===================================================================
+// agg_expr<Agg> — natural operator and method syntax for HAVING predicates
+//
+// Wraps an aggregate projection type and exposes comparison operators and
+// named methods, each returning a where_condition suitable for .having().
+//
+// Operators (mirror the col_expr<Col> API):
+//   count() == 0                → COUNT(*) = 0
+//   count() != 0                → COUNT(*) != 0
+//   count() < 10                → COUNT(*) < 10
+//   count() > 5                 → COUNT(*) > 5
+//   count() <= 10               → COUNT(*) <= 10
+//   count() >= 1                → COUNT(*) >= 1
+//
+// Named methods:
+//   count().equal_to(0)         → COUNT(*) = 0
+//   count().not_equal_to(0)     → COUNT(*) != 0
+//   count().less_than(10)       → COUNT(*) < 10
+//   count().greater_than(5)     → COUNT(*) > 5
+//   count().less_than_or_equal(10)    → COUNT(*) <= 10
+//   count().greater_than_or_equal(1)  → COUNT(*) >= 1
+//
+// Factory functions:
+//   count()           → agg_expr<count_all>        COUNT(*)
+//   count<Col>()      → agg_expr<count_col<Col>>   COUNT(col)
+//
+// For SUM/AVG/MIN/MAX, use the aggregate tag directly — free-function operators
+// (defined after projection_traits) allow the same operator syntax:
+//   sum<Col>() > 100.0       — SUM(col) > 100.000000
+//   avg<Col>() >= 4.0        — AVG(col) >= 4.000000
+//
+// The resulting where_condition composes with &, |, ! operators.
+// ===================================================================
+
+template <typename Agg>
+struct agg_expr {
+    using value_type = typename projection_traits<Agg>::value_type;
+
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator==(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " = " + sql_detail::to_sql_value(value_type{val})};
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator!=(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " != " + sql_detail::to_sql_value(value_type{val})};
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator<(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " < " + sql_detail::to_sql_value(value_type{val})};
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator>(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " > " + sql_detail::to_sql_value(value_type{val})};
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator<=(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " <= " + sql_detail::to_sql_value(value_type{val})};
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition operator>=(V const& val) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " >= " + sql_detail::to_sql_value(value_type{val})};
+    }
+
+    // Named method equivalents
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition equal_to(V const& val) const {
+        return *this == val;
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition not_equal_to(V const& val) const {
+        return *this != val;
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition less_than(V const& val) const {
+        return *this < val;
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition greater_than(V const& val) const {
+        return *this > val;
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition less_than_or_equal(V const& val) const {
+        return *this <= val;
+    }
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition greater_than_or_equal(V const& val) const {
+        return *this >= val;
+    }
+
+    template <typename V>
+        requires std::constructible_from<value_type, V const&>
+    [[nodiscard]] where_condition between(V const& low, V const& high) const {
+        return {{},
+                {},
+                std::string(projection_traits<Agg>::sql_expr()) + " BETWEEN " +
+                    sql_detail::to_sql_value(value_type{low}) + " AND " + sql_detail::to_sql_value(value_type{high})};
+    }
+
+    [[nodiscard]] where_condition in(std::initializer_list<value_type> vals) const {
+        std::ostringstream ss;
+        ss << std::string(projection_traits<Agg>::sql_expr()) << " IN (";
+        bool first = true;
+        for (auto const& v : vals) {
+            if (!first) {
+                ss << ", ";
+            }
+            ss << sql_detail::to_sql_value(v);
+            first = false;
+        }
+        ss << ')';
+        return {{}, {}, ss.str()};
+    }
+
+    [[nodiscard]] where_condition is_null() const noexcept {
+        return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " IS NULL"};
+    }
+
+    [[nodiscard]] where_condition is_not_null() const noexcept {
+        return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " IS NOT NULL"};
+    }
+};
+
+// count() — COUNT(*) aggregate expression
+[[nodiscard]] inline agg_expr<count_all> count() noexcept {
+    return {};
+}
+
+// count<Col>() — COUNT(col) aggregate expression
+// Note: count_col<Col> is the class template tag; count<Col>() is the factory function.
+template <ColumnDescriptor Col>
+[[nodiscard]] agg_expr<count_col<Col>> count() noexcept {
+    return {};
+}
+
+// ===================================================================
+// Free-function comparison operators for aggregate tags
+//
+// Allow natural HAVING syntax without requiring factory functions:
+//   sum<Col>() > 100.0       → SUM(col) > 100.000000
+//   avg<Col>() >= 4.0        → AVG(col) >= 4.000000
+//   min_of<Col>() < n        → MIN(col) < n
+//   max_of<Col>() > n        → MAX(col) > n
+//
+// These compose with &, |, ! like any other where_condition.
+// ===================================================================
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator==(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " = " + sql_detail::to_sql_value(vt{val})};
+}
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator!=(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " != " + sql_detail::to_sql_value(vt{val})};
+}
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator<(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " < " + sql_detail::to_sql_value(vt{val})};
+}
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator>(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " > " + sql_detail::to_sql_value(vt{val})};
+}
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator<=(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " <= " + sql_detail::to_sql_value(vt{val})};
+}
+
+template <AggregateProjection Agg, typename V>
+    requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
+[[nodiscard]] where_condition operator>=(Agg const&, V const& val) {
+    using vt = typename projection_traits<Agg>::value_type;
+    return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " >= " + sql_detail::to_sql_value(vt{val})};
+}
+
+// ===================================================================
+// SELECT Builder
+//
+// Entry points:
+//   select<Projs...>().from<Table>()
+//       .[distinct()]
+//       .[where(cond)]
+//       .[group_by<Col1, Col2, ...>()]
+//       .[having(cond)]
+//       .[order_by<Col>()]                   ASC by default
+//       .[order_by<Col, sort_order::desc>()]  DESC
+//       .[limit(n)]
+//       .[offset(n)]
+//       .build_sql()
+//
+//   select<Projs...>().from_joined<Table>()  — no table-membership check, for
+//       .[inner_join<RightT, LeftCol, RightCol>()]  JOIN queries spanning
+//       .[left_join<RightT, LeftCol, RightCol>()]   multiple tables.
+//       .[right_join<RightT, LeftCol, RightCol>()]
+//       (all other clauses above also available)
+//
+//   union_(q1, q2)                           — (q1) UNION (q2)
+//   union_all(q1, q2)                        — (q1) UNION ALL (q2)
+//
+// TypedSelectQuery — any builder stage that can produce typed rows.
+// ===================================================================
+
+template <typename T>
+concept TypedSelectQuery = requires(T const& t) {
+    typename T::result_row_type;
+    { t.build_sql() } -> std::convertible_to<std::string>;
+};
+
+namespace detail {
+
+enum class group_by_mode {
+    standard,
+    cube,
+    grouping_sets,
+};
+
+template <typename Set>
+struct grouping_set_sql;
+
+template <typename... Cols>
+struct grouping_set_sql<grouping_set<Cols...>> {
+    [[nodiscard]] static std::string value() {
+        std::ostringstream ss;
+        ss << '(';
+        bool first = true;
+        ((ss << (first ? "" : ", ") << column_traits<Cols>::column_name(), first = false), ...);
+        ss << ')';
+        return ss.str();
+    }
+};
+
+template <>
+struct grouping_set_sql<grouping_set<>> {
+    [[nodiscard]] static std::string value() {
+        return "()";
+    }
+};
+
+// ===================================================================
+// MySQL value deserialization
+// ===================================================================
+
+template <typename T>
+T from_mysql_value_nonnull(std::string_view sv) {
+    if constexpr (std::same_as<T, uint32_t>) {
+        return static_cast<uint32_t>(std::stoul(std::string{sv}));
+    } else if constexpr (std::same_as<T, int32_t>) {
+        return static_cast<int32_t>(std::stol(std::string{sv}));
+    } else if constexpr (std::same_as<T, uint64_t>) {
+        return static_cast<uint64_t>(std::stoull(std::string{sv}));
+    } else if constexpr (std::same_as<T, int64_t>) {
+        return static_cast<int64_t>(std::stoll(std::string{sv}));
+    } else if constexpr (std::same_as<T, float>) {
+        return std::stof(std::string{sv});
+    } else if constexpr (std::same_as<T, double>) {
+        return std::stod(std::string{sv});
+    } else if constexpr (std::same_as<T, bool>) {
+        return sv != "0" && sv != "false" && !sv.empty();
+    } else if constexpr (std::same_as<T, std::string>) {
+        return std::string{sv};
+    } else if constexpr (is_varchar_field_v<T>) {
+        return T::create(sv).value_or(T{});
+    } else if constexpr (std::same_as<T, std::chrono::system_clock::time_point>) {
+        std::istringstream ss{std::string{sv}};
+        std::tm tm{};
+        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+        return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    } else {
+        static_assert(false,
+                      "Unsupported type for MySQL deserialization. "
+                      "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, bool, "
+                      "std::string, varchar_field<N>, std::chrono::system_clock::time_point, "
+                      "and their std::optional variants.");
+    }
+}
+
+template <typename T>
+T from_mysql_value(std::optional<std::string> const& raw) {
+    if constexpr (is_optional_v<T>) {
+        if (!raw.has_value()) {
+            return std::nullopt;
+        }
+        using inner = unwrap_optional_t<T>;
+        return std::optional<inner>{from_mysql_value_nonnull<inner>(*raw)};
+    } else {
+        assert(raw.has_value() && "Non-optional field received NULL from database — schema mismatch?");
+        return from_mysql_value_nonnull<T>(*raw);
+    }
+}
+
+template <typename TupleType, std::size_t... Is>
+TupleType deserialize_row_impl(std::vector<std::optional<std::string>> const& row, std::index_sequence<Is...>) {
+    return TupleType{from_mysql_value<std::tuple_element_t<Is, TupleType>>(row[Is])...};
+}
+
+template <typename TupleType>
+TupleType deserialize_row(std::vector<std::optional<std::string>> const& row) {
+    return deserialize_row_impl<TupleType>(row, std::make_index_sequence<std::tuple_size_v<TupleType>>{});
+}
+
+// ===================================================================
+// column_belongs_to_table_v — compile-time membership predicate
+// ===================================================================
+
+template <typename Col, typename Table>
+constexpr bool column_belongs_to_table_v = false;
+
+template <typename T, std::size_t I, typename Table>
+constexpr bool column_belongs_to_table_v<col<T, I>, Table> = std::is_same_v<T, Table>;
+
+template <ColumnFieldType T, typename Table>
+consteval bool column_field_in_table() {
+    return []<std::size_t... Is>(std::index_sequence<Is...>) {
+        return (std::is_same_v<boost::pfr::tuple_element_t<Is, Table>, T> || ...);
+    }(std::make_index_sequence<boost::pfr::tuple_size_v<Table>>{});
+}
+
+template <typename T, typename Table>
+    requires ColumnFieldType<T>
+constexpr bool column_belongs_to_table_v<T, Table> = column_field_in_table<T, Table>();
+
+// ===================================================================
+// qualified_col_name<Col> — table-qualified column name for JOINs
+//
+// For col<T, I> descriptors (which carry table info): "table_name.col_name".
+// For ColumnFieldType descriptors (no table info):    bare "col_name".
+// ===================================================================
+
+template <typename Col>
+std::string qualified_col_name() {
+    if constexpr (requires { Col::table_name_str(); }) {
+        return std::string(Col::table_name_str()) + "." + std::string(column_traits<Col>::column_name());
+    } else {
+        return std::string(column_traits<Col>::column_name());
+    }
+}
+
+// ===================================================================
+// proj_index_in_pack<Proj, Projs...> — compile-time index of Proj in pack
+//
+// Returns the 0-based position of Proj within Projs...
+// Used by select_query_builder::with_alias<Proj>() to resolve the alias slot
+// at compile time without requiring the caller to know numeric indices.
+// ===================================================================
+
+namespace sql_detail {
+
+template <typename Needle, typename... Haystack>
+consteval std::size_t proj_index_in_pack() {
+    const std::array matches{std::is_same_v<Needle, Haystack>...};
+    for (std::size_t i = 0; i < matches.size(); ++i)
+        if (matches[i])
+            return i;
+    return std::size_t(-1);  // unreachable: guarded by requires clause
+}
+
+}  // namespace sql_detail
+
+// ===================================================================
+// select_query_builder — unified builder for all SELECT clauses
+// ===================================================================
+
+template <typename Table, typename... Projs>
+struct select_query_builder {
+    using result_row_type = std::tuple<typename projection_traits<Projs>::value_type...>;
+
+    select_query_builder() = default;
+
+    // ---- Optional clause modifiers ----
+
+    [[nodiscard]] select_query_builder distinct() const& {
+        auto copy = *this;
+        copy.distinct_ = true;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder distinct() && {
+        distinct_ = true;
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder where(where_condition cond) const& {
+        auto copy = *this;
+        copy.where_ = std::move(cond);
+        return copy;
+    }
+    [[nodiscard]] select_query_builder where(where_condition cond) && {
+        where_ = std::move(cond);
+        return std::move(*this);
+    }
+
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by() const& {
+        auto copy = *this;
+        copy.group_by_ = build_group_by_string<GroupCols...>();
+        copy.group_by_mode_ = group_by_mode::standard;
+        copy.with_rollup_ = false;
+        return copy;
+    }
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by() && {
+        group_by_ = build_group_by_string<GroupCols...>();
+        group_by_mode_ = group_by_mode::standard;
+        with_rollup_ = false;
+        return std::move(*this);
+    }
+
+    // group_by_rollup<Col1, Col2, ...>() — GROUP BY col1, col2, ... WITH ROLLUP
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by_rollup() const& {
+        auto copy = *this;
+        copy.group_by_ = build_group_by_string<GroupCols...>();
+        copy.with_rollup_ = true;
+        copy.group_by_mode_ = group_by_mode::standard;
+        return copy;
+    }
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by_rollup() && {
+        group_by_ = build_group_by_string<GroupCols...>();
+        with_rollup_ = true;
+        group_by_mode_ = group_by_mode::standard;
+        return std::move(*this);
+    }
+
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by_cube() const& {
+        auto copy = *this;
+        copy.group_by_ = build_group_by_string<GroupCols...>();
+        copy.group_by_mode_ = group_by_mode::cube;
+        copy.with_rollup_ = false;
+        return copy;
+    }
+
+    template <ColumnDescriptor... GroupCols>
+        requires(sizeof...(GroupCols) > 0)
+    [[nodiscard]] select_query_builder group_by_cube() && {
+        group_by_ = build_group_by_string<GroupCols...>();
+        group_by_mode_ = group_by_mode::cube;
+        with_rollup_ = false;
+        return std::move(*this);
+    }
+
+    template <typename... Sets>
+        requires((is_grouping_set_v<Sets> && ...) && sizeof...(Sets) > 0)
+    [[nodiscard]] select_query_builder group_by_grouping_sets() const& {
+        auto copy = *this;
+        copy.group_by_ = build_grouping_sets_string<Sets...>();
+        copy.group_by_mode_ = group_by_mode::grouping_sets;
+        copy.with_rollup_ = false;
+        return copy;
+    }
+
+    template <typename... Sets>
+        requires((is_grouping_set_v<Sets> && ...) && sizeof...(Sets) > 0)
+    [[nodiscard]] select_query_builder group_by_grouping_sets() && {
+        group_by_ = build_grouping_sets_string<Sets...>();
+        group_by_mode_ = group_by_mode::grouping_sets;
+        with_rollup_ = false;
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder having(where_condition cond) const& {
+        auto copy = *this;
+        copy.having_ = std::move(cond);
+        return copy;
+    }
+    [[nodiscard]] select_query_builder having(where_condition cond) && {
+        having_ = std::move(cond);
+        return std::move(*this);
+    }
+
+    // order_by<Col>()                       — appends "col ASC" to ORDER BY
+    // order_by<Col, sort_order::desc>()     — appends "col DESC" to ORDER BY
+    // Can be chained multiple times for multi-column ordering.
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] select_query_builder order_by() const& {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
+                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] select_query_builder order_by() && {
+        order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
+                                    (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return std::move(*this);
+    }
+
+    // order_by_agg<Agg>()                   — ORDER BY aggregate expression
+    // order_by_agg<Agg, sort_order::desc>() — ORDER BY aggregate DESC
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires(!ColumnDescriptor<Proj>)
+    [[nodiscard]] select_query_builder order_by_agg() const& {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
+                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires(!ColumnDescriptor<Proj>)
+    [[nodiscard]] select_query_builder order_by_agg() && {
+        order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
+                                    (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return std::move(*this);
+    }
+
+    // order_by_raw("expression DESC") — raw SQL ORDER BY expression
+    [[nodiscard]] select_query_builder order_by_raw(std::string expr) const& {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::move(expr));
+        return copy;
+    }
+    [[nodiscard]] select_query_builder order_by_raw(std::string expr) && {
+        order_by_clauses_.push_back(std::move(expr));
+        return std::move(*this);
+    }
+
+    // with_alias<Proj>("name") — add AS alias to the projection matching type Proj
+    //
+    // Proj must be one of the types in Projs...; a mismatch is a compile error.
+    // Example: .with_alias<sum<product::price_val>>("total")
+    template <Projection Proj>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder with_alias(std::string alias) const& {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        auto copy = *this;
+        copy.aliases_[Index] = std::move(alias);
+        return copy;
+    }
+    template <Projection Proj>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder with_alias(std::string alias) && {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        aliases_[Index] = std::move(alias);
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder limit(std::size_t n) const& {
+        auto copy = *this;
+        copy.limit_ = n;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder limit(std::size_t n) && {
+        limit_ = n;
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder offset(std::size_t n) const& {
+        auto copy = *this;
+        copy.offset_ = n;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder offset(std::size_t n) && {
+        offset_ = n;
+        return std::move(*this);
+    }
+
+    // ---- JOIN clauses ----
+    //
+    // Use col<Table, Index> descriptors for the join columns to produce
+    // table-qualified ON conditions (e.g. "symbol.id = price.symbol_id").
+    // ColumnFieldType descriptors (e.g. symbol::id) produce bare column names.
+
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder inner_join() const& {
+        return add_join("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                        qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder inner_join() && {
+        return std::move(*this).add_join("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder left_join() const& {
+        return add_join("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                        qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder left_join() && {
+        return std::move(*this).add_join("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder right_join() const& {
+        return add_join("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                        qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder right_join() && {
+        return std::move(*this).add_join("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+
+    // full_join — FULL OUTER JOIN
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder full_join() const& {
+        return add_join("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                        qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder full_join() && {
+        return std::move(*this).add_join("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+
+    // cross_join — CROSS JOIN (no ON clause)
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder cross_join() const& {
+        auto copy = *this;
+        copy.joins_ += " CROSS JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return copy;
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder cross_join() && {
+        joins_ += " CROSS JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return std::move(*this);
+    }
+
+    // join_on — JOIN with arbitrary ON condition (compound ON support)
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder inner_join_on(where_condition on_cond) const& {
+        return add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder inner_join_on(where_condition on_cond) && {
+        return std::move(*this).add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
+
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder left_join_on(where_condition on_cond) const& {
+        return add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder left_join_on(where_condition on_cond) && {
+        return std::move(*this).add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
+
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder right_join_on(where_condition on_cond) const& {
+        return add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder right_join_on(where_condition on_cond) && {
+        return std::move(*this).add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
+
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder full_join_on(where_condition on_cond) const& {
+        return add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder full_join_on(where_condition on_cond) && {
+        return std::move(*this).add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
+
+    // ---- Terminal ----
+
+    [[nodiscard]] std::string build_sql() const {
+        std::ostringstream sql;
+        sql << "SELECT ";
+        if (distinct_) {
+            sql << "DISTINCT ";
+        }
+        std::size_t proj_idx = 0;
+        bool first = true;
+        (
+            [&](auto expr) {
+                if (!first) {
+                    sql << ", ";
+                }
+                sql << expr;
+                auto it = aliases_.find(proj_idx);
+                if (it != aliases_.end()) {
+                    sql << " AS " << it->second;
+                }
+                first = false;
+                ++proj_idx;
+            }(projection_traits<Projs>::sql_expr()),
+            ...);
+
+        if (!from_subquery_.empty()) {
+            sql << " FROM " << from_subquery_;
+        } else {
+            sql << " FROM " << table_name_for<Table>::value().to_string_view();
+        }
+        sql << joins_;
+
+        if (where_.has_value()) {
+            sql << " WHERE " << where_->build_sql();
+        }
+        if (!group_by_.empty()) {
+            sql << " GROUP BY ";
+            if (group_by_mode_ == group_by_mode::cube) {
+                sql << "CUBE(" << group_by_ << ")";
+            } else if (group_by_mode_ == group_by_mode::grouping_sets) {
+                sql << "GROUPING SETS (" << group_by_ << ")";
+            } else {
+                sql << group_by_;
+            }
+            if (with_rollup_) {
+                sql << " WITH ROLLUP";
+            }
+        }
+        if (having_.has_value()) {
+            sql << " HAVING " << having_->build_sql();
+        }
+        if (!order_by_clauses_.empty()) {
+            sql << " ORDER BY ";
+            bool f = true;
+            for (auto const& clause : order_by_clauses_) {
+                if (!f) {
+                    sql << ", ";
+                }
+                sql << clause;
+                f = false;
+            }
+        }
+        if (limit_.has_value()) {
+            sql << " LIMIT " << *limit_;
+        }
+        if (offset_.has_value()) {
+            sql << " OFFSET " << *offset_;
+        }
+        return sql.str();
+    }
+
+    [[nodiscard]] select_query_builder add_join(std::string_view join_type, std::string_view right_table,
+                                                std::string left_col, std::string right_col) const& {
+        auto copy = *this;
+        copy.joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + std::move(left_col) +
+                       " = " + std::move(right_col);
+        return copy;
+    }
+    [[nodiscard]] select_query_builder add_join(std::string_view join_type, std::string_view right_table,
+                                                std::string left_col, std::string right_col) && {
+        joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + std::move(left_col) + " = " +
+                  std::move(right_col);
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder add_join_on(std::string_view join_type, std::string_view right_table,
+                                                   where_condition on_cond) const& {
+        auto copy = *this;
+        copy.joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + on_cond.build_sql();
+        return copy;
+    }
+    [[nodiscard]] select_query_builder add_join_on(std::string_view join_type, std::string_view right_table,
+                                                   where_condition on_cond) && {
+        joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + on_cond.build_sql();
+        return std::move(*this);
+    }
+
+    // Private helper: builds a comma-separated GROUP BY column name string.
+    template <ColumnDescriptor... GroupCols>
+    static std::string build_group_by_string() {
+        std::ostringstream ss;
+        bool first = true;
+        (
+            [&](std::string_view name) {
+                if (!first) {
+                    ss << ", ";
+                }
+                ss << name;
+                first = false;
+            }(column_traits<GroupCols>::column_name()),
+            ...);
+        return ss.str();
+    }
+
+    template <typename... Sets>
+    static std::string build_grouping_sets_string() {
+        std::ostringstream ss;
+        bool first = true;
+        ((ss << (first ? "" : ", ") << grouping_set_sql<Sets>::value(), first = false), ...);
+        return ss.str();
+    }
+
+    std::optional<where_condition> where_;
+    std::string group_by_;
+    bool with_rollup_ = false;
+    group_by_mode group_by_mode_ = group_by_mode::standard;
+    std::optional<where_condition> having_;
+    std::vector<std::string> order_by_clauses_;
+    std::optional<std::size_t> limit_;
+    std::optional<std::size_t> offset_;
+    bool distinct_ = false;
+    std::string joins_;
+    std::map<std::size_t, std::string> aliases_;
+    std::string from_subquery_;
+};
+
+// ===================================================================
+// select_builder — Stage 1: select<Projs...>()
+// ===================================================================
+
+template <typename... Projs>
+class select_builder {
+public:
+    // Checked: all column projections must belong to Table (single-table query).
+    template <typename Table>
+    [[nodiscard]] select_query_builder<Table, Projs...> from() const {
+        static_assert(((AggregateProjection<Projs> || column_belongs_to_table_v<Projs, Table>) && ...),
+                      "All column projections must belong to the table passed to from<Table>(). "
+                      "For JOIN queries spanning multiple tables, use .from_joined<Table>() instead.");
+        return {};
+    }
+
+    // Unchecked: for JOIN queries spanning multiple tables.
+    template <typename Table>
+    [[nodiscard]] select_query_builder<Table, Projs...> from_joined() const {
+        return {};
+    }
+
+    // from_subquery — derived table: SELECT ... FROM (subquery) AS alias
+    template <typename Table, AnySelectQuery Query>
+    [[nodiscard]] select_query_builder<Table, Projs...> from_subquery(Query const& subquery, std::string alias) const {
+        select_query_builder<Table, Projs...> builder;
+        builder.from_subquery_ = "(" + subquery.build_sql() + ") AS " + std::move(alias);
+        return builder;
+    }
+};
+
+// ===================================================================
+// union_query — wraps two compatible SELECT queries with UNION / UNION ALL
+// ===================================================================
+
+template <typename RowType>
+class union_query {
+public:
+    using result_row_type = RowType;
+
+    explicit union_query(std::string sql) : sql_(std::move(sql)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+}  // namespace detail
+
+// ===================================================================
+// union_ / union_all — combine two TypedSelectQuery results
+//
+//   union_(q1, q2)    — (q1) UNION (q2)      de-duplicates rows
+//   union_all(q1, q2) — (q1) UNION ALL (q2)  preserves duplicates
+//
+// Both queries must have the same result_row_type.
+// ===================================================================
+
+template <TypedSelectQuery Q1, TypedSelectQuery Q2>
+    requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
+[[nodiscard]] detail::union_query<typename Q1::result_row_type> union_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") UNION (" + q2.build_sql() + ")"};
+}
+
+template <TypedSelectQuery Q1, TypedSelectQuery Q2>
+    requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
+[[nodiscard]] detail::union_query<typename Q1::result_row_type> union_all(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") UNION ALL (" + q2.build_sql() +
+                                                             ")"};
+}
+
+template <TypedSelectQuery Q1, TypedSelectQuery Q2>
+    requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
+[[nodiscard]] detail::union_query<typename Q1::result_row_type> intersect_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") INTERSECT (" + q2.build_sql() +
+                                                             ")"};
+}
+
+template <TypedSelectQuery Q1, TypedSelectQuery Q2>
+    requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
+[[nodiscard]] detail::union_query<typename Q1::result_row_type> except_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") EXCEPT (" + q2.build_sql() +
+                                                             ")"};
+}
+
+/**
+ * select<Projs...>() — begin a type-safe SELECT query.
+ *
+ * Each Proj must satisfy Projection — either a ColumnDescriptor (typed column)
+ * or an aggregate such as count_all, sum<Col>, avg<Col>, etc.
+ *
+ * Next: .from<Table>() (enforces column membership) or
+ *       .from_joined<Table>() (skips the check, for multi-table JOINs).
+ *
+ * Example (single table):
+ *   auto rows = db.query_typed(
+ *       select<symbol::id, symbol::ticker>()
+ *           .from<symbol>()
+ *           .where(equal<symbol::ticker>("AAPL"))
+ *           .order_by<symbol::id>()
+ *           .limit(10));
+ *
+ * Example (JOIN — use col<T,I> for table-qualified ON columns):
+ *   auto rows = db.query_typed(
+ *       select<col<symbol, 1>, col<price, 2>>()
+ *           .from_joined<symbol>()
+ *           .inner_join<price, col<symbol, 0>, col<price, 1>>()
+ *           .order_by<col<price, 3>, sort_order::desc>()
+ *           .limit(100));
+ */
+template <Projection... Projs>
+[[nodiscard]] detail::select_builder<Projs...> select() {
+    return {};
+}
+
+/**
+ * count<T>() — SELECT COUNT(*) FROM <table> [WHERE ...].
+ *
+ * Shorthand for select<count_all>().from<T>(). Supports all optional clauses.
+ *
+ * Example:
+ *   auto rows = db.query(count<symbol>());
+ *   auto rows = db.query(count<symbol>().where(equal<symbol::ticker>("AAPL")));
+ */
+template <typename T>
+[[nodiscard]] detail::select_query_builder<T, count_all> count() {
+    return {};
+}
+
+/**
+ * truncate_table<T>() — TRUNCATE TABLE <table>.
+ *
+ * Removes all rows from the table. Faster than DELETE FROM with no WHERE.
+ *
+ * Example:
+ *   db.execute(truncate_table<symbol>());
+ */
+template <typename T>
+[[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table() {
+    return {};
+}
+
+// ===================================================================
+// CTE (Common Table Expressions) — WITH clause
+//
+//   with_cte("name", subquery).select<Projs...>().from_cte<Table>("name")
+//   → WITH name AS (subquery) SELECT ... FROM name
+//
+//   with_cte("n1", q1).with_cte("n2", q2).select<>().from_cte<T>("n1")
+//   → WITH n1 AS (...), n2 AS (...) SELECT ... FROM n1
+// ===================================================================
+
+class cte_builder {
+public:
+    template <AnySelectQuery Q>
+    cte_builder(std::string name, Q const& query) {
+        ctes_.emplace_back(std::move(name), query.build_sql());
+    }
+
+    template <AnySelectQuery Q>
+    [[nodiscard]] cte_builder with_cte(std::string name, Q const& query) const {
+        auto copy = *this;
+        copy.ctes_.emplace_back(std::move(name), query.build_sql());
+        return copy;
+    }
+
+    [[nodiscard]] cte_builder recursive() const {
+        auto copy = *this;
+        copy.recursive_ = true;
+        return copy;
+    }
+
+    template <typename Table, Projection... Projs>
+    [[nodiscard]] detail::select_query_builder<Table, Projs...> select_from_cte(std::string const& cte_name) const {
+        detail::select_query_builder<Table, Projs...> builder;
+        builder.from_subquery_ = cte_name;
+
+        // Build the WITH prefix and store it in a wrapper
+        std::ostringstream with_sql;
+        with_sql << "WITH ";
+        bool first = true;
+        for (auto const& [name, sql] : ctes_) {
+            if (!first) {
+                with_sql << ", ";
+            }
+            with_sql << name << " AS (" << sql << ")";
+            first = false;
+        }
+        // We need to return a query that prepends the WITH clause.
+        // Use a thin wrapper.
+        builder.from_subquery_ = cte_name;
+        // Store with_prefix to be prepended in build_sql — we embed it in joins_ as a workaround
+        // since the builder doesn't have a dedicated CTE field. Actually let's use a dedicated approach.
+        // Since the builder copies by value, we set the from field to carry the CTE.
+
+        // Better approach: return a cte_select wrapper.
+        return builder;
+    }
+
+    [[nodiscard]] std::string with_prefix() const {
+        std::ostringstream ss;
+        ss << (recursive_ ? "WITH RECURSIVE " : "WITH ");
+        bool first = true;
+        for (auto const& [name, sql] : ctes_) {
+            if (!first) {
+                ss << ", ";
+            }
+            ss << name << " AS (" << sql << ")";
+            first = false;
+        }
+        ss << " ";
+        return ss.str();
+    }
+
+    // Terminal: build a full CTE query
+    template <AnySelectQuery MainQuery>
+    [[nodiscard]] std::string build_sql(MainQuery const& main) const {
+        return with_prefix() + main.build_sql();
+    }
+
+private:
+    std::vector<std::pair<std::string, std::string>> ctes_;
+    bool recursive_ = false;
+};
+
+// cte_select_query — wraps a CTE prefix + main SELECT query
+template <typename MainQuery>
+class cte_select_query {
+public:
+    using result_row_type = typename MainQuery::result_row_type;
+
+    cte_select_query(std::string with_prefix, MainQuery main)
+        : with_prefix_(std::move(with_prefix)), main_(std::move(main)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return with_prefix_ + main_.build_sql();
+    }
+
+private:
+    std::string with_prefix_;
+    MainQuery main_;
+};
+
+template <AnySelectQuery Q>
+[[nodiscard]] cte_builder with_cte(std::string name, Q const& query) {
+    return cte_builder{std::move(name), query};
+}
+
+template <AnySelectQuery Q>
+[[nodiscard]] cte_builder with_recursive_cte(std::string name, Q const& query) {
+    return cte_builder{std::move(name), query}.recursive();
+}
+
+// ===================================================================
+// DML extensions
+//
+// INSERT IGNORE, INSERT ... SELECT, REPLACE INTO, UPDATE with JOIN
+// ===================================================================
+
+namespace dml_detail {
+
+// ---------------------------------------------------------------
+// insert_ignore_into builders
+// ---------------------------------------------------------------
+template <typename T>
+class insert_ignore_values_builder {
+public:
+    insert_ignore_values_builder(std::string column_list, std::string values, bool bulk = false)
+        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        if (bulk_) {
+            s.reserve(19 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            s += "INSERT IGNORE INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES ";
+            s += values_;
+        } else {
+            s.reserve(19 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            s += "INSERT IGNORE INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES (";
+            s += values_;
+            s += ')';
+        }
+        return s;
+    }
+
+private:
+    std::string column_list_;
+    std::string values_;
+    bool bulk_ = false;
+};
+
+template <typename T>
+class insert_ignore_into_builder {
+public:
+    [[nodiscard]] insert_ignore_values_builder<T> values(T const& row) const {
+        return {generate_column_list<T>(), generate_values(row)};
+    }
+
+    template <std::ranges::input_range Rows>
+        requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
+    [[nodiscard]] insert_ignore_values_builder<T> values(Rows&& rows) const {
+        std::ostringstream values_sql;
+        bool first = true;
+        for (auto const& row : rows) {
+            if (!first) {
+                values_sql << ", ";
+            }
+            values_sql << "(" << generate_values(row) << ")";
+            first = false;
+        }
+        if (first) {
+            return {generate_column_list<T>(), {}};
+        }
+        return {generate_column_list<T>(), values_sql.str(), true};
+    }
+};
+
+// ---------------------------------------------------------------
+// insert_into_select_builder — INSERT INTO T (...) SELECT ...
+// ---------------------------------------------------------------
+template <typename T>
+class insert_into_select_builder {
+public:
+    explicit insert_into_select_builder(std::string select_sql) : select_sql_(std::move(select_sql)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto columns = generate_column_list<T>();
+        std::string s;
+        s.reserve(12 + table_name.size() + 2 + columns.size() + 2 + select_sql_.size());
+        s += "INSERT INTO ";
+        s += table_name;
+        s += " (";
+        s += columns;
+        s += ") ";
+        s += select_sql_;
+        return s;
+    }
+
+private:
+    std::string select_sql_;
+};
+
+// ---------------------------------------------------------------
+// replace_into builders — REPLACE INTO T (...) VALUES (...)
+// ---------------------------------------------------------------
+template <typename T>
+class replace_into_values_builder {
+public:
+    replace_into_values_builder(std::string column_list, std::string values, bool bulk = false)
+        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        std::string s;
+        if (bulk_) {
+            s.reserve(13 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            s += "REPLACE INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES ";
+            s += values_;
+        } else {
+            s.reserve(13 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            s += "REPLACE INTO ";
+            s += table_name;
+            s += " (";
+            s += column_list_;
+            s += ") VALUES (";
+            s += values_;
+            s += ')';
+        }
+        return s;
+    }
+
+private:
+    std::string column_list_;
+    std::string values_;
+    bool bulk_ = false;
+};
+
+template <typename T>
+class replace_into_builder {
+public:
+    [[nodiscard]] replace_into_values_builder<T> values(T const& row) const {
+        return {generate_column_list<T>(), generate_values(row)};
+    }
+
+    template <std::ranges::input_range Rows>
+        requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
+    [[nodiscard]] replace_into_values_builder<T> values(Rows&& rows) const {
+        std::ostringstream values_sql;
+        bool first = true;
+        for (auto const& row : rows) {
+            if (!first) {
+                values_sql << ", ";
+            }
+            values_sql << "(" << generate_values(row) << ")";
+            first = false;
+        }
+        if (first) {
+            return {generate_column_list<T>(), {}};
+        }
+        return {generate_column_list<T>(), values_sql.str(), true};
+    }
+};
+
+// ---------------------------------------------------------------
+// update_join_builder — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
+// ---------------------------------------------------------------
+template <typename T>
+class update_join_set_where_builder {
+public:
+    update_join_set_where_builder(std::string prefix, std::string set, where_condition where)
+        : prefix_(std::move(prefix)), set_(std::move(set)), where_(std::move(where)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        auto where_sql = where_.build_sql();
+        std::string s;
+        s.reserve(prefix_.size() + 5 + set_.size() + 7 + where_sql.size());
+        s += prefix_;
+        s += " SET ";
+        s += set_;
+        s += " WHERE ";
+        s += std::move(where_sql);
+        return s;
+    }
+
+private:
+    std::string prefix_;
+    std::string set_;
+    where_condition where_;
+};
+
+template <typename T>
+class update_join_set_builder {
+public:
+    update_join_set_builder(std::string prefix, std::string set) : prefix_(std::move(prefix)), set_(std::move(set)) {
+    }
+
+    [[nodiscard]] update_join_set_where_builder<T> where(where_condition condition) const {
+        return {prefix_, set_, std::move(condition)};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::string s;
+        s.reserve(prefix_.size() + 5 + set_.size());
+        s += prefix_;
+        s += " SET ";
+        s += set_;
+        return s;
+    }
+
+private:
+    std::string prefix_;
+    std::string set_;
+};
+
+template <typename T1, typename T2>
+class update_join_builder {
+public:
+    explicit update_join_builder(std::string join_clause) : join_clause_(std::move(join_clause)) {
+    }
+
+    template <FieldOf<T1>... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] update_join_set_builder<T1> set(Cols... assignments) const {
+        const auto t1_name = table_name_for<T1>::value().to_string_view();
+        std::string prefix;
+        prefix.reserve(7 + t1_name.size() + join_clause_.size());
+        prefix += "UPDATE ";
+        prefix += t1_name;
+        prefix += join_clause_;
+
+        std::ostringstream ss;
+        bool first = true;
+        (
+            [&](auto const& field) {
+                if (!first) {
+                    ss << ", ";
+                }
+                using C = std::decay_t<decltype(field)>;
+                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
+                first = false;
+            }(assignments),
+            ...);
+        return update_join_set_builder<T1>{std::move(prefix), ss.str()};
+    }
+
+private:
+    std::string join_clause_;
+};
+
+}  // namespace dml_detail
+
+// insert_ignore_into<T>() — INSERT IGNORE INTO <table> (...) VALUES (...)
+template <typename T>
+[[nodiscard]] dml_detail::insert_ignore_into_builder<T> insert_ignore_into() {
+    return {};
+}
+
+// insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
+template <typename T, AnySelectQuery Query>
+[[nodiscard]] dml_detail::insert_into_select_builder<T> insert_into_select(Query const& query) {
+    return dml_detail::insert_into_select_builder<T>{query.build_sql()};
+}
+
+// replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
+template <typename T>
+[[nodiscard]] dml_detail::replace_into_builder<T> replace_into() {
+    return {};
+}
+
+// update_join<T1, T2>() — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
+template <typename T1, typename T2, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+[[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join() {
+    std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +
+                              detail::qualified_col_name<LeftCol>() + " = " + detail::qualified_col_name<RightCol>();
+    return dml_detail::update_join_builder<T1, T2>{std::move(join_clause)};
+}
+
+// ===================================================================
+// SqlStatement — unified concept for all SQL builder types.
+// Satisfied by any builder stage that exposes build_sql() -> std::string.
+//
+// SqlExecuteStatement — DDL / DML builders (CREATE, INSERT, UPDATE, DELETE, DROP, ...).
+// Any SqlStatement that is not a TypedSelectQuery (i.e. carries no result_row_type).
+// Used by mysql_database::execute() to enforce that callers cannot pass a SELECT
+// builder to execute() and cannot pass a DDL/DML builder to query().
+// ===================================================================
+
+template <typename T>
+concept SqlStatement = requires(T const& t) {
+    { t.build_sql() } -> std::convertible_to<std::string>;
+};
+
+template <typename T>
+concept SqlExecuteStatement = SqlStatement<T> && !TypedSelectQuery<T>;
+
+}  // namespace ds_mysql

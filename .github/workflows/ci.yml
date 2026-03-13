@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y software-properties-common ca-certificates gpg wget
+          # Kitware APT repo for CMake 3.31+
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
+            | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build g++-15 \
+            libmysqlclient-dev pkg-config
+
+      - name: Configure
+        run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON -DBUILD_INTEGRATION_TESTS=OFF
+        env:
+          CXX: g++-15
+          CC: gcc-15
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
+        run: ctest --preset release
+
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      DS_MYSQL_TEST_HOST: 127.0.0.1
+      DS_MYSQL_TEST_DATABASE: ds_mysql_test
+      DS_MYSQL_TEST_USER: ds_mysql_test_user
+      DS_MYSQL_TEST_PASSWORD: ds_mysql_test_password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y software-properties-common ca-certificates gpg wget
+          # Kitware APT repo for CMake 3.31+
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
+            | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build g++-15 \
+            libmysqlclient-dev pkg-config
+
+      - name: Start MySQL
+        run: |
+          CONTAINER_ID=$(docker run -d \
+            -p 0:3306 \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -e MYSQL_DATABASE=ds_mysql_test \
+            -e MYSQL_USER=ds_mysql_test_user \
+            -e MYSQL_PASSWORD=ds_mysql_test_password \
+            --health-cmd="mysqladmin ping -h localhost" \
+            --health-interval=5s \
+            --health-timeout=10s \
+            --health-retries=10 \
+            mysql:8.0)
+          echo "MYSQL_CONTAINER_ID=$CONTAINER_ID" >> "$GITHUB_ENV"
+          PORT=$(docker inspect --format='{{(index (index .NetworkSettings.Ports "3306/tcp") 0).HostPort}}' "$CONTAINER_ID")
+          echo "DS_MYSQL_TEST_PORT=$PORT" >> "$GITHUB_ENV"
+          echo "Waiting for MySQL to be healthy..."
+          for i in $(seq 1 30); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_ID")
+            if [ "$STATUS" = "healthy" ]; then
+              echo "MySQL is healthy on port $PORT"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "MySQL did not become healthy in time"
+              docker logs "$CONTAINER_ID"
+              exit 1
+            fi
+            echo "Status: $STATUS, waiting... ($i/30)"
+            sleep 5
+          done
+
+      - name: Initialize database
+        run: |
+          sudo apt-get install -y mysql-client
+          mysql -h 127.0.0.1 -P "$DS_MYSQL_TEST_PORT" -u root -proot \
+            < tests/integration/docker/init-db.sql
+
+      - name: Configure
+        run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON
+        env:
+          CXX: g++-15
+          CC: gcc-15
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Test
+        run: ctest --preset release
+
+      - name: Stop MySQL
+        if: always()
+        run: |
+          if [ -n "$MYSQL_CONTAINER_ID" ]; then
+            docker stop "$MYSQL_CONTAINER_ID"
+            docker rm "$MYSQL_CONTAINER_ID"
+          fi

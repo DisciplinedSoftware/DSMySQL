@@ -1,0 +1,1063 @@
+#include <dotenv.h>
+
+#include <boost/ut.hpp>
+#include <chrono>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "ds_mysql/mysql_database.hpp"
+#include "ut_expected_expect.hpp"
+
+using namespace boost::ut;
+using namespace std::string_literals;
+
+namespace ds_mysql {
+
+// ===================================================================
+// Test fixtures
+// ===================================================================
+
+namespace {
+
+struct trade {
+    using id = column_field<struct id_tag, uint32_t>;
+    using account_id = column_field<struct account_id_tag, std::optional<uint32_t>>;
+    using code = column_field<struct code_tag, varchar_field<32>>;
+    using type = column_field<struct type_tag, varchar_field<64>>;
+    using name = column_field<struct name_tag, std::optional<varchar_field<255>>>;
+    using category = column_field<struct category_tag, std::optional<varchar_field<255>>>;
+    using currency = column_field<struct currency_tag, std::optional<varchar_field<32>>>;
+    using executed_at = column_field<struct executed_at_tag, sql_datetime>;
+    using recorded_at = column_field<struct recorded_at_tag, sql_datetime>;
+
+    id id_;
+    account_id account_id_;
+    code code_;
+    type type_;
+    name name_;
+    category category_;
+    currency currency_;
+    executed_at executed_at_;
+    recorded_at recorded_at_;
+};
+
+[[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
+    const std::string host = dotenv::getenv("DS_MYSQL_TEST_HOST", "");
+    const std::string database = dotenv::getenv("DS_MYSQL_TEST_DATABASE", "ds_mysql_test");
+    const std::string user = dotenv::getenv("DS_MYSQL_TEST_USER", "");
+    const std::string password = dotenv::getenv("DS_MYSQL_TEST_PASSWORD", "");
+
+    if (host.empty() || user.empty() || password.empty()) {
+        return std::nullopt;
+    }
+
+    const std::string port_env =
+        dotenv::getenv("DS_MYSQL_TEST_PORT", std::to_string(default_mysql_port.to_unsigned_int()));
+    const auto parsed_port = static_cast<unsigned int>(std::stoul(port_env));
+
+    return mysql_config{
+        host_name{host},
+        database_name{database},
+        auth_credentials{user_name{user}, user_password{password}},
+        port_number{parsed_port},
+    };
+}
+
+// A database struct registering `trade` for validate_database<> tests.
+struct trade_db : ds_mysql::database_schema {
+    using tables = std::tuple<trade>;
+};
+
+// A struct with only two columns; its auto-derived table name is "trade_few_columns".
+// The DB table is created (via raw SQL) with 9 columns in the mismatch tests, so
+// validate_table / validate_database will detect the count discrepancy.
+struct trade_few_columns {
+    using id = column_field<struct id_tag, uint32_t>;
+    using code = column_field<struct code_tag, varchar_field<32>>;
+
+    id id_;
+    code code_;
+};
+
+// A database struct wrapping trade_few_columns for validate_database mismatch tests.
+struct trade_few_columns_db : ds_mysql::database_schema {
+    using tables = std::tuple<trade_few_columns>;
+};
+
+// A second table used for multi-table validate_database tests.
+struct account {
+    using id = column_field<struct account_id_tag, uint32_t>;
+    using name = column_field<struct account_name_tag, varchar_field<64>>;
+
+    id id_;
+    name name_;
+};
+
+// A database struct with two tables for multi-table validation tests.
+struct multi_table_db : ds_mysql::database_schema {
+    using tables = std::tuple<trade, account>;
+};
+
+struct temporal_precision_trade {
+    using id = column_field<struct id_tag, uint32_t>;
+    using code = column_field<struct code_tag, varchar_field<32>>;
+    using executed_at = column_field<struct executed_at_tag, sql_datetime>;
+    using recorded_at = column_field<struct recorded_at_tag, sql_timestamp>;
+
+    id id_;
+    code code_;
+    executed_at executed_at_;
+    recorded_at recorded_at_;
+};
+
+}  // namespace
+
+template <>
+struct field_schema<temporal_precision_trade, 2> {
+    static constexpr std::string_view name() {
+        return temporal_precision_trade::executed_at::column_name();
+    }
+
+    static std::string sql_type() {
+        return sql_type_format::datetime_type(6);
+    }
+};
+
+template <>
+struct field_schema<temporal_precision_trade, 3> {
+    static constexpr std::string_view name() {
+        return temporal_precision_trade::recorded_at::column_name();
+    }
+
+    static std::string sql_type() {
+        return sql_type_format::timestamp_type(6);
+    }
+};
+
+// ===================================================================
+// DDL Integration — CREATE TABLE, DESCRIBE, DROP TABLE
+// ===================================================================
+
+suite<"DDL Integration"> ddl_integration_suite = [] {
+    "create and describe table"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value()) << "Failed to drop table";
+        expect(db->execute(create_table<trade>()).has_value()) << "Failed to create trade table";
+
+        auto const describe_result = db->query(describe<trade>());
+        expect(fatal(describe_result.has_value())) << "DESCRIBE trade failed";
+        expect(describe_result->size() == 9u) << "trade should have 9 columns";
+    };
+
+    "create table if not exists is idempotent"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+    };
+
+    "drop table if exists then create table via chaining"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value())
+            << "Chained DROP/CREATE should succeed";
+
+        auto const result = db->query(count<trade>());
+        expect(fatal(result.has_value()));
+        expect(result->size() == 1u) << "Should get count result";
+    };
+};
+
+// ===================================================================
+// INSERT Integration
+// ===================================================================
+
+suite<"INSERT Integration"> insert_integration_suite = [] {
+    "insert single row and verify"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value());
+
+        trade row;
+        row.code_ = "AAPL";
+        row.type_ = "Stock";
+        row.name_ = "Apple Inc.";
+        row.category_ = "Technology";
+        row.currency_ = "USD";
+        expect(db->execute(insert_into<trade>().values(row)).has_value()) << "Insert should succeed";
+
+        auto const count_result = db->query(count<trade>());
+        expect(fatal(count_result.has_value()));
+        expect(fatal(!count_result->empty()));
+        expect(std::get<0>((*count_result)[0]) == 1u) << "Should have 1 row after INSERT";
+    };
+
+    "insert multiple rows"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value());
+
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const count_result = db->query(count<trade>());
+        expect(fatal(count_result.has_value()));
+        expect(std::get<0>((*count_result)[0]) == 3u) << "Should have 3 rows";
+    };
+
+    "insert temporal values with configured precision and verify stored fractions"_test = [] {
+        using namespace std::chrono;
+
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<temporal_precision_trade>().if_exists()).has_value());
+        expect(db->execute(create_table<temporal_precision_trade>()).has_value());
+
+        temporal_precision_trade row;
+        row.code_ = "PREC";
+        auto const tp = system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{987654};
+        row.executed_at_ = sql_datetime{tp, 3};
+        row.recorded_at_ = sql_timestamp{tp, 2};
+
+        expect(db->execute(insert_into<temporal_precision_trade>().values(row)).has_value());
+
+        auto const results =
+            db->query(select<date_format_of<temporal_precision_trade::executed_at, "%Y-%m-%d %H:%i:%s.%f">,
+                             date_format_of<temporal_precision_trade::recorded_at, "%Y-%m-%d %H:%i:%s.%f">>()
+                          .from<temporal_precision_trade>()
+                          .where(equal<temporal_precision_trade::code>("PREC"))
+                          .limit(1));
+
+        expect(fatal(results.has_value()));
+        expect(fatal(results->size() == 1u));
+        expect(std::get<0>((*results)[0]) == "2024-01-01 00:00:00.987000") << std::get<0>((*results)[0]);
+        expect(std::get<1>((*results)[0]) == "2024-01-01 00:00:00.980000") << std::get<1>((*results)[0]);
+    };
+};
+
+// ===================================================================
+// SELECT Integration
+// ===================================================================
+
+suite<"SELECT Integration"> select_integration_suite = [] {
+    "select specific columns"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::id, trade::code>().from<trade>());
+        expect(fatal(results.has_value()));
+        expect(results->size() == 3u) << "Should have 3 trades";
+        expect(std::get<1>((*results)[0]) == "AAPL") << "First code should be AAPL";
+        expect(std::get<1>((*results)[1]) == "GOOGL") << "Second code should be GOOGL";
+        expect(std::get<1>((*results)[2]) == "MSFT") << "Third code should be MSFT";
+    };
+
+    "select with equal WHERE clause"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where(equal<trade::code>("AAPL")));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 1u) << "Should find only AAPL";
+        expect(std::get<0>((*results)[0]) == "AAPL");
+    };
+
+    "select with category WHERE clause"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        trade aapl;
+        aapl.code_ = "AAPL";
+        aapl.type_ = "Stock";
+        aapl.category_ = "Technology";
+        expect(db->execute(insert_into<trade>().values(aapl)).has_value());
+
+        trade googl;
+        googl.code_ = "GOOGL";
+        googl.type_ = "Stock";
+        googl.category_ = "Technology";
+        expect(db->execute(insert_into<trade>().values(googl)).has_value());
+
+        auto const rows =
+            db->query(select<trade::code, trade::name>().from<trade>().where(equal<trade::category>("Technology")));
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 2u) << "Should have 2 technology trades";
+    };
+
+    "select with LIMIT"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"},
+                                varchar_field<32>{"AMZN"}, varchar_field<32>{"TSLA"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::id, trade::code>().from<trade>().limit(3));
+        expect(fatal(results.has_value()));
+        expect(results->size() <= 3u) << "LIMIT 3 should return at most 3 rows";
+
+        for (auto const& result : *results) {
+            expect(!std::get<1>(result).empty()) << "Code should not be empty";
+        }
+    };
+};
+
+// ===================================================================
+// UPDATE Integration
+// ===================================================================
+
+suite<"UPDATE Integration"> update_integration_suite = [] {
+    "update single field and verify"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        trade row;
+        row.code_ = varchar_field<32>{"AAPL"};
+        row.type_ = varchar_field<64>{"Stock"};
+        row.name_ = varchar_field<255>{"Apple Inc."};
+        expect(db->execute(insert_into<trade>().values(row)).has_value());
+
+        expect(db->execute(update<trade>()
+                               .set(trade::name{varchar_field<255>{"Apple Corporation"}})
+                               .where(equal<trade::code>("AAPL")))
+                   .has_value())
+            << "Update should succeed";
+
+        auto const updated_count =
+            db->query(count<trade>().where(and_(equal<trade::code>("AAPL"), equal<trade::name>("Apple Corporation"))));
+        expect(fatal(updated_count.has_value()));
+        expect(fatal(!updated_count->empty()));
+        expect(std::get<0>((*updated_count)[0]) == 1u) << "Name should be updated";
+    };
+
+    "update type field and verify"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        trade row;
+        row.code_ = "AAPL";
+        row.type_ = "Stock";
+        expect(db->execute(insert_into<trade>().values(row)).has_value());
+
+        expect(
+            db->execute(update<trade>().set<trade::type>("Tech Stock").where(equal<trade::code>("AAPL"))).has_value());
+
+        auto const results = db->query(select<trade::type>().from<trade>().where(equal<trade::code>("AAPL")));
+        expect(fatal(results.has_value()));
+        expect(results->size() >= 1u);
+        expect(std::get<0>((*results)[0]) == "Tech Stock");
+    };
+};
+
+// ===================================================================
+// DELETE Integration
+// ===================================================================
+
+suite<"DELETE Integration"> delete_integration_suite = [] {
+    "delete single row and verify"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        expect(db->execute(delete_from<trade>().where(equal<trade::code>("AAPL"))).has_value());
+
+        auto const results = db->query(select<trade::code>().from<trade>());
+        expect(fatal(results.has_value()));
+        expect(results->size() == 2u) << "Should have 2 trades left";
+
+        bool found_aapl = false;
+        for (auto const& result : *results) {
+            if (std::get<0>(result) == "AAPL"s) {
+                found_aapl = true;
+            }
+        }
+        expect(!found_aapl) << "AAPL should be deleted";
+    };
+
+    "delete all rows"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        auto const count_result = db->query(count<trade>());
+        expect(fatal(count_result.has_value()));
+        expect(std::get<0>((*count_result)[0]) == 0u) << "Table should be empty";
+    };
+};
+
+// ===================================================================
+// WHERE Operator Syntax Integration
+// ===================================================================
+
+suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = [] {
+    "col_ref == filters correctly"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where(col_ref<trade::code> == "AAPL"));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 1u) << "col_ref == should filter to AAPL only";
+        expect(std::get<0>((*results)[0]) == "AAPL"s);
+    };
+
+    "col_ref != excludes correctly"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where(col_ref<trade::code> != "AAPL"));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 2u) << "col_ref != should exclude AAPL";
+        expect(std::get<0>((*results)[0]) == "GOOGL"s);
+        expect(std::get<0>((*results)[1]) == "MSFT"s);
+    };
+
+    "OR operator combines conditions"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where((col_ref<trade::code> == "AAPL") |
+                                                                                 (col_ref<trade::code> == "GOOGL")));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 2u) << "| should match AAPL or GOOGL";
+        expect(std::get<0>((*results)[0]) == "AAPL"s);
+        expect(std::get<0>((*results)[1]) == "GOOGL"s);
+    };
+
+    "AND operator narrows results"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where((col_ref<trade::code> != "AAPL") &
+                                                                                 (col_ref<trade::code> != "GOOGL")));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 1u) << "& should leave only MSFT";
+        expect(std::get<0>((*results)[0]) == "MSFT"s);
+    };
+
+    "NOT operator negates condition"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+            trade row;
+            row.code_ = code;
+            row.type_ = "Stock";
+            expect(db->execute(insert_into<trade>().values(row)).has_value());
+        }
+
+        auto const results = db->query(select<trade::code>().from<trade>().where(!(col_ref<trade::code> == "AAPL")));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 2u) << "! should exclude AAPL";
+        expect(std::get<0>((*results)[0]) == "GOOGL"s);
+        expect(std::get<0>((*results)[1]) == "MSFT"s);
+    };
+
+    "parenthesised priority (a | b) & c"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        trade aapl;
+        aapl.code_ = "AAPL";
+        aapl.type_ = "Bond";
+        expect(db->execute(insert_into<trade>().values(aapl)).has_value());
+
+        trade googl;
+        googl.code_ = "GOOGL";
+        googl.type_ = "Stock";
+        expect(db->execute(insert_into<trade>().values(googl)).has_value());
+
+        auto const results = db->query(select<trade::code>().from<trade>().where(
+            ((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")) & (col_ref<trade::type> == "Bond")));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 1u) << "(a | b) & c priority: only AAPL should survive";
+        expect(std::get<0>((*results)[0]) == "AAPL"s);
+    };
+};
+
+// ===================================================================
+// Schema Validation Integration
+// ===================================================================
+
+suite<"Schema Validation Integration"> schema_validation_suite = [] {
+    "validate_table succeeds when table matches C++ struct"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+
+        auto const result = db->validate_table<trade>();
+        expect(result.has_value()) << "validate_table<trade> should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+    };
+
+    "validate_table fails when table does not exist"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value());
+
+        auto const result = db->validate_table<trade>();
+        expect(!result.has_value()) << "validate_table<trade> should fail when table is absent";
+    };
+
+    "validate_table detects column count mismatch"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Create the trade_few_columns DB table with the same 9 columns as trade —
+        // the C++ struct only defines 2, so validate_table must detect the count mismatch.
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(drop_table<trade_few_columns>().if_exists()).has_value());
+        expect(db->execute(create_table<trade_few_columns>().like<trade>()).has_value());
+
+        auto const result = db->validate_table<trade_few_columns>();
+        expect(!result.has_value()) << "validate_table should fail: 2-column struct vs 9-column DB table";
+        expect(result.has_value() || result.error().find("column count") != std::string::npos)
+            << "Error should mention column count — got: " + (result.has_value() ? "" : result.error());
+    };
+
+    "validate_database succeeds when all registered tables match"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+
+        auto const result = db->validate_database<trade_db>();
+        expect(result.has_value()) << "validate_database<trade_db> should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+    };
+
+    "validate_database reports error when a table is absent"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value());
+
+        auto const result = db->validate_database<trade_db>();
+        expect(!result.has_value()) << "validate_database<trade_db> should fail when trade table is missing";
+    };
+
+    "validate_database reports error when a table column count mismatch"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Ensure trade_few_columns DB table has 9 columns; the C++ struct defines only 2.
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(drop_table<trade_few_columns>().if_exists()).has_value());
+        expect(db->execute(create_table<trade_few_columns>().like<trade>()).has_value());
+
+        auto const result = db->validate_database<trade_few_columns_db>();
+        expect(!result.has_value()) << "validate_database<trade_few_columns_db> should fail on column count mismatch";
+        expect(result.has_value() || result.error().find("column count") != std::string::npos)
+            << "Error should mention column count — got: " + (result.has_value() ? "" : result.error());
+    };
+
+    "validate_database succeeds with multiple tables"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(create_table<account>().if_not_exists()).has_value());
+
+        auto const result = db->validate_database<multi_table_db>();
+        expect(result.has_value()) << "validate_database<multi_table_db> should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+    };
+
+    "validate_database reports error when one of multiple tables is absent"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(drop_table<account>().if_exists()).has_value());
+
+        auto const result = db->validate_database<multi_table_db>();
+        expect(!result.has_value()) << "validate_database<multi_table_db> should fail when account table is absent";
+    };
+};
+
+// ===================================================================
+// Cleanup — drop table at end
+// ===================================================================
+
+suite<"Cleanup"> cleanup_suite = [] {
+    "drop trade table"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value()) << "Table drop should succeed";
+        expect(db->execute(drop_table<trade_few_columns>().if_exists()).has_value());
+        expect(db->execute(drop_table<account>().if_exists()).has_value());
+    };
+};
+
+// ===================================================================
+// Connection Error
+// ===================================================================
+
+suite<"Connection Error"> connection_error_suite = [] {
+    "connect with wrong credentials fails"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        // Use the same host/port as valid config but wrong credentials.
+        auto const bad_db = mysql_database::connect(
+            config->host(), config->database(),
+            auth_credentials{user_name{"nonexistent_user___"}, user_password{"wrong_pass___"}}, config->port());
+        expect(!bad_db.has_value()) << "Should fail with wrong credentials";
+        expect(!bad_db.has_value() || bad_db.error().empty() == false) << "Error message should not be empty";
+    };
+};
+
+// ===================================================================
+// Execute Failure
+// ===================================================================
+
+suite<"Execute Failure"> execute_failure_suite = [] {
+    "execute fails when table already exists"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value());
+        expect(db->execute(create_table<trade>()).has_value());
+
+        // Creating the same table again without IF NOT EXISTS triggers MySQL error 1050.
+        auto const fail = db->execute(create_table<trade>());
+        expect(!fail.has_value()) << "Should fail: table already exists";
+        expect(fail.has_value() || !fail.error().empty()) << "Error should not be empty";
+
+        expect(db->execute(drop_table<trade>().if_exists()).has_value());
+    };
+};
+
+// ===================================================================
+// Raw SQL DML via query() — covers query_raw_nullable DDL/DML path
+// ===================================================================
+
+suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
+    "query(raw_sql DML) returns empty result set"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+
+        // A DML statement via raw_sql triggers the DDL/DML no-result-set path.
+        auto const result = db->query(raw_sql{"DELETE FROM trade WHERE id = 0"});
+        expect(result.has_value()) << "DML via raw_sql should succeed";
+        expect(result->empty()) << "DML result should be empty (no result set)";
+    };
+
+    "query(raw_sql DDL) returns empty result set"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // DDL via raw_sql also returns no result set.
+        auto const result =
+            db->query(raw_sql{"CREATE TABLE IF NOT EXISTS raw_ddl_test (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY)"});
+        expect(result.has_value()) << "DDL via raw_sql should succeed";
+        expect(result->empty()) << "DDL result should be empty (no result set)";
+
+        auto const drop = db->query(raw_sql{"DROP TABLE IF EXISTS raw_ddl_test"});
+        expect(drop.has_value());
+    };
+};
+
+// ===================================================================
+// Boolean column validation — covers normalize_cpp_sql_type("BOOLEAN")
+// ===================================================================
+
+namespace {
+struct bool_table {
+    using id = column_field<struct bool_id_tag, uint32_t>;
+    using is_active = column_field<struct is_active_tag, bool>;
+
+    id id_;
+    is_active is_active_;
+};
+}  // namespace
+
+suite<"Boolean Column Coverage"> boolean_column_suite = [] {
+    "validate_table with bool column — normalize_cpp_sql_type maps BOOLEAN to TINYINT(1)"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        expect(db->execute(drop_table<bool_table>().if_exists()).has_value());
+        expect(db->execute(create_table<bool_table>()).has_value());
+
+        auto const result = db->validate_table<bool_table>();
+        expect(result.has_value()) << "validate_table<bool_table> should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+
+        expect(db->execute(drop_table<bool_table>().if_exists()).has_value());
+    };
+};
+
+// ===================================================================
+// validate_field error path coverage — name, type, nullability mismatches
+// ===================================================================
+
+namespace {
+// C++ struct matching the layout of the tables created in validate_field tests.
+struct mismatch_table {
+    using id = column_field<struct mismatch_id_tag, uint32_t>;
+    using right_name = column_field<struct right_name_tag, varchar_field<32>>;
+
+    id id_;
+    right_name right_name_;
+};
+
+struct type_mismatch_struct {
+    using id = column_field<struct tm_id_tag, uint32_t>;
+    using code = column_field<struct tm_code_tag, varchar_field<32>>;  // expects VARCHAR(32)
+
+    id id_;
+    code code_;
+};
+
+struct nullability_mismatch_struct {
+    using id = column_field<struct nm_id_tag, uint32_t>;
+    using code = column_field<struct nm_code_tag, varchar_field<32>>;  // expects NOT NULL
+
+    id id_;
+    code code_;
+};
+}  // namespace
+
+template <>
+struct table_name_for<mismatch_table> {
+    static constexpr table_name value() noexcept {
+        return table_name{"mismatch_name_tbl"};
+    }
+};
+
+template <>
+struct table_name_for<type_mismatch_struct> {
+    static constexpr table_name value() noexcept {
+        return table_name{"type_mismatch_tbl"};
+    }
+};
+
+template <>
+struct table_name_for<nullability_mismatch_struct> {
+    static constexpr table_name value() noexcept {
+        return table_name{"nullable_mismatch_tbl"};
+    }
+};
+
+suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
+    "validate_table detects column name mismatch"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Create a table where column 2 is 'wrong_col_name' but struct expects 'right_name'.
+        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"});
+        expect(drop.has_value());
+        auto create =
+            db->query(raw_sql{"CREATE TABLE mismatch_name_tbl "
+                              "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
+                              "wrong_col_name VARCHAR(32) NOT NULL, "
+                              "PRIMARY KEY (id))"});
+        expect(create.has_value());
+
+        auto const result = db->validate_table<mismatch_table>();
+        expect(!result.has_value()) << "validate_table should fail on name mismatch";
+        expect(!result.has_value() && result.error().find("name expected") != std::string::npos)
+            << "Error should mention 'name expected' — got: " + (result.has_value() ? "" : result.error());
+
+        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"});
+        expect(cleanup.has_value());
+    };
+
+    "validate_table detects column type mismatch"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Create a table where 'code' is INT but struct expects VARCHAR(32).
+        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"});
+        expect(drop.has_value());
+        auto create =
+            db->query(raw_sql{"CREATE TABLE type_mismatch_tbl "
+                              "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
+                              "code INT NOT NULL, "
+                              "PRIMARY KEY (id))"});
+        expect(create.has_value());
+
+        auto const result = db->validate_table<type_mismatch_struct>();
+        expect(!result.has_value()) << "validate_table should fail on type mismatch";
+        expect(!result.has_value() && result.error().find("type expected") != std::string::npos)
+            << "Error should mention 'type expected' — got: " + (result.has_value() ? "" : result.error());
+
+        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"});
+        expect(cleanup.has_value());
+    };
+
+    "validate_table detects nullability mismatch"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Create a table where 'code' is nullable but struct expects NOT NULL.
+        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
+        expect(drop.has_value());
+        auto create =
+            db->query(raw_sql{"CREATE TABLE nullable_mismatch_tbl "
+                              "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
+                              "code VARCHAR(32) NULL, "
+                              "PRIMARY KEY (id))"});
+        expect(create.has_value());
+
+        auto const result = db->validate_table<nullability_mismatch_struct>();
+        expect(!result.has_value()) << "validate_table should fail on nullability mismatch";
+        expect(!result.has_value() && result.error().find("nullability expected") != std::string::npos)
+            << "Error should mention 'nullability expected' — got: " + (result.has_value() ? "" : result.error());
+
+        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
+        expect(cleanup.has_value());
+    };
+};
+
+// ===================================================================
+// Typed query column count mismatch — covers mysql_database::query() guard
+// ===================================================================
+
+namespace {
+struct one_col_query {
+    using result_row_type = std::tuple<uint32_t>;
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SELECT id, code FROM trade LIMIT 1";
+    }
+};
+}  // namespace
+
+suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
+    "query with mismatched column count returns error"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+
+        // Ensure at least one row exists so the result set is non-empty.
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+        trade row;
+        row.code_ = varchar_field<32>{"AAPL"};
+        row.type_ = varchar_field<64>{"Stock"};
+        expect(db->execute(insert_into<trade>().values(row)).has_value());
+
+        // one_col_query::result_row_type has 1 column but the SQL returns 2.
+        auto const result = db->query(one_col_query{});
+        expect(!result.has_value()) << "Should detect column count mismatch";
+        expect(!result.has_value() && result.error().find("Column count mismatch") != std::string::npos)
+            << "Error should mention 'Column count mismatch' — got: " + (result.has_value() ? "" : result.error());
+
+        expect(db->execute(delete_from<trade>()).has_value());
+    };
+};
+
+}  // namespace ds_mysql

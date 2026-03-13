@@ -1,0 +1,271 @@
+# DSMySQL
+
+A portable C++23 type-safe MySQL query builder and database wrapper.
+
+DSMySQL provides a **header-only** library for building type-safe SQL queries and interacting with MySQL databases using compile-time reflection via Boost.PFR. Define your schema as C++ structs and let the compiler verify column names, types, and nullability.
+
+## Features
+
+- **Header-only** — no compiled library to link against (beyond the MySQL C client)
+- **Type-safe queries** — column types are verified at compile time
+- **Compile-time schema generation** — `CREATE TABLE` SQL is derived from C++ structs
+- **Schema validation** — verify a live database schema against your C++ definitions
+- **C++23** — uses `std::expected`, concepts, ranges, and structured bindings
+- **Zero-overhead abstractions** — all query building happens at compile time
+- **Strong types** — `host_name`, `database_name`, `port_number`, `varchar_field<N>`, etc.
+- **Optional support** — `std::optional<T>` maps to nullable SQL columns automatically
+
+## Quick Start
+
+```cpp
+#include "ds_mysql/mysql_database.hpp"
+#include "ds_mysql/sql.hpp"
+#include "ds_mysql/column_field.hpp"
+#include "ds_mysql/varchar_field.hpp"
+
+using namespace ds_mysql;
+
+// 1. Define your table as a C++ struct
+struct product {
+    using id    = column_field<struct id_tag,    uint32_t>;
+    using sku   = column_field<struct sku_tag,   varchar_field<64>>;
+    using name  = column_field<struct name_tag,  varchar_field<255>>;
+    using price = column_field<struct price_tag, double>;
+
+    id    id_;
+    sku   sku_;
+    name  name_;
+    price price_;
+};
+
+// 2. Register the table name
+template <> struct table_name_for<product> {
+    static constexpr table_name value() noexcept { return table_name{"product"}; }
+};
+
+// 3. Connect and query
+auto db = mysql_database::connect(mysql_config{
+    host_name{"127.0.0.1"},
+    database_name{"my_db"},
+    auth_credentials{user_name{"root"}, user_password{"secret"}},
+    port_number{3306},
+}).value();
+
+// CREATE TABLE IF NOT EXISTS product (...)
+db.execute(create_table<product>().if_not_exists());
+
+// Type-safe SELECT: returns std::expected<std::vector<std::tuple<uint32_t, varchar_field<255>>>, std::string>
+auto rows = db.query(select<product::id, product::name>()
+                         .from<product>()
+                         .where(product::price{9.99})
+                         .order_by<product::id>());
+
+for (auto const& [id, name] : *rows) {
+    std::println("{}: {}", id, name.to_string());
+}
+```
+
+## Requirements
+
+- CMake 3.25 or higher
+- C++23 compiler (GCC 13+ or Clang 16+)
+- MySQL client library (`libmysqlclient-dev`)
+- Ninja build system (recommended)
+- Docker (for integration tests only)
+
+## Building
+
+```bash
+git clone https://github.com/DisciplinedSoftware/DSMySQL.git
+cd DSMySQL
+
+cmake --preset release
+cmake --build build -j$(nproc)
+ctest --preset release
+```
+
+### Build Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `BUILD_TESTING` | ON | Build unit and integration tests |
+| `BUILD_INTEGRATION_TESTS` | ON | Build MySQL integration tests |
+| `BUILD_EXAMPLES` | ON | Build example programs |
+| `ENABLE_COVERAGE` | OFF | Enable code coverage instrumentation |
+| `SKIP_DOCKER_MANAGEMENT` | OFF | Skip Docker lifecycle (for CI environments) |
+
+```bash
+# Unit tests only, skip integration tests
+cmake --preset release -DBUILD_INTEGRATION_TESTS=OFF
+cmake --build build -j$(nproc)
+ctest --preset release
+
+# Debug build
+cmake --preset debug
+cmake --build build -j$(nproc)
+```
+
+## Using as a Dependency
+
+Since DSMySQL is header-only, integrate it with CMake FetchContent:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    DSMySQL
+    GIT_REPOSITORY https://github.com/DisciplinedSoftware/DSMySQL.git
+    GIT_TAG main
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(DSMySQL)
+
+target_link_libraries(my_target PRIVATE ds_mysql)
+```
+
+## Project Structure
+
+```text
+DSMySQL/
+├── lib/include/ds_mysql/       # All public headers (header-only)
+│   ├── mysql_database.hpp      # MySQL connection & query execution
+│   ├── sql.hpp                 # SQL query builder (SELECT, INSERT, UPDATE, ...)
+│   ├── sql_extension.hpp       # MySQL-specific SQL extensions
+│   ├── column_field.hpp        # Typed column descriptors
+│   ├── schema_generator.hpp    # Compile-time CREATE TABLE generation
+│   ├── mysql_metadata.hpp      # MySQL information_schema typed schemas
+│   ├── mysql_config.hpp        # Connection configuration struct
+│   ├── varchar_field.hpp       # Fixed-length VARCHAR type
+│   ├── sql_temporal.hpp        # sql_datetime, sql_timestamp types
+│   ├── text_field.hpp          # MEDIUMTEXT / LONGTEXT support
+│   ├── credentials.hpp         # auth_credentials (user + password)
+│   ├── host_name.hpp           # Strong type for hostname
+│   ├── database_name.hpp       # Strong type for database name
+│   ├── port_number.hpp         # Strong type for port (0–65535)
+│   ├── user_name.hpp           # Strong type for MySQL username
+│   ├── user_password.hpp       # Strong type for MySQL password
+│   ├── sql_identifiers.hpp     # table_name, column_name, database_schema
+│   ├── col.hpp                 # Column descriptor utilities
+│   └── member_name_reflection.hpp  # Boost.PFR member name reflection
+├── tests/
+│   ├── unit/                   # boost.ut unit tests (no database required)
+│   └── integration/            # MySQL integration tests (Docker)
+│       ├── mysql/              # Test source files
+│       ├── docker/             # Docker Compose + init scripts
+│       └── cmake/              # DockerIntegration.cmake module
+├── examples/
+│   ├── basic_query.cpp         # Connect, create table, insert, select
+│   └── schema_generation.cpp   # Schema generation and DDL printing
+├── docs/
+│   ├── BUILD.md                # Build instructions
+│   ├── DEVELOPMENT.md          # Development guide
+│   ├── INTEGRATION_TESTS.md    # Integration testing with Docker
+│   ├── COVERAGE.md             # Code coverage setup
+│   └── QUICKREF.md             # Quick reference
+├── CMakeLists.txt
+└── CMakePresets.json
+```
+
+## Key API
+
+### Connecting
+
+```cpp
+// Explicit parameters
+auto db = mysql_database::connect(
+    host_name{"127.0.0.1"},
+    database_name{"my_db"},
+    auth_credentials{user_name{"root"}, user_password{"secret"}},
+    port_number{3306}
+).value();
+
+// Via mysql_config
+mysql_config cfg{host_name{"127.0.0.1"}, database_name{"my_db"},
+                 auth_credentials{user_name{"root"}, user_password{""}},
+                 port_number{3306}};
+auto db = mysql_database::connect(cfg).value();
+```
+
+### DDL (CREATE, DROP)
+
+```cpp
+db.execute(create_table<product>().if_not_exists());
+db.execute(drop_table<product>());
+db.execute(create_database<my_db>().if_not_exists());
+```
+
+### DML (INSERT, UPDATE, DELETE)
+
+```cpp
+db.execute(insert_into<product>().values(row));
+db.execute(update<product>().set(product::price{12.99}).where(product::id{1}));
+db.execute(delete_from<product>().where(product::id{1}));
+db.execute(truncate<product>());
+```
+
+### DQL (SELECT, COUNT, DESCRIBE)
+
+```cpp
+// Select specific columns
+auto rows = db.query(select<product::id, product::name>().from<product>());
+
+// Select all columns
+auto all = db.query(select_all<product>().from<product>().order_by<product::id>());
+
+// Count
+auto cnt = db.query(count<product>().where(product::price{9.99}));
+
+// DESCRIBE (schema introspection)
+auto cols = db.query(describe<product>());
+```
+
+### Schema Validation
+
+```cpp
+// Validate a single table
+auto r = db.validate_table<product>();
+if (!r) std::println(stderr, "Mismatch: {}", r.error());
+
+// Validate all tables in a database schema
+auto r2 = db.validate_database<my_db>();
+```
+
+### Numeric Precision Overrides
+
+```cpp
+template <>
+struct ds_mysql::field_schema<order_row, 2> {   // field at index 2
+    static constexpr std::string_view name() { return order_row::amount::column_name(); }
+    static std::string sql_type() { return sql_type_format::decimal_type(18, 6); }
+};
+```
+
+## Integration Tests
+
+Integration tests connect to a real MySQL 8.0 instance managed via Docker Compose.
+
+```bash
+# Start Docker container, run all tests, stop container (automatic)
+ctest --preset release
+
+# Manual container management
+cmake --build build --target docker_integration_up
+ctest --preset release -R tests_integration_ds_mysql
+cmake --build build --target docker_integration_down
+```
+
+See [docs/INTEGRATION_TESTS.md](docs/INTEGRATION_TESTS.md) for full details.
+
+## Dependencies
+
+Automatically fetched via CMake FetchContent:
+
+- [Boost.PFR](https://github.com/boostorg/pfr) — compile-time struct reflection (header-only)
+- [boost.ut](https://github.com/boost-ext/ut) v2.1.0 — unit testing (test builds only)
+- [dotenv-cpp](https://github.com/laserpants/dotenv-cpp) — `.env` file loading (integration tests only)
+
+System dependencies:
+- MySQL client library (`libmysqlclient-dev` on Ubuntu)
+
+## License
+
+See [LICENSE](LICENSE) for details.
