@@ -27,10 +27,15 @@ using namespace ds_mysql;
 
 // 1. Define your table as a C++ struct
 struct product {
-    using id    = column_field<struct id_tag,    uint32_t>;
-    using sku   = column_field<struct sku_tag,   varchar_field<64>>;
-    using name  = column_field<struct name_tag,  varchar_field<255>>;
-    using price = column_field<struct price_tag, double>;
+    struct id_tag {};
+    struct sku_tag {};
+    struct name_tag {};
+    struct price_tag {};
+
+    using id    = column_field<id_tag,    uint32_t>;
+    using sku   = column_field<sku_tag,   varchar_field<64>>;
+    using name  = column_field<name_tag,  varchar_field<255>>;
+    using price = column_field<price_tag, double>;
 
     id    id_;
     sku   sku_;
@@ -38,12 +43,7 @@ struct product {
     price price_;
 };
 
-// 2. Register the table name
-template <> struct table_name_for<product> {
-    static constexpr table_name value() noexcept { return table_name{"product"}; }
-};
-
-// 3. Connect and query
+// 2. Connect and query
 auto db = mysql_database::connect(mysql_config{
     host_name{"127.0.0.1"},
     database_name{"my_db"},
@@ -87,7 +87,7 @@ ctest --preset release
 ### Build Options
 
 | Option | Default | Description |
-|--------|---------|-------------|
+| ------ | ------- | ----------- |
 | `BUILD_TESTING` | ON | Build unit and integration tests |
 | `BUILD_INTEGRATION_TESTS` | ON | Build MySQL integration tests |
 | `BUILD_EXAMPLES` | ON | Build example programs |
@@ -221,6 +221,7 @@ Automatically fetched via CMake FetchContent:
 - [dotenv-cpp](https://github.com/laserpants/dotenv-cpp) — `.env` file loading (integration tests only)
 
 System dependencies:
+
 - MySQL client library (`libmysqlclient-dev` on Ubuntu)
 
 ## License

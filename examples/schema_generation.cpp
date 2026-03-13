@@ -27,11 +27,17 @@
 // ===================================================================
 
 struct user {
-    using id         = ds_mysql::column_field<struct id_tag,         uint32_t>;
-    using username   = ds_mysql::column_field<struct username_tag,   ds_mysql::varchar_field<64>>;
-    using email      = ds_mysql::column_field<struct email_tag,      ds_mysql::varchar_field<255>>;
-    using is_active  = ds_mysql::column_field<struct is_active_tag,  bool>;
-    using created_at = ds_mysql::column_field<struct created_at_tag, ds_mysql::sql_datetime>;
+    struct id_tag {};
+    struct username_tag {};
+    struct email_tag {};
+    struct is_active_tag {};
+    struct created_at_tag {};
+
+    using id = ds_mysql::column_field<id_tag, uint32_t>;
+    using username = ds_mysql::column_field<username_tag, ds_mysql::varchar_field<64>>;
+    using email = ds_mysql::column_field<email_tag, ds_mysql::varchar_field<255>>;
+    using is_active = ds_mysql::column_field<is_active_tag, bool>;
+    using created_at = ds_mysql::column_field<created_at_tag, ds_mysql::sql_datetime>;
 
     id         id_;
     username   username_;
@@ -40,22 +46,17 @@ struct user {
     created_at created_at_;
 };
 
-template <>
-struct ds_mysql::table_name_for<user> {
-    static constexpr ds_mysql::table_name value() noexcept { return ds_mysql::table_name{"user"}; }
-};
-
 // ===================================================================
 // Define an 'order_row' table with a numeric precision override
 // ===================================================================
 
 struct order_row {
-    using id         = ds_mysql::column_field<struct order_id_tag,   uint32_t>;
-    using user_id    = ds_mysql::column_field<struct user_id_tag,    uint32_t>;
-    using amount     = ds_mysql::column_field<struct amount_tag,     double>;
-    using fee        = ds_mysql::column_field<struct fee_tag,        std::optional<double>>;
-    using status     = ds_mysql::column_field<struct status_tag,     ds_mysql::varchar_field<32>>;
-    using created_at = ds_mysql::column_field<struct order_created_at_tag, ds_mysql::sql_datetime>;
+    struct order_id_tag {};          using id         = ds_mysql::column_field<order_id_tag,          uint32_t>;
+    struct user_id_tag {};           using user_id    = ds_mysql::column_field<user_id_tag,           uint32_t>;
+    struct amount_tag {};            using amount     = ds_mysql::column_field<amount_tag,            double>;
+    struct fee_tag {};               using fee        = ds_mysql::column_field<fee_tag,               std::optional<double>>;
+    struct status_tag {};            using status     = ds_mysql::column_field<status_tag,            ds_mysql::varchar_field<32>>;
+    struct order_created_at_tag {};  using created_at = ds_mysql::column_field<order_created_at_tag, ds_mysql::sql_datetime>;
 
     id         id_;
     user_id    user_id_;
@@ -63,11 +64,6 @@ struct order_row {
     fee        fee_;
     status     status_;
     created_at created_at_;
-};
-
-template <>
-struct ds_mysql::table_name_for<order_row> {
-    static constexpr ds_mysql::table_name value() noexcept { return ds_mysql::table_name{"order_row"}; }
 };
 
 // Override 'amount' (index 2) to use DECIMAL(18,6) instead of DOUBLE

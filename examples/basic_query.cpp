@@ -42,13 +42,21 @@
 // ===================================================================
 
 struct product {
-    using id          = ds_mysql::column_field<struct id_tag,          uint32_t>;
-    using sku         = ds_mysql::column_field<struct sku_tag,          ds_mysql::varchar_field<64>>;
-    using name        = ds_mysql::column_field<struct name_tag,         ds_mysql::varchar_field<255>>;
-    using price       = ds_mysql::column_field<struct price_tag,        double>;
-    using stock       = ds_mysql::column_field<struct stock_tag,        uint32_t>;
-    using description = ds_mysql::column_field<struct description_tag,  std::optional<ds_mysql::varchar_field<512>>>;
-    using created_at  = ds_mysql::column_field<struct created_at_tag,   ds_mysql::sql_datetime>;
+    struct id_tag {};
+    struct sku_tag {};
+    struct name_tag {};
+    struct price_tag {};
+    struct stock_tag {};
+    struct description_tag {};
+    struct created_at_tag {};
+
+    using id = ds_mysql::column_field<id_tag, uint32_t>;
+    using sku = ds_mysql::column_field<sku_tag, ds_mysql::varchar_field<64>>;
+    using name = ds_mysql::column_field<name_tag, ds_mysql::varchar_field<255>>;
+    using price = ds_mysql::column_field<price_tag, double>;
+    using stock = ds_mysql::column_field<stock_tag, uint32_t>;
+    using description = ds_mysql::column_field<description_tag, std::optional<ds_mysql::varchar_field<512>>>;
+    using created_at = ds_mysql::column_field<created_at_tag, ds_mysql::sql_datetime>;
 
     id          id_;
     sku         sku_;
@@ -57,15 +65,6 @@ struct product {
     stock       stock_;
     description description_;
     created_at  created_at_;
-};
-
-// ===================================================================
-// Teach ds_mysql the table name for product.
-// ===================================================================
-
-template <>
-struct ds_mysql::table_name_for<product> {
-    static constexpr ds_mysql::table_name value() noexcept { return ds_mysql::table_name{"product"}; }
 };
 
 // ===================================================================
