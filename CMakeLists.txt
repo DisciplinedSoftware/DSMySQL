@@ -126,14 +126,17 @@ endif()
 # Add library
 add_subdirectory(lib)
 
-# Add tests
-if(BUILD_TESTING)
-    add_subdirectory(tests)
-endif()
+# Add tests and examples only when DSMySQL is the top-level project
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    # Add tests
+    if(BUILD_TESTING)
+        add_subdirectory(tests)
+    endif()
 
-# Add examples
-if(BUILD_EXAMPLES)
-    add_subdirectory(examples)
+    # Add examples
+    if(BUILD_EXAMPLES)
+        add_subdirectory(examples)
+    endif()
 endif()
 
 # Display configuration summary
