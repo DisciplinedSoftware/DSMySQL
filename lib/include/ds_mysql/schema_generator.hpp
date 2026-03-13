@@ -11,6 +11,7 @@
 #include <type_traits>
 
 #include "ds_mysql/column_field.hpp"
+#include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/sql_identifiers.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/text_field.hpp"
@@ -167,49 +168,6 @@ namespace sql_type_format {
 // ===================================================================
 // Table Schema - Table Name via Reflection
 // ===================================================================
-
-namespace detail {
-
-/**
- * Extract struct type name from compiler intrinsics (__PRETTY_FUNCTION__ or __FUNCSIG__)
- */
-template <typename T>
-consteval std::string_view extract_type_name() {
-#if defined(__clang__) || defined(__GNUC__)
-    constexpr std::string_view signature = __PRETTY_FUNCTION__;
-    constexpr std::string_view marker = "T = ";
-#elif defined(_MSC_VER)
-    constexpr std::string_view signature = __FUNCSIG__;
-    constexpr std::string_view marker = "extract_type_name<";
-#else
-    return "unknown";
-#endif
-
-    constexpr auto npos = std::string_view::npos;
-    constexpr auto marker_pos = signature.find(marker);
-    if constexpr (marker_pos == npos) {
-        return "unknown";
-    }
-
-    constexpr auto start = marker_pos + marker.size();
-
-#if defined(__clang__) || defined(__GNUC__)
-    // GCC/Clang format: [with T = TYPE] or [with T = TYPE; ALIAS = EXPANSION, ...]
-    constexpr auto end = min_find_pos(signature.find(';', start), signature.find(']', start));
-#else
-    // MSVC format: "...extract_type_name<TYPE>(void)..."
-    // The type ends at '>' (template arg close) or ',' (comma in multi-param templates).
-    constexpr auto end = min_find_pos(signature.find('>', start), signature.find(',', start));
-#endif
-
-    if constexpr (end == npos || end <= start) {
-        return "unknown";
-    }
-
-    return strip_type_qualifiers(signature.substr(start, end - start));
-}
-
-}  // namespace detail
 
 /**
  * table_name_for - Automatically derive table name from struct type name via reflection

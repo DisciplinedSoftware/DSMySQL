@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
 
@@ -23,99 +24,6 @@ struct column_field_tag {};
 //   using id = column_field<struct id_tag, uint32_t>;
 template <typename Tag, typename T>
 struct column_field;
-
-// ===================================================================
-// detail::tag_to_column_name<Tag>
-// ===================================================================
-
-namespace detail {
-
-template <typename>
-inline constexpr bool dependent_false_v = false;
-
-/**
- * min_find_pos — returns the earlier of two string_view::find() positions.
- * Treats npos as "not found": if only one is valid it is returned; if neither
- * is valid npos is returned.
- */
-[[nodiscard]] constexpr std::size_t min_find_pos(std::size_t p1, std::size_t p2) noexcept {
-    constexpr auto npos = std::string_view::npos;
-    return (p1 != npos && p2 != npos) ? (p1 < p2 ? p1 : p2) : (p1 != npos ? p1 : p2);
-}
-
-/**
- * strip_type_qualifiers — given a raw type-name substring from a compiler
- * function-signature intrinsic, returns the final unqualified identifier:
- *
- *   - (MSVC only) strips a leading 'struct ' or 'class ' keyword
- *   - strips any leading namespace/scope qualifier up to the last '::'
- *
- * Example inputs → outputs:
- *   "struct `anonymous-namespace'::ticker_tag"  →  "ticker_tag"   (MSVC)
- *   "(anonymous namespace)::ticker_tag"          →  "ticker_tag"   (GCC/Clang)
- *   "child_table_cascade"                        →  "child_table_cascade"
- */
-[[nodiscard]] constexpr std::string_view strip_type_qualifiers(std::string_view name) noexcept {
-#if defined(_MSC_VER)
-    if (name.starts_with("struct "))
-        name = name.substr(7);
-    else if (name.starts_with("class "))
-        name = name.substr(6);
-#endif
-    auto const scope = name.rfind("::");
-    if (scope != std::string_view::npos && scope + 2 < name.size())
-        name = name.substr(scope + 2);
-    return name;
-}
-
-/**
- * tag_to_column_name<Tag> — derive a SQL column name from a tag type at compile time.
- *
- * Extracts the unqualified type name of Tag and strips a trailing "_tag" suffix:
- *
- *   tag_to_column_name<id_tag>()       → "id"
- *   tag_to_column_name<ticker_tag>()   → "ticker"
- *   tag_to_column_name<my_col>()       → "my_col"
- */
-template <typename Tag>
-consteval std::string_view tag_to_column_name() noexcept {
-#if defined(__clang__) || defined(__GNUC__)
-    constexpr std::string_view sig = __PRETTY_FUNCTION__;
-    constexpr std::string_view key = "Tag = ";
-#elif defined(_MSC_VER)
-    constexpr std::string_view sig = __FUNCSIG__;
-    constexpr std::string_view key = "tag_to_column_name<";
-#else
-    static_assert(dependent_false_v<Tag>, "tag_to_column_name requires Clang, GCC, or MSVC");
-    return {};
-#endif
-    constexpr auto npos = std::string_view::npos;
-    constexpr auto key_pos = sig.find(key);
-    if constexpr (key_pos == npos) {
-        static_assert(dependent_false_v<Tag>, "Failed to parse Tag name from compiler function signature");
-        return {};
-    }
-    constexpr auto start = key_pos + key.size();
-#if defined(_MSC_VER)
-    // MSVC __FUNCSIG__: "...tag_to_column_name<struct `anonymous-namespace'::tag>(void)..."
-    // The tag type ends at '>' (template arg close); '(' is a secondary fallback.
-    constexpr auto end = min_find_pos(sig.find('>', start), sig.find('(', start));
-#else
-    constexpr auto end = min_find_pos(sig.find(';', start), sig.find(']', start));
-#endif
-    if constexpr (end == npos || end <= start) {
-        static_assert(dependent_false_v<Tag>, "Failed to locate end of Tag name in compiler function signature");
-        return {};
-    }
-    auto name = strip_type_qualifiers(sig.substr(start, end - start));
-    constexpr std::string_view suffix = "_tag";
-    if (name.size() > suffix.size() && name.substr(name.size() - suffix.size()) == suffix) {
-        return name.substr(0, name.size() - suffix.size());
-    }
-    return name;
-}
-
-}  // namespace detail
 
 // ===================================================================
 // column_field_detail — internal base specializations
