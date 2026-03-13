@@ -41,12 +41,13 @@ DSMySQL/
 
 | Header | Purpose |
 |--------|---------|
+| `ds_mysql.hpp` | **Umbrella header** — include this to get everything |
 | `ds_mysql/mysql_database.hpp` | MySQL connection & queries |
 | `ds_mysql/sql.hpp` | SQL query builder |
 | `ds_mysql/sql_extension.hpp` | MySQL-specific extensions |
+| `ds_mysql/mysql_metadata.hpp` | MySQL information_schema types |
 | `ds_mysql/column_field.hpp` | Typed column descriptors |
 | `ds_mysql/schema_generator.hpp` | Schema generation |
-| `ds_mysql/mysql_metadata.hpp` | MySQL information_schema types |
 | `ds_mysql/mysql_config.hpp` | Connection configuration |
 | `ds_mysql/varchar_field.hpp` | Fixed-length string type |
 

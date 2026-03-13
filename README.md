@@ -18,10 +18,7 @@ DSMySQL provides a **header-only** library for building type-safe SQL queries an
 ## Quick Start
 
 ```cpp
-#include "ds_mysql/mysql_database.hpp"
-#include "ds_mysql/sql.hpp"
-#include "ds_mysql/column_field.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql.hpp"
 
 using namespace ds_mysql;
 
