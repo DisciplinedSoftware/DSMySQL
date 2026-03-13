@@ -707,7 +707,7 @@ void append_column_defs(std::ostringstream& sql, std::index_sequence<Is...>) {
             if constexpr (!is_field_nullable_v<field_type>) {
                 sql << " NOT NULL";
             }
-            if (Is == 0) {
+            if constexpr (Is == 0) {
                 sql << " PRIMARY KEY AUTO_INCREMENT";
             }
             ++count;
