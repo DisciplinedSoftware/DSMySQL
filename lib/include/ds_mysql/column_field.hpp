@@ -78,6 +78,12 @@ consteval std::string_view tag_to_column_name() noexcept {
         return {};
     }
     auto name = sig.substr(start, end - start);
+    // MSVC prepends 'struct ' or 'class ' to type names; strip before scope/suffix processing.
+    if (name.starts_with("struct ")) {
+        name = name.substr(7);
+    } else if (name.starts_with("class ")) {
+        name = name.substr(6);
+    }
     auto const scope = name.rfind("::");
     if (scope != std::string_view::npos && scope + 2 < name.size()) {
         name = name.substr(scope + 2);

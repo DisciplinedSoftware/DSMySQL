@@ -218,6 +218,13 @@ consteval std::string_view extract_type_name() {
 
     auto name = signature.substr(start, end - start);
 
+    // MSVC prepends 'struct ' or 'class ' to type names; strip before scope processing.
+    if (name.starts_with("struct ")) {
+        name = name.substr(7);
+    } else if (name.starts_with("class ")) {
+        name = name.substr(6);
+    }
+
     // Remove namespace qualifiers (keep only the final name)
     auto const scope_pos = name.rfind("::");
     if (scope_pos != std::string_view::npos && scope_pos + 2 < name.size()) {
