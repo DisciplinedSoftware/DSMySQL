@@ -14,6 +14,10 @@ if(NOT TARGET Boost::ut)
     FetchContent_MakeAvailable(boost_ut)
 endif()
 
+# Disable boost.ut's C++20 module mode — not all compilers/toolchains support
+# its module declaration (notably MSVC issues C3378 with /std:c++latest).
+add_compile_definitions(BOOST_UT_DISABLE_MODULE)
+
 # Unit tests
 add_subdirectory(unit)
 

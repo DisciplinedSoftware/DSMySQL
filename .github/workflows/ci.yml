@@ -88,16 +88,15 @@ jobs:
             | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
           echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
             | sudo tee /etc/apt/sources.list.d/kitware.list
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build clang-15 \
+          sudo apt-get install -y cmake ninja-build clang-18 \
             libmysqlclient-dev pkg-config
 
       - name: Configure
         run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON -DBUILD_INTEGRATION_TESTS=OFF -DBUILD_EXAMPLES=OFF
         env:
-          CXX: clang++-15
-          CC: clang-15
+          CXX: clang++-18
+          CC: clang-18
 
       - name: Build
         run: cmake --build build -j4
