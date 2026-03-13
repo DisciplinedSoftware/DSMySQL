@@ -12,20 +12,25 @@
 //   cmake --preset release && cmake --build build -j$(nproc)
 //   ./build/bin/examples/example_basic_query
 //
-// Set these environment variables to point at a real MySQL instance:
-//   DS_MYSQL_TEST_HOST       (e.g. 127.0.0.1)
-//   DS_MYSQL_TEST_PORT       (e.g. 3307)
-//   DS_MYSQL_TEST_DATABASE   (e.g. ds_mysql_example)
-//   DS_MYSQL_TEST_USER
-//   DS_MYSQL_TEST_PASSWORD
+// Edit the connection constants below to match your MySQL instance.
 
-#include <cstdlib>
-#include <iostream>
 #include <optional>
 #include <print>
 #include <string>
 
 #include "ds_mysql.hpp"
+
+// ===================================================================
+// Connection configuration — adjust to match your MySQL instance.
+// ===================================================================
+
+namespace {
+    constexpr auto k_host     = "127.0.0.1";
+    constexpr auto k_database = "ds_mysql_example";
+    constexpr auto k_user     = "root";
+    constexpr auto k_password = "";
+    constexpr unsigned int k_port = 3306;
+}
 
 // ===================================================================
 // Define a typed table struct.
@@ -63,59 +68,23 @@ struct product {
 };
 
 // ===================================================================
-// Read connection config from environment variables.
-// ===================================================================
-
-[[nodiscard]] std::optional<ds_mysql::mysql_config> config_from_env() {
-    auto get = [](char const* name, char const* fallback = "") -> std::string {
-        char const* v = std::getenv(name);
-        return v ? v : fallback;
-    };
-
-    const std::string host     = get("DS_MYSQL_TEST_HOST");
-    const std::string database = get("DS_MYSQL_TEST_DATABASE", "ds_mysql_example");
-    const std::string user     = get("DS_MYSQL_TEST_USER");
-    const std::string password = get("DS_MYSQL_TEST_PASSWORD");
-
-    if (host.empty() || user.empty()) {
-        return std::nullopt;
-    }
-
-    const unsigned int port = [&] {
-        char const* p = std::getenv("DS_MYSQL_TEST_PORT");
-        return p ? static_cast<unsigned int>(std::stoul(p))
-                 : ds_mysql::default_mysql_port.to_unsigned_int();
-    }();
-
-    return ds_mysql::mysql_config{
-        ds_mysql::host_name{host},
-        ds_mysql::database_name{database},
-        ds_mysql::auth_credentials{ds_mysql::user_name{user}, ds_mysql::user_password{password}},
-        ds_mysql::port_number{port},
-    };
-}
-
-// ===================================================================
 // Main
 // ===================================================================
 
 int main() {
-    const auto config = config_from_env();
-    if (!config) {
-        std::println(stderr,
-            "Set DS_MYSQL_TEST_HOST, DS_MYSQL_TEST_USER, DS_MYSQL_TEST_PASSWORD "
-            "to run this example.");
-        return 1;
-    }
-
     // --- Connect ---
-    auto db_result = ds_mysql::mysql_database::connect(*config);
+    auto db_result = ds_mysql::mysql_database::connect(ds_mysql::mysql_config{
+        ds_mysql::host_name{k_host},
+        ds_mysql::database_name{k_database},
+        ds_mysql::auth_credentials{ds_mysql::user_name{k_user}, ds_mysql::user_password{k_password}},
+        ds_mysql::port_number{k_port},
+    });
     if (!db_result) {
         std::println(stderr, "Connection failed: {}", db_result.error());
         return 1;
     }
     auto& db = *db_result;
-    std::println("Connected to {}:{}", config->host().to_string(), config->port().to_unsigned_int());
+    std::println("Connected to {}:{}", k_host, k_port);
 
     // --- Create table ---
     if (auto r = db.execute(ds_mysql::create_table<product>().if_not_exists()); !r) {

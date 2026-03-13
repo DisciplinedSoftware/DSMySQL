@@ -1818,6 +1818,27 @@ public:
 // insert_into_values_builder / insert_into_builder
 // ---------------------------------------------------------------
 template <typename T>
+class insert_into_upsert_builder {
+public:
+    insert_into_upsert_builder(std::string insert_sql, std::string update_clause)
+        : insert_sql_(std::move(insert_sql)), update_clause_(std::move(update_clause)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::string sql;
+        sql.reserve(insert_sql_.size() + 26 + update_clause_.size());
+        sql += insert_sql_;
+        sql += " ON DUPLICATE KEY UPDATE ";
+        sql += update_clause_;
+        return sql;
+    }
+
+private:
+    std::string insert_sql_;
+    std::string update_clause_;
+};
+
+template <typename T>
 class insert_into_values_builder {
 public:
     insert_into_values_builder(std::string column_list, std::string values, bool bulk = false)
@@ -1828,9 +1849,8 @@ public:
     // Each argument must be a FieldOf<T> column_field instance carrying the new value.
     template <FieldOf<T>... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] std::string on_duplicate_key_update(Cols const&... assignments) const {
+    [[nodiscard]] insert_into_upsert_builder<T> on_duplicate_key_update(Cols const&... assignments) const {
         std::ostringstream ss;
-        ss << build_sql() << " ON DUPLICATE KEY UPDATE ";
         bool first = true;
         (
             [&](auto const& field) {
@@ -1842,7 +1862,7 @@ public:
                 first = false;
             }(assignments),
             ...);
-        return ss.str();
+        return insert_into_upsert_builder<T>{build_sql(), ss.str()};
     }
 
     [[nodiscard]] std::string build_sql() const {

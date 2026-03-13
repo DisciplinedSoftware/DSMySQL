@@ -322,7 +322,7 @@ suite<"DML"> dml_suite = [] {
         row.ticker_ = "AAPL";
         row.instrument_ = "Stock";
         auto const sql =
-            insert_into<asset>().values(row).on_duplicate_key_update(asset::ticker{"AAPL"}, asset::instrument{"Stock"});
+            insert_into<asset>().values(row).on_duplicate_key_update(asset::ticker{"AAPL"}, asset::instrument{"Stock"}).build_sql();
         expect(sql ==
                "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, "
                "last_updated_date) "
