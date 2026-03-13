@@ -122,49 +122,6 @@ FetchContent_MakeAvailable(DSMySQL)
 target_link_libraries(my_target PRIVATE ds_mysql)
 ```
 
-## Project Structure
-
-```text
-DSMySQL/
-├── lib/include/ds_mysql/       # All public headers (header-only)
-│   ├── mysql_database.hpp      # MySQL connection & query execution
-│   ├── sql.hpp                 # SQL query builder (SELECT, INSERT, UPDATE, ...)
-│   ├── sql_extension.hpp       # MySQL-specific SQL extensions
-│   ├── column_field.hpp        # Typed column descriptors
-│   ├── schema_generator.hpp    # Compile-time CREATE TABLE generation
-│   ├── mysql_metadata.hpp      # MySQL information_schema typed schemas
-│   ├── mysql_config.hpp        # Connection configuration struct
-│   ├── varchar_field.hpp       # Fixed-length VARCHAR type
-│   ├── sql_temporal.hpp        # sql_datetime, sql_timestamp types
-│   ├── text_field.hpp          # MEDIUMTEXT / LONGTEXT support
-│   ├── credentials.hpp         # auth_credentials (user + password)
-│   ├── host_name.hpp           # Strong type for hostname
-│   ├── database_name.hpp       # Strong type for database name
-│   ├── port_number.hpp         # Strong type for port (0–65535)
-│   ├── user_name.hpp           # Strong type for MySQL username
-│   ├── user_password.hpp       # Strong type for MySQL password
-│   ├── sql_identifiers.hpp     # table_name, column_name, database_schema
-│   ├── col.hpp                 # Column descriptor utilities
-│   └── member_name_reflection.hpp  # Boost.PFR member name reflection
-├── tests/
-│   ├── unit/                   # boost.ut unit tests (no database required)
-│   └── integration/            # MySQL integration tests (Docker)
-│       ├── mysql/              # Test source files
-│       ├── docker/             # Docker Compose + init scripts
-│       └── cmake/              # DockerIntegration.cmake module
-├── examples/
-│   ├── basic_query.cpp         # Connect, create table, insert, select
-│   └── schema_generation.cpp   # Schema generation and DDL printing
-├── docs/
-│   ├── BUILD.md                # Build instructions
-│   ├── DEVELOPMENT.md          # Development guide
-│   ├── INTEGRATION_TESTS.md    # Integration testing with Docker
-│   ├── COVERAGE.md             # Code coverage setup
-│   └── QUICKREF.md             # Quick reference
-├── CMakeLists.txt
-└── CMakePresets.json
-```
-
 ## Key API
 
 ### Connecting
