@@ -215,7 +215,6 @@ Automatically fetched via CMake FetchContent:
 
 - [Boost.PFR](https://github.com/boostorg/pfr) — compile-time struct reflection (header-only)
 - [boost.ut](https://github.com/boost-ext/ut) v2.1.0 — unit testing (test builds only)
-- [dotenv-cpp](https://github.com/laserpants/dotenv-cpp) — `.env` file loading (integration tests only)
 
 System dependencies:
 

@@ -14,19 +14,6 @@ if(NOT TARGET Boost::ut)
     FetchContent_MakeAvailable(boost_ut)
 endif()
 
-# dotenv-cpp (header-only, for .env file loading in integration tests)
-if(NOT TARGET dotenv)
-    include(FetchContent)
-    set(BUILD_DOCS OFF CACHE BOOL "Disable dependency docs generation" FORCE)
-    FetchContent_Declare(
-        laserpants_dotenv
-        GIT_REPOSITORY https://github.com/laserpants/dotenv-cpp.git
-        GIT_TAG master
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(laserpants_dotenv)
-endif()
-
 find_package(PkgConfig REQUIRED)
 
 # Add integration test cmake modules path
@@ -45,7 +32,6 @@ target_link_libraries(tests_integration_ds_mysql
     PRIVATE
         ds_mysql
         Boost::ut
-        dotenv
 )
 
 # Link with MySQL client library

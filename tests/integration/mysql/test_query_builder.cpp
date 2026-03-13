@@ -1,7 +1,6 @@
-#include <dotenv.h>
-
 #include <boost/ut.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <vector>
@@ -43,18 +42,23 @@ struct trade {
 };
 
 [[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
-    const std::string host = dotenv::getenv("DS_MYSQL_TEST_HOST", "");
-    const std::string database = dotenv::getenv("DS_MYSQL_TEST_DATABASE", "ds_mysql_test");
-    const std::string user = dotenv::getenv("DS_MYSQL_TEST_USER", "");
-    const std::string password = dotenv::getenv("DS_MYSQL_TEST_PASSWORD", "");
+    auto getenv_or = [](char const* key, char const* fallback = "") -> std::string {
+        char const* v = std::getenv(key);
+        return v ? v : fallback;
+    };
+
+    const std::string host     = getenv_or("DS_MYSQL_TEST_HOST");
+    const std::string database = getenv_or("DS_MYSQL_TEST_DATABASE", "ds_mysql_test");
+    const std::string user     = getenv_or("DS_MYSQL_TEST_USER");
+    const std::string password = getenv_or("DS_MYSQL_TEST_PASSWORD");
 
     if (host.empty() || user.empty() || password.empty()) {
         return std::nullopt;
     }
 
-    const std::string port_env =
-        dotenv::getenv("DS_MYSQL_TEST_PORT", std::to_string(default_mysql_port.to_unsigned_int()));
-    const auto parsed_port = static_cast<unsigned int>(std::stoul(port_env));
+    const std::string port_str =
+        getenv_or("DS_MYSQL_TEST_PORT", std::to_string(default_mysql_port.to_unsigned_int()).c_str());
+    const auto parsed_port = static_cast<unsigned int>(std::stoul(port_str));
 
     return mysql_config{
         host_name{host},
