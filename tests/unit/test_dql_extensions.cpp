@@ -294,7 +294,9 @@ suite<"DQL Scalar Functions"> dql_scalar_functions_suite = [] {
 
     "round/format aliases — generate expected SQL"_test = [] {
         auto const sql =
-            select<round<product::price_val, 2>, format<product::price_val, 2>>().from<product>().build_sql();
+            select<ds_mysql::round<product::price_val, 2>, ds_mysql::format<product::price_val, 2>>()
+                .from<product>()
+                .build_sql();
         expect(sql == "SELECT ROUND(price_val, 2), FORMAT(price_val, 2) FROM product"s) << sql;
     };
 

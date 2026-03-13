@@ -63,16 +63,9 @@ consteval std::string_view tag_to_column_name() noexcept {
     constexpr auto start = key_pos + key.size();
     constexpr auto end1 = sig.find(';', start);
     constexpr auto end2 = sig.find(']', start);
-    constexpr auto end = [] {
-        if constexpr (end1 != npos && end2 != npos) {
-            return (end1 < end2) ? end1 : end2;
-        } else if constexpr (end1 != npos) {
-            return end1;
-        } else if constexpr (end2 != npos) {
-            return end2;
-        }
-        return npos;
-    }();
+    constexpr auto end = (end1 != npos && end2 != npos) ? ((end1 < end2) ? end1 : end2) :
+                         (end1 != npos) ? end1 :
+                         (end2 != npos) ? end2 : npos;
     if constexpr (end == npos || end <= start) {
         static_assert(dependent_false_v<Tag>, "Failed to locate end of Tag name in compiler function signature");
         return {};
