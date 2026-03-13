@@ -25,12 +25,12 @@
 // ===================================================================
 
 namespace {
-    constexpr auto k_host     = "127.0.0.1";
-    constexpr auto k_database = "ds_mysql_example";
-    constexpr auto k_user     = "root";
-    constexpr auto k_password = "";
-    constexpr unsigned int k_port = 3306;
-}
+constexpr auto host = "127.0.0.1";
+constexpr auto database = "ds_mysql_example";
+constexpr auto user = "root";
+constexpr auto password = "";
+constexpr unsigned int port = 3306;
+}  // namespace
 
 // ===================================================================
 // Define a typed table struct.
@@ -58,13 +58,13 @@ struct product {
     using description = ds_mysql::column_field<description_tag, std::optional<ds_mysql::varchar_field<512>>>;
     using created_at = ds_mysql::column_field<created_at_tag, ds_mysql::sql_datetime>;
 
-    id          id_;
-    sku         sku_;
-    name        name_;
-    price       price_;
-    stock       stock_;
+    id id_;
+    sku sku_;
+    name name_;
+    price price_;
+    stock stock_;
     description description_;
-    created_at  created_at_;
+    created_at created_at_;
 };
 
 // ===================================================================
@@ -74,17 +74,17 @@ struct product {
 int main() {
     // --- Connect ---
     auto db_result = ds_mysql::mysql_database::connect(ds_mysql::mysql_config{
-        ds_mysql::host_name{k_host},
-        ds_mysql::database_name{k_database},
-        ds_mysql::auth_credentials{ds_mysql::user_name{k_user}, ds_mysql::user_password{k_password}},
-        ds_mysql::port_number{k_port},
+        ds_mysql::host_name{host},
+        ds_mysql::database_name{database},
+        ds_mysql::auth_credentials{ds_mysql::user_name{user}, ds_mysql::user_password{password}},
+        ds_mysql::port_number{port},
     });
     if (!db_result) {
         std::println(stderr, "Connection failed: {}", db_result.error());
         return 1;
     }
     auto& db = *db_result;
-    std::println("Connected to {}:{}", k_host, k_port);
+    std::println("Connected to {}:{}", host, port);
 
     // --- Create table ---
     if (auto r = db.execute(ds_mysql::create_table<product>().if_not_exists()); !r) {
@@ -102,13 +102,13 @@ int main() {
 
     // --- Insert a row ---
     product row;
-    row.id_          = product::id{0};      // AUTO_INCREMENT — value ignored on INSERT
-    row.sku_         = product::sku{"WIDGET-001"};
-    row.name_        = product::name{"Blue Widget"};
-    row.price_       = product::price{9.99};
-    row.stock_       = product::stock{42};
+    row.id_ = product::id{0};  // AUTO_INCREMENT — value ignored on INSERT
+    row.sku_ = product::sku{"WIDGET-001"};
+    row.name_ = product::name{"Blue Widget"};
+    row.price_ = product::price{9.99};
+    row.stock_ = product::stock{42};
     row.description_ = product::description{std::nullopt};
-    row.created_at_  = product::created_at{ds_mysql::sql_now};
+    row.created_at_ = product::created_at{ds_mysql::sql_now};
 
     if (auto r = db.execute(ds_mysql::insert_into<product>().values(row)); !r) {
         std::println(stderr, "INSERT failed: {}", r.error());
@@ -118,9 +118,7 @@ int main() {
 
     // --- Query all products ---
     auto rows = db.query(
-        ds_mysql::select<product::id, product::sku, product::name, product::price, product::stock>()
-            .from<product>()
-    );
+        ds_mysql::select<product::id, product::sku, product::name, product::price, product::stock>().from<product>());
     if (!rows) {
         std::println(stderr, "SELECT failed: {}", rows.error());
         return 1;
@@ -128,8 +126,7 @@ int main() {
 
     std::println("\nProducts ({} row(s)):", rows->size());
     for (auto const& [id, sku, name, price, stock] : *rows) {
-        std::println("  [{:>3}]  {:<20}  {:>8.2f}  stock={}",
-                     id, std::string_view{name}, price, stock);
+        std::println("  [{:>3}]  {:<20}  {:>8.2f}  stock={}", id, std::string_view{name}, price, stock);
     }
 
     // --- Count rows ---
@@ -140,4 +137,3 @@ int main() {
 
     return 0;
 }
-
