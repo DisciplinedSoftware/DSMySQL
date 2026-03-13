@@ -195,43 +195,18 @@ consteval std::string_view extract_type_name() {
 
 #if defined(__clang__) || defined(__GNUC__)
     // GCC/Clang format: [with T = TYPE] or [with T = TYPE; ALIAS = EXPANSION, ...]
-    constexpr auto end_semicolon = signature.find(';', start);
-    constexpr auto end_bracket   = signature.find(']', start);
-    constexpr auto end = (end_semicolon != npos && end_bracket != npos)
-                             ? (end_semicolon < end_bracket ? end_semicolon : end_bracket)
-                         : (end_semicolon != npos ? end_semicolon
-                          : end_bracket != npos   ? end_bracket : npos);
+    constexpr auto end = min_find_pos(signature.find(';', start), signature.find(']', start));
 #else
     // MSVC format: "...extract_type_name<TYPE>(void)..."
     // The type ends at '>' (template arg close) or ',' (comma in multi-param templates).
-    constexpr auto end_bracket = signature.find('>', start);
-    constexpr auto end_comma   = signature.find(',', start);
-    constexpr auto end = (end_bracket != npos && end_comma != npos)
-                             ? (end_bracket < end_comma ? end_bracket : end_comma)
-                         : (end_bracket != npos ? end_bracket
-                          : end_comma != npos   ? end_comma : npos);
+    constexpr auto end = min_find_pos(signature.find('>', start), signature.find(',', start));
 #endif
 
     if constexpr (end == npos || end <= start) {
         return "unknown";
     }
 
-    auto name = signature.substr(start, end - start);
-
-    // MSVC prepends 'struct ' or 'class ' to type names; strip before scope processing.
-    if (name.starts_with("struct ")) {
-        name = name.substr(7);
-    } else if (name.starts_with("class ")) {
-        name = name.substr(6);
-    }
-
-    // Remove namespace qualifiers (keep only the final name)
-    auto const scope_pos = name.rfind("::");
-    if (scope_pos != std::string_view::npos && scope_pos + 2 < name.size()) {
-        name = name.substr(scope_pos + 2);
-    }
-
-    return name;
+    return strip_type_qualifiers(signature.substr(start, end - start));
 }
 
 }  // namespace detail
