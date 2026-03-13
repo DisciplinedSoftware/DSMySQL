@@ -1,5 +1,6 @@
 build/
 build-coverage/
+build_clang/
 .env
 compile_commands.json
 *.o
