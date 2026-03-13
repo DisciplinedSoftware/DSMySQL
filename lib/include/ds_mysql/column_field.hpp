@@ -61,8 +61,15 @@ consteval std::string_view tag_to_column_name() noexcept {
         return {};
     }
     constexpr auto start = key_pos + key.size();
+#if defined(_MSC_VER)
+    // MSVC __FUNCSIG__: "...tag_to_column_name<struct `anonymous-namespace'::tag>(void)..."
+    // The tag type ends at '>' (template arg close); '(' is a secondary fallback.
+    constexpr auto end1 = sig.find('>', start);
+    constexpr auto end2 = sig.find('(', start);
+#else
     constexpr auto end1 = sig.find(';', start);
     constexpr auto end2 = sig.find(']', start);
+#endif
     constexpr auto end = (end1 != npos && end2 != npos) ? ((end1 < end2) ? end1 : end2) :
                          (end1 != npos) ? end1 :
                          (end2 != npos) ? end2 : npos;

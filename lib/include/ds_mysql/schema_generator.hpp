@@ -185,43 +185,34 @@ consteval std::string_view extract_type_name() {
     return "unknown";
 #endif
 
-    auto const marker_pos = signature.find(marker);
-    if (marker_pos == std::string_view::npos) {
+    constexpr auto npos = std::string_view::npos;
+    constexpr auto marker_pos = signature.find(marker);
+    if constexpr (marker_pos == npos) {
         return "unknown";
     }
 
-    auto const start = marker_pos + marker.size();
+    constexpr auto start = marker_pos + marker.size();
 
 #if defined(__clang__) || defined(__GNUC__)
     // GCC/Clang format: [with T = TYPE] or [with T = TYPE; ALIAS = EXPANSION, ...]
-    // Neither ';' nor ']' can appear in a C++ type name, making them safe end delimiters.
-    auto const end_semicolon = signature.find(';', start);
-    auto const end_bracket = signature.find(']', start);
-
-    auto end = std::string_view::npos;
-    if (end_semicolon != std::string_view::npos && end_bracket != std::string_view::npos) {
-        end = end_semicolon < end_bracket ? end_semicolon : end_bracket;
-    } else if (end_semicolon != std::string_view::npos) {
-        end = end_semicolon;
-    } else if (end_bracket != std::string_view::npos) {
-        end = end_bracket;
-    }
+    constexpr auto end_semicolon = signature.find(';', start);
+    constexpr auto end_bracket   = signature.find(']', start);
+    constexpr auto end = (end_semicolon != npos && end_bracket != npos)
+                             ? (end_semicolon < end_bracket ? end_semicolon : end_bracket)
+                         : (end_semicolon != npos ? end_semicolon
+                          : end_bracket != npos   ? end_bracket : npos);
 #else
-    // MSVC format: extract_type_name<TYPE>
-    auto const end_bracket = signature.find('>', start);
-    auto const end_comma = signature.find(',', start);
-
-    auto end = std::string_view::npos;
-    if (end_bracket != std::string_view::npos && end_comma != std::string_view::npos) {
-        end = end_bracket < end_comma ? end_bracket : end_comma;
-    } else if (end_bracket != std::string_view::npos) {
-        end = end_bracket;
-    } else if (end_comma != std::string_view::npos) {
-        end = end_comma;
-    }
+    // MSVC format: "...extract_type_name<TYPE>(void)..."
+    // The type ends at '>' (template arg close) or ',' (comma in multi-param templates).
+    constexpr auto end_bracket = signature.find('>', start);
+    constexpr auto end_comma   = signature.find(',', start);
+    constexpr auto end = (end_bracket != npos && end_comma != npos)
+                             ? (end_bracket < end_comma ? end_bracket : end_comma)
+                         : (end_bracket != npos ? end_bracket
+                          : end_comma != npos   ? end_comma : npos);
 #endif
 
-    if (end == std::string_view::npos || end <= start) {
+    if constexpr (end == npos || end <= start) {
         return "unknown";
     }
 
