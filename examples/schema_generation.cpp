@@ -14,13 +14,7 @@
 #include <print>
 #include <string>
 
-#include "ds_mysql/column_field.hpp"
-#include "ds_mysql/mysql_database.hpp"
-#include "ds_mysql/schema_generator.hpp"
-#include "ds_mysql/sql.hpp"
-#include "ds_mysql/sql_identifiers.hpp"
-#include "ds_mysql/sql_temporal.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql.hpp"
 
 // ===================================================================
 // Define a 'user' table
