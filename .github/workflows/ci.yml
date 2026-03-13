@@ -139,4 +139,4 @@ jobs:
         run: cmake --build build --config Release -j4
 
       - name: Unit tests
-        run: ctest --build-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
+        run: ctest --test-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
