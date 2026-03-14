@@ -53,7 +53,6 @@ suite<"My Feature Suite"> my_suite = [] {
 
 1. Add test cases to `tests/integration/mysql/test_query_builder.cpp`
 2. Use `ds_mysql::mysql_config_from_env()` to read connection config
-3. Add any required test data to `tests/integration/docker/init-db.sql`
 
 ## SQL Type Overrides
 
@@ -84,6 +83,7 @@ struct ds_mysql::field_schema<quote_row, 2> {
 ```
 
 Available helpers:
+
 - `sql_type_format::float_type()` / `float_type(p)` / `float_type(p, s)`
 - `sql_type_format::double_type()` / `double_type(p)` / `double_type(p, s)`
 - `sql_type_format::decimal_type()` / `decimal_type(p)` / `decimal_type(p, s)`

@@ -66,8 +66,7 @@ jobs:
 
       - name: Initialize database
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -proot \
-            < tests/integration/docker/init-db.sql
+          mysql -h 127.0.0.1 -P 3306 -u root -proot
 
       - name: Integration tests
         run: ctest --preset release -R tests_integration_ds_mysql

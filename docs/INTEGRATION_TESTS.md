@@ -16,10 +16,10 @@ ctest --preset release
 ```
 
 CTest automatically:
+
 1. Starts a MySQL container via Docker Compose
-2. Initialises the test database from `init-db.sql`
-3. Runs all unit and integration tests
-4. Stops the MySQL container
+2. Runs all unit and integration tests
+3. Stops the MySQL container
 
 ## Configuration
 
@@ -59,7 +59,6 @@ cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON
 - **Image**: MySQL 8.0
 - **Container Name**: `ds_mysql_test`
 - **Default Port**: 3307 (auto-selects an available port if occupied)
-- **Init Script**: `tests/integration/docker/init-db.sql`
 
 ## Troubleshooting
 
