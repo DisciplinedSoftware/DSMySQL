@@ -15,34 +15,24 @@ namespace {
 
 // Test schema reused across all suites
 struct product {
-    using id          = column_field<"id",          uint32_t>;
-    using category_id = column_field<"category_id", std::optional<uint32_t>>;
-    using sku         = column_field<"sku",         varchar_field<32>>;
-    using type        = column_field<"type",        varchar_field<64>>;
-    using name        = column_field<"name",        std::optional<varchar_field<255>>>;
-    using price_val   = column_field<"price_val",   double>;
-
-    id          id_;
-    category_id category_id_;
-    sku         sku_;
-    type        type_;
-    name        name_;
-    price_val   price_val_;
+    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(category_id, std::optional<uint32_t>)
+    COLUMN_FIELD(sku,         varchar_field<32>)
+    COLUMN_FIELD(type,        varchar_field<64>)
+    COLUMN_FIELD(name,        std::optional<varchar_field<255>>)
+    COLUMN_FIELD(price_val,   double)
 };
 
 struct category {
-    using id    = column_field<"id",    uint32_t>;
-    using label = column_field<"label", varchar_field<64>>;
-    id    id_;
-    label label_;
+    COLUMN_FIELD(id,    uint32_t)
+    COLUMN_FIELD(label, varchar_field<64>)
 };
 
 struct event_log {
-    using id         = column_field<"event_id",   uint32_t>;
-    using created_at = column_field<"created_at", sql_datetime>;
-
-    id         id_;
-    created_at created_at_;
+    struct event_id_tag {};
+    using id = tagged_column_field<event_id_tag, uint32_t>;
+    id id_;
+    COLUMN_FIELD(created_at, sql_datetime)
 };
 
 }  // namespace

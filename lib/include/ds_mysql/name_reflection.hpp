@@ -43,6 +43,45 @@ namespace detail {
 }
 
 /**
+ * Extract the fully-qualified type name from compiler intrinsics.
+ * Unlike extract_type_name(), does NOT strip namespace/class scope prefixes.
+ *
+ * Examples:
+ *   raw_type_name<my_table::id_tag>()  →  "my_table::id_tag"
+ *   raw_type_name<ns::my_table::id_tag>() → "ns::my_table::id_tag"
+ *   raw_type_name<id_tag>()            →  "id_tag"
+ */
+template <typename T>
+consteval std::string_view raw_type_name() {
+#if defined(__clang__) || defined(__GNUC__)
+    constexpr std::string_view signature = __PRETTY_FUNCTION__;
+    constexpr std::string_view marker = "T = ";
+#elif defined(_MSC_VER)
+    constexpr std::string_view signature = __FUNCSIG__;
+    constexpr std::string_view marker = "raw_type_name<";
+#else
+#error ("raw_type_name requires Clang, GCC, or MSVC")
+#endif
+
+    constexpr auto npos = std::string_view::npos;
+    constexpr auto marker_pos = signature.find(marker);
+    static_assert(marker_pos != npos, "Failed to locate marker in compiler function signature");
+
+    constexpr auto start = marker_pos + marker.size();
+
+#if defined(__clang__) || defined(__GNUC__)
+    constexpr auto end = min_find_pos(signature.find(';', start), signature.find(']', start));
+#elif defined(_MSC_VER)
+    constexpr auto end = min_find_pos(signature.find('>', start), signature.find(',', start));
+#else
+#error ("raw_type_name requires Clang, GCC, or MSVC")
+#endif
+
+    static_assert(end != npos && end > start, "Failed to locate end of type name in compiler function signature");
+    return signature.substr(start, end - start);
+}
+
+/**
  * Extract struct type name from compiler intrinsics (__PRETTY_FUNCTION__ or __FUNCSIG__)
  */
 template <typename T>
@@ -83,6 +122,28 @@ consteval std::string_view extract_type_name() {
     }
 
     return strip_type_qualifiers(signature.substr(start, end - start));
+}
+
+consteval std::string_view remove_suffix(std::string_view name, std::string_view suffix) noexcept {
+    if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix)
+        return name.substr(0, name.size() - suffix.size());
+    else {
+        return name;
+    }
+}
+
+/**
+ * tag_to_column_name<Tag> — derive a SQL column name from a tag type at compile time.
+ *
+ * Extracts the unqualified type name of Tag and strips a trailing "_tag" suffix:
+ *
+ *   tag_to_column_name<id_tag>()       → "id"
+ *   tag_to_column_name<ticker_tag>()   → "ticker"
+ *   tag_to_column_name<my_col>()       → "my_col"
+ */
+template <typename Tag>
+consteval std::string_view tag_to_column_name() noexcept {
+    return remove_suffix(extract_type_name<Tag>(), "_tag");
 }
 
 }  // namespace detail

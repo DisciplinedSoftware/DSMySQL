@@ -23,34 +23,37 @@ DSMySQL provides a **header-only** library for building type-safe SQL queries an
 using namespace ds_mysql;
 
 // 1. Define your table as a C++ struct.
-//    Each field is a type alias for column_field<"name", ValueType>.
-//    The string literal is the SQL column name — no tag structs needed.
+//    Each field is declared with COLUMN_FIELD(name, type) — the recommended
+//    one-liner that generates a nested tag struct, a type alias, and a member.
 struct product {
-    using id    = column_field<"id",    uint32_t>;
-    using sku   = column_field<"sku",   varchar_field<64>>;
-    using name  = column_field<"name",  varchar_field<255>>;
-    using price = column_field<"price", double>;
-
-    id    id_;
-    sku   sku_;
-    name  name_;
-    price price_;
+    COLUMN_FIELD(id,    uint32_t)
+    COLUMN_FIELD(sku,   varchar_field<64>)
+    COLUMN_FIELD(name,  varchar_field<255>)
+    COLUMN_FIELD(price, double)
 };
 
 // Three equivalent styles — pick what suits your team:
 
-// a) Explicit string literal (recommended — column name is right there):
-//   using price = column_field<"price", double>;
-//   price price_;
+// a) COLUMN_FIELD macro (recommended — one-liner, guarantees per-table type uniqueness):
+//   COLUMN_FIELD(price, double)
+//   // expands to: struct price_tag {}; using price = tagged_column_field<price_tag, double>; price price_;
 
-// b) Tag struct — no string literals, column name derived from tag type at
-//    compile time (trailing "_tag" suffix is stripped automatically):
+// b) Explicit tag struct — same guarantees as (a), more verbose, useful when the
+//    SQL column name differs from the C++ alias (e.g., "order_id" alias → "id"):
 //   struct price_tag {};
 //   using price = tagged_column_field<price_tag, double>;
 //   price price_;
+//   // IMPORTANT: tag structs must be nested inside the table struct — not at global scope.
 
-// c) COLUMN_FIELD macro — one-liner shorthand for style (a):
-//   COLUMN_FIELD(price, double)
+// c) Fixed string literal — column name embedded directly, no tag needed. Note: two tables
+//    with identically-named and -typed columns share the same C++ type, which weakens
+//    cross-table isolation but is still safe for single-table queries:
+//   using price = column_field<"price", double>;
+//   price price_;
+
+// **Note:** Tag structs must always be defined as nested classes of the table struct
+// (not globally). This ensures each table's columns are distinct types at compile time,
+// preventing accidental cross-table column mixing.
 
 // 2. Connect and query
 auto db = mysql_database::connect(mysql_config{

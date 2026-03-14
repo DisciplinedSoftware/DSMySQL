@@ -165,15 +165,12 @@ struct price_tag {};
 struct order_id_tag {};
 struct no_suffix {};
 
-// With _tag suffix stripped:
-static_assert(std::is_same_v<tagged_column_field<price_tag, double>,
-                             column_field<"price", double>>);
-// Multi-word tag with _tag stripped:
-static_assert(std::is_same_v<tagged_column_field<order_id_tag, uint32_t>,
-                             column_field<"order_id", uint32_t>>);
-// Tag without _tag suffix — name kept as-is:
-static_assert(std::is_same_v<tagged_column_field<no_suffix, int>,
-                             column_field<"no_suffix", int>>);
+// Different tags → different types (cross-table isolation)
+static_assert(!std::is_same_v<tagged_column_field<price_tag, double>, tagged_column_field<order_id_tag, double>>);
+// Same tag + same value type → same type
+static_assert(std::is_same_v<tagged_column_field<price_tag, double>, tagged_column_field<price_tag, double>>);
+// tagged_column_field satisfies ColumnFieldType (derived from column_field_tag)
+static_assert(ds_mysql::ColumnFieldType<tagged_column_field<price_tag, double>>);
 }  // namespace
 
 suite<"tagged_column_field"> tagged_column_field_suite = [] {

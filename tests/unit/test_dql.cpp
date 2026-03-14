@@ -16,25 +16,15 @@ using namespace std::string_literals;
 namespace {
 
 struct product {
-    using id              = column_field<"id",              uint32_t>;
-    using category_id     = column_field<"category_id",     std::optional<uint32_t>>;
-    using sku             = column_field<"sku",             varchar_field<32>>;
-    using type            = column_field<"type",            varchar_field<64>>;
-    using name            = column_field<"name",            std::optional<varchar_field<255>>>;
-    using tag             = column_field<"tag",             std::optional<varchar_field<255>>>;
-    using unit            = column_field<"unit",            std::optional<varchar_field<32>>>;
-    using created_at      = column_field<"created_at",      sql_datetime>;
-    using last_updated_at = column_field<"last_updated_at", sql_datetime>;
-
-    id              id_;
-    category_id     category_id_;
-    sku             sku_;
-    type            type_;
-    name            name_;
-    tag             tag_;
-    unit            unit_;
-    created_at      created_at_;
-    last_updated_at last_updated_at_;
+    COLUMN_FIELD(id,              uint32_t)
+    COLUMN_FIELD(category_id,     std::optional<uint32_t>)
+    COLUMN_FIELD(sku,             varchar_field<32>)
+    COLUMN_FIELD(type,            varchar_field<64>)
+    COLUMN_FIELD(name,            std::optional<varchar_field<255>>)
+    COLUMN_FIELD(tag,             std::optional<varchar_field<255>>)
+    COLUMN_FIELD(unit,            std::optional<varchar_field<32>>)
+    COLUMN_FIELD(created_at,      sql_datetime)
+    COLUMN_FIELD(last_updated_at, sql_datetime)
 };
 
 }  // namespace
@@ -491,10 +481,8 @@ suite<"DQL MySQL Metadata Queries"> dql_mysql_metadata_suite = [] {
 
 namespace {
 struct category {
-    using id    = column_field<"id",    uint32_t>;
-    using label = column_field<"label", varchar_field<64>>;
-    id    id_;
-    label label_;
+    COLUMN_FIELD(id,    uint32_t)
+    COLUMN_FIELD(label, varchar_field<64>)
 };
 }  // namespace
 
@@ -563,24 +551,21 @@ static_assert(std::is_same_v<decltype(select<count_all>().from<product>())::resu
 // column_belongs_to_table — compile-time checks
 // ===================================================================
 
-// Custom table types used to verify column membership enforcement.
-// With the fixed_string design, column_field<"name", T> is the same type everywhere,
-// so columns are only distinguishable across tables when their names differ.
+// Custom table types used to verify cross-table type isolation with tagged fields.
 namespace {
 struct table_a {
-    using id   = column_field<"id",     uint32_t>;
-    using name = column_field<"a_name", std::string>;
-    id   id_;
-    name name_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(name, std::string)
 };
 
 struct table_b {
-    using id   = column_field<"id",     uint32_t>;
-    using name = column_field<"b_name", std::string>;
-    id   id_;
-    name name_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(name, std::string)
 };
 }  // namespace
+
+// Different tags → different types: cross-table isolation is guaranteed.
+static_assert(!std::is_same_v<table_a::id, table_b::id>);
 
 // Columns belong to their own table.
 static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_a>,
@@ -590,16 +575,15 @@ static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::name, table_a
 static_assert(ds_mysql::detail::column_belongs_to_table_v<table_b::id, table_b>,
               "table_b::id must belong to table_b");
 
-// Columns with the same name+type are the same type and therefore match any table
-// containing that field — this is the expected trade-off of the fixed_string design.
-static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_b>,
-              "table_a::id == table_b::id (same type), so it belongs to both");
-
-// Columns with distinct names are unique types and do NOT match across tables.
+// Cross-table isolation: tagged columns do NOT belong to the other table.
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_b>,
+              "table_a::id must not belong to table_b (different tag types)");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_b::id, table_a>,
+              "table_b::id must not belong to table_a (different tag types)");
 static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_a::name, table_b>,
-              "table_a::name (\"a_name\") must not belong to table_b");
+              "table_a::name must not belong to table_b");
 static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_b::name, table_a>,
-              "table_b::name (\"b_name\") must not belong to table_a");
+              "table_b::name must not belong to table_a");
 
 // ===================================================================
 // DQL col_ref operators

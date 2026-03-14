@@ -16,25 +16,15 @@ using namespace std::string_literals;
 
 namespace {
 struct asset {
-    using id                = column_field<"id",                uint32_t>;
-    using exchange_id       = column_field<"exchange_id",       std::optional<uint32_t>>;
-    using ticker            = column_field<"ticker",            varchar_field<32>>;
-    using instrument        = column_field<"instrument",        varchar_field<64>>;
-    using name              = column_field<"name",              std::optional<varchar_field<255>>>;
-    using sector            = column_field<"sector",            std::optional<varchar_field<255>>>;
-    using currency          = column_field<"currency",          std::optional<varchar_field<32>>>;
-    using created_date      = column_field<"created_date",      sql_datetime>;
-    using last_updated_date = column_field<"last_updated_date", sql_datetime>;
-
-    id                id_;
-    exchange_id       exchange_id_;
-    ticker            ticker_;
-    instrument        instrument_;
-    name              name_;
-    sector            sector_;
-    currency          currency_;
-    created_date      created_date_;
-    last_updated_date last_updated_date_;
+    COLUMN_FIELD(id,                uint32_t)
+    COLUMN_FIELD(exchange_id,       std::optional<uint32_t>)
+    COLUMN_FIELD(ticker,            varchar_field<32>)
+    COLUMN_FIELD(instrument,        varchar_field<64>)
+    COLUMN_FIELD(name,              std::optional<varchar_field<255>>)
+    COLUMN_FIELD(sector,            std::optional<varchar_field<255>>)
+    COLUMN_FIELD(currency,          std::optional<varchar_field<32>>)
+    COLUMN_FIELD(created_date,      sql_datetime)
+    COLUMN_FIELD(last_updated_date, sql_datetime)
 };
 }  // namespace
 

@@ -523,7 +523,7 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
 }  // namespace ds_mysql
 
 // ===================================================================
-// tagged_column_field — tag-struct convenience alias
+// tagged_column_field — tag-struct based column descriptor
 // ===================================================================
 
 namespace ds_mysql {
@@ -564,36 +564,69 @@ consteval auto column_name_from_tag() noexcept {
 }  // namespace detail
 
 /**
- * tagged_column_field<Tag, T> — tag-struct alternative to column_field<"name", T>.
+ * tagged_column_field<Tag, T> — tag-struct based column descriptor.
  *
- * Derive the SQL column name from a tag struct at compile time (stripping a
- * trailing "_tag" suffix).  The result is an ordinary column_field, so it
- * satisfies all the same concepts and works everywhere column_field does.
+ * The SQL column name is derived at compile time from the tag type name by
+ * stripping a trailing "_tag" suffix.  Unlike a plain type alias, this is a
+ * *distinct* type for every unique Tag, which preserves cross-table type
+ * isolation: two tables that each declare an "id" column end up with
+ * different C++ types, so mixing them is a compile-time error.
  *
- * Usage:
- *   struct price_tag {};
- *   using price = tagged_column_field<price_tag, double>;
- *   price price_;
+ * The tag struct MUST be defined as a nested class of the owning table —
+ * not globally and not inline in the template argument list.  Defining it
+ * inside the table struct ensures uniqueness and enables the compile-time
+ * membership check in from<Table>().
  *
- * This is exactly equivalent to:
- *   using price = column_field<"price", double>;
- *   price price_;
+ * Preferred usage via the COLUMN_FIELD macro (which generates the nested
+ * tag struct automatically):
+ *
+ *   struct my_table {
+ *       COLUMN_FIELD(id,    uint32_t)
+ *       COLUMN_FIELD(price, double)
+ *   };
+ *
+ * Or explicitly:
+ *
+ *   struct my_table {
+ *       struct id_tag {};
+ *       using id = tagged_column_field<id_tag, uint32_t>;
+ *       id id_;
+ *   };
+ *
+ * Both produce the SQL column name "id" (derived from the tag name).
  */
 template <typename Tag, typename T>
-using tagged_column_field = column_field<detail::column_name_from_tag<Tag>(), T>;
+struct tagged_column_field : column_field<detail::column_name_from_tag<Tag>(), T> {
+    using tag_type = Tag;
+
+private:
+    using base = column_field<detail::column_name_from_tag<Tag>(), T>;
+
+public:
+    using base::base;
+    using base::operator=;
+};
 
 }  // namespace ds_mysql
 
+// clang-format off
 /**
- * COLUMN_FIELD(tag, type) — convenience macro to declare a column field member.
+ * COLUMN_FIELD(tag, type) — one-liner macro to declare a tagged column field.
  *
- * Expands to a type alias and a member variable in one line:
+ * Generates a nested tag struct, a type alias, and a member variable:
  *
  *   COLUMN_FIELD(id, uint32_t)
  *   // equivalent to:
- *   using id = ::ds_mysql::column_field<"id", uint32_t>;
+ *   struct id_tag {};
+ *   using id = ::ds_mysql::tagged_column_field<id_tag, uint32_t>;
  *   id id_;
+ *
+ * The tag struct is nested inside the enclosing class, guaranteeing
+ * per-table type uniqueness and satisfying the compile-time membership
+ * check in from<Table>().
  */
-#define COLUMN_FIELD(tag, type)                       \
-    using tag = ::ds_mysql::column_field<#tag, type>; \
+#define COLUMN_FIELD(tag, type)                                    \
+    struct tag##_tag {};                                           \
+    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type>;  \
     tag tag##_;
+// clang-format on

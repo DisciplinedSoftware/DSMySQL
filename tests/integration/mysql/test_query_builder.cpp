@@ -20,25 +20,15 @@ namespace ds_mysql {
 namespace {
 
 struct trade {
-    using id          = column_field<"id",          uint32_t>;
-    using account_id  = column_field<"account_id",  std::optional<uint32_t>>;
-    using code        = column_field<"code",        varchar_field<32>>;
-    using type        = column_field<"type",        varchar_field<64>>;
-    using name        = column_field<"name",        std::optional<varchar_field<255>>>;
-    using category    = column_field<"category",    std::optional<varchar_field<255>>>;
-    using currency    = column_field<"currency",    std::optional<varchar_field<32>>>;
-    using executed_at = column_field<"executed_at", sql_datetime>;
-    using recorded_at = column_field<"recorded_at", sql_datetime>;
-
-    id          id_;
-    account_id  account_id_;
-    code        code_;
-    type        type_;
-    name        name_;
-    category    category_;
-    currency    currency_;
-    executed_at executed_at_;
-    recorded_at recorded_at_;
+    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(account_id,  std::optional<uint32_t>)
+    COLUMN_FIELD(code,        varchar_field<32>)
+    COLUMN_FIELD(type,        varchar_field<64>)
+    COLUMN_FIELD(name,        std::optional<varchar_field<255>>)
+    COLUMN_FIELD(category,    std::optional<varchar_field<255>>)
+    COLUMN_FIELD(currency,    std::optional<varchar_field<32>>)
+    COLUMN_FIELD(executed_at, sql_datetime)
+    COLUMN_FIELD(recorded_at, sql_datetime)
 };
 
 [[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
@@ -95,11 +85,8 @@ struct trade_db : ds_mysql::database_schema {
 // The DB table is created (via raw SQL) with 9 columns in the mismatch tests, so
 // validate_table / validate_database will detect the count discrepancy.
 struct trade_few_columns {
-    using id   = column_field<"id",   uint32_t>;
-    using code = column_field<"code", varchar_field<32>>;
-
-    id   id_;
-    code code_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(code, varchar_field<32>)
 };
 
 // A database struct wrapping trade_few_columns for validate_database mismatch tests.
@@ -109,11 +96,8 @@ struct trade_few_columns_db : ds_mysql::database_schema {
 
 // A second table used for multi-table validate_database tests.
 struct account {
-    using id   = column_field<"id",   uint32_t>;
-    using name = column_field<"name", varchar_field<64>>;
-
-    id   id_;
-    name name_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(name, varchar_field<64>)
 };
 
 // A database struct with two tables for multi-table validation tests.
@@ -122,15 +106,10 @@ struct multi_table_db : ds_mysql::database_schema {
 };
 
 struct temporal_precision_trade {
-    using id          = column_field<"id",          uint32_t>;
-    using code        = column_field<"code",        varchar_field<32>>;
-    using executed_at = column_field<"executed_at", sql_datetime>;
-    using recorded_at = column_field<"recorded_at", sql_timestamp>;
-
-    id          id_;
-    code        code_;
-    executed_at executed_at_;
-    recorded_at recorded_at_;
+    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(code,        varchar_field<32>)
+    COLUMN_FIELD(executed_at, sql_datetime)
+    COLUMN_FIELD(recorded_at, sql_timestamp)
 };
 
 }  // namespace
@@ -962,11 +941,8 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
 
 namespace {
 struct bool_table {
-    using id        = column_field<"id",        uint32_t>;
-    using is_active = column_field<"is_active", bool>;
-
-    id        id_;
-    is_active is_active_;
+    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(is_active, bool)
 };
 }  // namespace
 
@@ -999,27 +975,18 @@ suite<"Boolean Column Coverage"> boolean_column_suite = [] {
 namespace {
 // C++ struct matching the layout of the tables created in validate_field tests.
 struct mismatch_table {
-    using id         = column_field<"id",         uint32_t>;
-    using right_name = column_field<"right_name", varchar_field<32>>;
-
-    id         id_;
-    right_name right_name_;
+    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(right_name, varchar_field<32>)
 };
 
 struct type_mismatch_struct {
-    using id   = column_field<"id",   uint32_t>;
-    using code = column_field<"code", varchar_field<32>>;  // expects VARCHAR(32)
-
-    id   id_;
-    code code_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(code, varchar_field<32>)  // expects VARCHAR(32)
 };
 
 struct nullability_mismatch_struct {
-    using id   = column_field<"id",   uint32_t>;
-    using code = column_field<"code", varchar_field<32>>;  // expects NOT NULL
-
-    id   id_;
-    code code_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(code, varchar_field<32>)  // expects NOT NULL
 };
 }  // namespace
 

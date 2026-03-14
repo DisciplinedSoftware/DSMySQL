@@ -18,50 +18,39 @@ using namespace std::string_literals;
 
 namespace {
 struct test_table {
-    using id   = column_field<"id",   uint32_t>;
-    using name = column_field<"name", varchar_field<255>>;
-    id   id_;
-    name name_;
+    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(name, varchar_field<255>)
 };
 
 struct new_table {
-    using id = column_field<"id", uint32_t>;
-    id id_;
+    COLUMN_FIELD(id, uint32_t)
 };
 
 struct numeric_format_table {
-    using id     = column_field<"id",     uint32_t>;
-    using price  = column_field<"price",  float>;
-    using ratio  = column_field<"ratio",  double>;
-    using amount = column_field<"amount", std::optional<double>>;
-    id     id_;
-    price  price_;
-    ratio  ratio_;
-    amount amount_;
+    COLUMN_FIELD(id,     uint32_t)
+    COLUMN_FIELD(price,  float)
+    COLUMN_FIELD(ratio,  double)
+    COLUMN_FIELD(amount, std::optional<double>)
 };
 
 struct test_db : ds_mysql::database_schema {
     struct symbol {
-        using id = column_field<"id", uint32_t>;
-        id id_;
+        COLUMN_FIELD(id, uint32_t)
     };
 };
 
 struct custom_named_db : ds_mysql::database_schema {};
 
 struct renamed_table {
-    using id = column_field<"renamed_id", uint32_t>;
+    struct renamed_id_tag {};
+    using id = tagged_column_field<renamed_id_tag, uint32_t>;
     id id_;
 };
 
 struct temporal_table {
-    using id         = column_field<"id",         uint32_t>;
-    using created_at = column_field<"created_at", std::chrono::system_clock::time_point>;
-    using updated_at = column_field<"updated_at", sql_timestamp>;
-
-    id         id_;
-    created_at created_at_;
-    updated_at updated_at_;
+    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
+    COLUMN_FIELD(updated_at, sql_timestamp)
 };
 }  // namespace
 
@@ -368,15 +357,12 @@ suite<"DDL"> ddl_suite = [] {
 
 namespace {
 struct child_table {
-    using id        = column_field<"id",        uint32_t>;
-    using parent_id = column_field<"parent_id", uint32_t>;
-    id        id_;
-    parent_id parent_id_;
+    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t)
 };
 
 struct parent_table {
-    using id = column_field<"id", uint32_t>;
-    id id_;
+    COLUMN_FIELD(id, uint32_t)
 };
 }  // namespace
 
@@ -398,10 +384,8 @@ struct ds_mysql::foreign_key_schema<child_table, 1> {
 };
 
 struct child_table_cascade {
-    using id        = column_field<"id",        uint32_t>;
-    using parent_id = column_field<"parent_id", uint32_t>;
-    id        id_;
-    parent_id parent_id_;
+    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t)
 };
 
 template <>
@@ -632,16 +616,11 @@ static_assert(!Database<test_table>, "plain table must NOT satisfy Database conc
 
 namespace {
 struct text_table {
-    using id          = column_field<"id",          uint32_t>;
-    using description = column_field<"description", text_field<>>;
-    using notes       = column_field<"notes",       mediumtext_field>;
-    using body        = column_field<"body",        longtext_field>;
-    using opt_notes   = column_field<"opt_notes",   std::optional<text_field<>>>;
-    id          id_;
-    description description_;
-    notes       notes_;
-    body        body_;
-    opt_notes   opt_notes_;
+    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(description, text_field<>)
+    COLUMN_FIELD(notes,       mediumtext_field)
+    COLUMN_FIELD(body,        longtext_field)
+    COLUMN_FIELD(opt_notes,   std::optional<text_field<>>)
 };
 }  // namespace
 

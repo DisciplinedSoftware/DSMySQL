@@ -21,17 +21,11 @@
 // ===================================================================
 
 struct user {
-    using id         = ds_mysql::column_field<"id",         uint32_t>;
-    using username   = ds_mysql::column_field<"username",   ds_mysql::varchar_field<64>>;
-    using email      = ds_mysql::column_field<"email",      ds_mysql::varchar_field<255>>;
-    using is_active  = ds_mysql::column_field<"is_active",  bool>;
-    using created_at = ds_mysql::column_field<"created_at", ds_mysql::sql_datetime>;
-
-    id         id_;
-    username   username_;
-    email      email_;
-    is_active  is_active_;
-    created_at created_at_;
+    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(username,   ds_mysql::varchar_field<64>)
+    COLUMN_FIELD(email,      ds_mysql::varchar_field<255>)
+    COLUMN_FIELD(is_active,  bool)
+    COLUMN_FIELD(created_at, ds_mysql::sql_datetime)
 };
 
 // ===================================================================
@@ -39,18 +33,17 @@ struct user {
 // ===================================================================
 
 struct order_row {
-    using id         = ds_mysql::column_field<"order_id",         uint32_t>;
-    using user_id    = ds_mysql::column_field<"user_id",          uint32_t>;
-    using amount     = ds_mysql::column_field<"amount",           double>;
-    using fee        = ds_mysql::column_field<"fee",              std::optional<double>>;
-    using status     = ds_mysql::column_field<"status",           ds_mysql::varchar_field<32>>;
-    using created_at = ds_mysql::column_field<"order_created_at", ds_mysql::sql_datetime>;
+    struct order_id_tag {};
+    using id = ds_mysql::tagged_column_field<order_id_tag, uint32_t>;
+    id id_;
 
-    id         id_;
-    user_id    user_id_;
-    amount     amount_;
-    fee        fee_;
-    status     status_;
+    COLUMN_FIELD(user_id, uint32_t)
+    COLUMN_FIELD(amount,  double)
+    COLUMN_FIELD(fee,     std::optional<double>)
+    COLUMN_FIELD(status,  ds_mysql::varchar_field<32>)
+
+    struct order_created_at_tag {};
+    using created_at = ds_mysql::tagged_column_field<order_created_at_tag, ds_mysql::sql_datetime>;
     created_at created_at_;
 };
 

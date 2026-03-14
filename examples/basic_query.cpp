@@ -42,21 +42,13 @@ constexpr unsigned int port = 3306;
 // ===================================================================
 
 struct product {
-    using id          = ds_mysql::column_field<"id",          uint32_t>;
-    using sku         = ds_mysql::column_field<"sku",         ds_mysql::varchar_field<64>>;
-    using name        = ds_mysql::column_field<"name",        ds_mysql::varchar_field<255>>;
-    using price       = ds_mysql::column_field<"price",       double>;
-    using stock       = ds_mysql::column_field<"stock",       uint32_t>;
-    using description = ds_mysql::column_field<"description", std::optional<ds_mysql::varchar_field<512>>>;
-    using created_at  = ds_mysql::column_field<"created_at",  ds_mysql::sql_datetime>;
-
-    id          id_;
-    sku         sku_;
-    name        name_;
-    price       price_;
-    stock       stock_;
-    description description_;
-    created_at  created_at_;
+    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(sku,         ds_mysql::varchar_field<64>)
+    COLUMN_FIELD(name,        ds_mysql::varchar_field<255>)
+    COLUMN_FIELD(price,       double)
+    COLUMN_FIELD(stock,       uint32_t)
+    COLUMN_FIELD(description, std::optional<ds_mysql::varchar_field<512>>)
+    COLUMN_FIELD(created_at,  ds_mysql::sql_datetime)
 };
 
 // ===================================================================
