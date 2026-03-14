@@ -483,6 +483,30 @@ struct column_field : column_field_detail::base<T> {
 };
 
 // ===================================================================
+// COLUMN_FIELD convenience macro
+// ===================================================================
+
+/**
+ * COLUMN_FIELD(tag, type) — declares a column field with a member variable.
+ *
+ * Expands to:
+ *   struct tag_tag {};
+ *   using tag = column_field<tag_tag, type>;
+ *   tag tag_;
+ *
+ * Example (inside a struct/class body):
+ *   COLUMN_FIELD(id,     uint32_t)
+ *   COLUMN_FIELD(ticker, varchar_field<32>)
+ *   COLUMN_FIELD(sector, std::optional<varchar_field<64>>)
+ *
+ * SQL column names: "id", "ticker", "sector"
+ */
+#define COLUMN_FIELD(tag, type)                            \
+    struct tag##_tag {};                                   \
+    using tag = ::ds_mysql::column_field<tag##_tag, type>; \
+    tag tag##_
+
+// ===================================================================
 // ColumnFieldType concept
 // ===================================================================
 
