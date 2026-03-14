@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "ds_mysql/fixed_string.hpp"
+#include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
 
@@ -518,6 +519,68 @@ struct unwrap_column_field<T> {
 
 template <typename T>
 using unwrap_column_field_t = typename unwrap_column_field<T>::type;
+
+}  // namespace ds_mysql
+
+// ===================================================================
+// tagged_column_field — tag-struct convenience alias
+// ===================================================================
+
+namespace ds_mysql {
+
+namespace detail {
+
+/**
+ * Construct a fixed_string<N> from a string_view at compile time.
+ * N must equal sv.size() + 1 (to include the null terminator).
+ */
+template <std::size_t N>
+consteval fixed_string<N> fixed_string_from_sv(std::string_view sv) noexcept {
+    fixed_string<N> result{};
+    for (std::size_t i = 0; i + 1 < N; ++i)
+        result.data[i] = sv[i];
+    return result;
+}
+
+/**
+ * Derive the column name from a tag type at compile time.
+ * Strips a trailing "_tag" suffix if present, then returns a fixed_string.
+ *
+ * Examples:
+ *   column_name_from_tag<id_tag>()    →  fixed_string{"id"}
+ *   column_name_from_tag<price_tag>() →  fixed_string{"price"}
+ *   column_name_from_tag<foo>()       →  fixed_string{"foo"}   (no suffix)
+ */
+template <typename Tag>
+consteval auto column_name_from_tag() noexcept {
+    constexpr std::string_view full   = extract_type_name<Tag>();
+    constexpr std::string_view suffix = "_tag";
+    constexpr std::string_view name   = full.ends_with(suffix)
+                                            ? full.substr(0, full.size() - suffix.size())
+                                            : full;
+    return fixed_string_from_sv<name.size() + 1>(name);
+}
+
+}  // namespace detail
+
+/**
+ * tagged_column_field<Tag, T> — tag-struct alternative to column_field<"name", T>.
+ *
+ * Derive the SQL column name from a tag struct at compile time (stripping a
+ * trailing "_tag" suffix).  The result is an ordinary column_field, so it
+ * satisfies all the same concepts and works everywhere column_field does.
+ *
+ * Usage:
+ *   struct price_tag {};
+ *   using price = tagged_column_field<price_tag, double>;
+ *   price price_;
+ *
+ * This is exactly equivalent to:
+ *   using price = column_field<"price", double>;
+ *   price price_;
+ */
+template <typename Tag, typename T>
+using tagged_column_field = column_field<detail::column_name_from_tag<Tag>(), T>;
 
 }  // namespace ds_mysql
 

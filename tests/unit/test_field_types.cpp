@@ -157,8 +157,41 @@ suite<"varchar_field"> varchar_field_suite = [] {
 };
 
 // ===================================================================
-// column_field with std::string value type
+// tagged_column_field — tag-struct alias
 // ===================================================================
+
+namespace {
+struct price_tag {};
+struct order_id_tag {};
+struct no_suffix {};
+
+// With _tag suffix stripped:
+static_assert(std::is_same_v<tagged_column_field<price_tag, double>,
+                             column_field<"price", double>>);
+// Multi-word tag with _tag stripped:
+static_assert(std::is_same_v<tagged_column_field<order_id_tag, uint32_t>,
+                             column_field<"order_id", uint32_t>>);
+// Tag without _tag suffix — name kept as-is:
+static_assert(std::is_same_v<tagged_column_field<no_suffix, int>,
+                             column_field<"no_suffix", int>>);
+}  // namespace
+
+suite<"tagged_column_field"> tagged_column_field_suite = [] {
+    "tagged_column_field column_name matches derived tag name"_test = [] {
+        using price = tagged_column_field<price_tag, double>;
+        expect(price::column_name() == "price"sv);
+    };
+
+    "tagged_column_field with multi-word tag"_test = [] {
+        using order_id = tagged_column_field<order_id_tag, uint32_t>;
+        expect(order_id::column_name() == "order_id"sv);
+    };
+
+    "tagged_column_field without _tag suffix keeps full name"_test = [] {
+        using ns = tagged_column_field<no_suffix, int>;
+        expect(ns::column_name() == "no_suffix"sv);
+    };
+};
 
 namespace {
 using string_column = column_field<"string_col", std::string>;

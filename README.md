@@ -37,13 +37,20 @@ struct product {
     price price_;
 };
 
-// The COLUMN_FIELD(tag, type) macro is a one-liner convenience equivalent:
-// struct product {
-//     COLUMN_FIELD(id,    uint32_t)
-//     COLUMN_FIELD(sku,   varchar_field<64>)
-//     COLUMN_FIELD(name,  varchar_field<255>)
-//     COLUMN_FIELD(price, double)
-// };
+// Three equivalent styles — pick what suits your team:
+
+// a) Explicit string literal (recommended — column name is right there):
+//   using price = column_field<"price", double>;
+//   price price_;
+
+// b) Tag struct — no string literals, column name derived from tag type at
+//    compile time (trailing "_tag" suffix is stripped automatically):
+//   struct price_tag {};
+//   using price = tagged_column_field<price_tag, double>;
+//   price price_;
+
+// c) COLUMN_FIELD macro — one-liner shorthand for style (a):
+//   COLUMN_FIELD(price, double)
 
 // 2. Connect and query
 auto db = mysql_database::connect(mysql_config{

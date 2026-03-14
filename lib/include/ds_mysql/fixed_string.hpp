@@ -22,6 +22,8 @@ template <std::size_t N>
 struct fixed_string {
     char data[N]{};
 
+    constexpr fixed_string() noexcept = default;
+
     // NOLINTNEXTLINE(google-explicit-constructor)
     consteval fixed_string(char const (&str)[N]) noexcept {
         for (std::size_t i = 0; i < N; ++i)
