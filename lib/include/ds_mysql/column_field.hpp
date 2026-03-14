@@ -521,7 +521,6 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
 
 }  // namespace ds_mysql
 
-// clang-format off
 /**
  * COLUMN_FIELD(tag, type) — convenience macro to declare a column field member.
  *
@@ -532,7 +531,6 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
  *   using id = ::ds_mysql::column_field<"id", uint32_t>;
  *   id id_;
  */
-#define COLUMN_FIELD(tag, type)                         \
-    using tag = ::ds_mysql::column_field<#tag, type>;   \
+#define COLUMN_FIELD(tag, type)                       \
+    using tag = ::ds_mysql::column_field<#tag, type>; \
     tag tag##_;
-// clang-format on
