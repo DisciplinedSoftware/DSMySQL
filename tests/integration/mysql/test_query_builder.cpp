@@ -20,15 +20,25 @@ namespace ds_mysql {
 namespace {
 
 struct trade {
-    using id = column_field<struct id_tag, uint32_t>;
-    using account_id = column_field<struct account_id_tag, std::optional<uint32_t>>;
-    using code = column_field<struct code_tag, varchar_field<32>>;
-    using type = column_field<struct type_tag, varchar_field<64>>;
-    using name = column_field<struct name_tag, std::optional<varchar_field<255>>>;
-    using category = column_field<struct category_tag, std::optional<varchar_field<255>>>;
-    using currency = column_field<struct currency_tag, std::optional<varchar_field<32>>>;
-    using executed_at = column_field<struct executed_at_tag, sql_datetime>;
-    using recorded_at = column_field<struct recorded_at_tag, sql_datetime>;
+    struct id_tag {};
+    struct account_id_tag {};
+    struct code_tag {};
+    struct type_tag {};
+    struct name_tag {};
+    struct category_tag {};
+    struct currency_tag {};
+    struct executed_at_tag {};
+    struct recorded_at_tag {};
+
+    using id = column_field<id_tag, uint32_t>;
+    using account_id = column_field<account_id_tag, std::optional<uint32_t>>;
+    using code = column_field<code_tag, varchar_field<32>>;
+    using type = column_field<type_tag, varchar_field<64>>;
+    using name = column_field<name_tag, std::optional<varchar_field<255>>>;
+    using category = column_field<category_tag, std::optional<varchar_field<255>>>;
+    using currency = column_field<currency_tag, std::optional<varchar_field<32>>>;
+    using executed_at = column_field<executed_at_tag, sql_datetime>;
+    using recorded_at = column_field<recorded_at_tag, sql_datetime>;
 
     id id_;
     account_id account_id_;
@@ -47,9 +57,9 @@ struct trade {
         return v ? v : fallback;
     };
 
-    const std::string host     = getenv_or("DS_MYSQL_TEST_HOST");
+    const std::string host = getenv_or("DS_MYSQL_TEST_HOST");
     const std::string database = getenv_or("DS_MYSQL_TEST_DATABASE", "ds_mysql_test");
-    const std::string user     = getenv_or("DS_MYSQL_TEST_USER");
+    const std::string user = getenv_or("DS_MYSQL_TEST_USER");
     const std::string password = getenv_or("DS_MYSQL_TEST_PASSWORD");
 
     if (host.empty() || user.empty() || password.empty()) {
@@ -70,12 +80,16 @@ struct trade {
 
 template <typename F>
 struct scope_guard {
-    explicit scope_guard(F fn) : fn_(std::move(fn)) {}
-    ~scope_guard() noexcept { fn_(); }
+    explicit scope_guard(F fn) : fn_(std::move(fn)) {
+    }
+    ~scope_guard() noexcept {
+        fn_();
+    }
     scope_guard(scope_guard const&) = delete;
     scope_guard& operator=(scope_guard const&) = delete;
     scope_guard(scope_guard&&) = delete;
     scope_guard& operator=(scope_guard&&) = delete;
+
 private:
     F fn_;
 };
@@ -164,7 +178,9 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists()).has_value()) << "Failed to drop table";
         expect(db->execute(create_table<trade>()).has_value()) << "Failed to create trade table";
@@ -180,7 +196,9 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
@@ -192,7 +210,9 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value())
             << "Chained DROP/CREATE should succeed";
@@ -214,7 +234,9 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value());
 
@@ -238,7 +260,9 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value());
 
@@ -262,7 +286,9 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<temporal_precision_trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<temporal_precision_trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<temporal_precision_trade>().if_exists()).has_value());
         expect(db->execute(create_table<temporal_precision_trade>()).has_value());
@@ -300,7 +326,9 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -326,7 +354,9 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -349,7 +379,9 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -378,7 +410,9 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -411,7 +445,9 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -441,7 +477,9 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -472,7 +510,9 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -504,7 +544,9 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -526,7 +568,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -549,7 +593,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -573,7 +619,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -598,7 +646,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -622,7 +672,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -646,7 +698,9 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
@@ -680,7 +734,9 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
 
@@ -695,7 +751,9 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists()).has_value());
 
@@ -732,7 +790,9 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
 
@@ -747,7 +807,9 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists()).has_value());
 
@@ -844,7 +906,9 @@ suite<"Execute Failure"> execute_failure_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<trade>().if_exists()).has_value());
         expect(db->execute(create_table<trade>()).has_value());
@@ -869,7 +933,9 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
 
@@ -885,7 +951,9 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->query(raw_sql{"DROP TABLE IF EXISTS raw_ddl_test"})); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS raw_ddl_test"}));
+        }};
 
         // DDL via raw_sql also returns no result set.
         auto const result =
@@ -919,7 +987,9 @@ suite<"Boolean Column Coverage"> boolean_column_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<bool_table>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<bool_table>().if_exists()));
+        }};
 
         expect(db->execute(drop_table<bool_table>().if_exists()).has_value());
         expect(db->execute(create_table<bool_table>()).has_value());
@@ -991,7 +1061,9 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"})); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"}));
+        }};
 
         // Create a table where column 2 is 'wrong_col_name' but struct expects 'right_name'.
         auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"});
@@ -1018,7 +1090,9 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"})); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"}));
+        }};
 
         // Create a table where 'code' is INT but struct expects VARCHAR(32).
         auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"});
@@ -1045,7 +1119,9 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"})); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"}));
+        }};
 
         // Create a table where 'code' is nullable but struct expects NOT NULL.
         auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
@@ -1088,7 +1164,9 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table<trade>().if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
 
         // Ensure at least one row exists so the result set is non-empty.
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
