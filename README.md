@@ -45,9 +45,11 @@ struct product {
 //   price price_;
 //   // IMPORTANT: tag structs must be nested inside the table struct — not at global scope.
 
-// c) Fixed string literal — column name embedded directly, no tag needed. Note: two tables
-//    with identically-named and -typed columns share the same C++ type, which weakens
-//    cross-table isolation but is still safe for single-table queries:
+// c) Fixed string literal — column name embedded directly, no tag needed.
+//    ⚠ Two tables with identically-named and -typed columns share the same C++ type,
+//    so column_field cannot verify which table a column belongs to. This means
+//    column_field columns cannot be used as select projections in from<Table>().
+//    Prefer COLUMN_FIELD or explicit nested tags for query-building use cases.
 //   using price = column_field<"price", double>;
 //   price price_;
 

@@ -69,6 +69,43 @@ struct table_with_borrowed_tag {
     id id_;
 };
 
+// ── Two tables with identical NTTP column definitions ──────────────
+//
+// Both declare "id" as column_field<"id", uint32_t>.  The resulting C++
+// type is identical — there is no tag to distinguish ownership.
+// column_belongs_to_table_v must therefore be false for both directions
+// to prevent cross-table column misuse from silently compiling.
+struct nttp_table_a {
+    using id    = column_field<"id",    uint32_t>;
+    using price = column_field<"price", double>;
+    id    id_;
+    price price_;
+};
+
+struct nttp_table_b {
+    using id    = column_field<"id",    uint32_t>;
+    using value = column_field<"value", double>;
+    id    id_;
+    value value_;
+};
+
+// ── Two tables sharing the same outer (global-scope) tag ──────────
+//
+// When the same tag struct is reused across tables, both tables produce
+// the same tagged_column_field type — no isolation.  ValidTable rejects
+// both tables, so entry points refuse them at the boundary.
+struct shared_outer_tag {};
+
+struct outer_tag_table_a {
+    using id = tagged_column_field<shared_outer_tag, uint32_t>;
+    id id_;
+};
+
+struct outer_tag_table_b {
+    using id = tagged_column_field<shared_outer_tag, uint32_t>;
+    id id_;
+};
+
 }  // namespace
 
 // ===================================================================
@@ -94,6 +131,36 @@ static_assert(!ValidTable<table_with_borrowed_tag>);
 
 // Cross-table isolation: same column name but different tables → different types
 static_assert(!std::is_same_v<table_with_macro::id, other_table::id>);
+
+// ===================================================================
+// column_belongs_to_table_v — cross-table isolation checks
+// ===================================================================
+
+// Tagged columns belong only to their own table.
+static_assert(ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, table_with_macro>, "id in macro table");
+static_assert(ds_mysql::detail::column_belongs_to_table_v<table_with_macro::price, table_with_macro>, "price in macro table");
+static_assert(ds_mysql::detail::column_belongs_to_table_v<other_table::id, other_table>, "id in other_table");
+
+// Tagged columns do NOT belong to a different table.
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, other_table>, "macro id not in other_table");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<other_table::id, table_with_macro>, "other id not in macro table");
+
+// NTTP column_field has no tag → cannot verify ownership → always false.
+// This prevents cross-table misuse from silently compiling.
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<nttp_table_a::id, nttp_table_a>, "nttp: no ownership");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<nttp_table_a::id, nttp_table_b>, "nttp: no cross-table");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<nttp_table_b::id, nttp_table_a>, "nttp: no cross-table 2");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<nttp_table_b::id, nttp_table_b>, "nttp: no ownership 2");
+
+// NTTP columns from two tables are the same C++ type — there is nothing
+// to distinguish them at compile time.
+static_assert(std::is_same_v<nttp_table_a::id, nttp_table_b::id>);
+
+// Shared outer tag → same type across tables.
+static_assert(std::is_same_v<outer_tag_table_a::id, outer_tag_table_b::id>);
+// Both tables are rejected by ValidTable, so entry points refuse them.
+static_assert(!ValidTable<outer_tag_table_a>);
+static_assert(!ValidTable<outer_tag_table_b>);
 
 // ===================================================================
 // tag_is_nested_in_table — compile-time checks
@@ -228,6 +295,40 @@ suite<"ValidTable"> valid_table_suite = [] {
 
     "cross-table isolation: same column name yields distinct types"_test = [] {
         expect(constant<!std::is_same_v<table_with_macro::id, other_table::id>>);
+    };
+};
+
+// ===================================================================
+// column_belongs_to_table_v — runtime suite
+// ===================================================================
+
+suite<"column_belongs_to_table_v"> col_belongs_suite = [] {
+    "tagged column belongs to its own table"_test = [] {
+        expect(constant<ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, table_with_macro>>);
+        expect(constant<ds_mysql::detail::column_belongs_to_table_v<table_with_macro::price, table_with_macro>>);
+        expect(constant<ds_mysql::detail::column_belongs_to_table_v<other_table::id, other_table>>);
+    };
+
+    "tagged column does not belong to a different table"_test = [] {
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, other_table>>);
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<other_table::id, table_with_macro>>);
+    };
+
+    "NTTP column_field has no ownership — false for any table"_test = [] {
+        // column_field<"id", uint32_t> is the same type in both nttp_table_a and
+        // nttp_table_b, so membership cannot be verified at compile time.
+        // column_belongs_to_table_v is false for all combinations to prevent
+        // cross-table select misuse from silently compiling.
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<nttp_table_a::id, nttp_table_a>>);
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<nttp_table_a::id, nttp_table_b>>);
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<nttp_table_b::id, nttp_table_a>>);
+        expect(constant<!ds_mysql::detail::column_belongs_to_table_v<nttp_table_b::id, nttp_table_b>>);
+    };
+
+    "shared outer tag produces same type across tables — both rejected by ValidTable"_test = [] {
+        expect(constant<std::is_same_v<outer_tag_table_a::id, outer_tag_table_b::id>>);
+        expect(constant<!ValidTable<outer_tag_table_a>>);
+        expect(constant<!ValidTable<outer_tag_table_b>>);
     };
 };
 

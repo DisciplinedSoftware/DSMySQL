@@ -3312,6 +3312,13 @@ TupleType deserialize_row(std::vector<std::optional<std::string>> const& row) {
 
 // ===================================================================
 // column_belongs_to_table_v — compile-time membership predicate
+//
+// For tagged_column_field: true iff the tag struct is nested inside Table
+// (i.e. tag_is_nested_in_table<T::tag_type, Table>() returns true).
+// For bare column_field (no tag_type): always false — type identity alone
+// cannot establish table ownership when different tables share the same
+// NTTP name and value type.
+// For col<T, I> descriptors: true iff T == Table (existing behaviour).
 // ===================================================================
 
 template <typename Col, typename Table>
@@ -3320,16 +3327,9 @@ constexpr bool column_belongs_to_table_v = false;
 template <typename T, std::size_t I, typename Table>
 constexpr bool column_belongs_to_table_v<col<T, I>, Table> = std::is_same_v<T, Table>;
 
-template <ColumnFieldType T, typename Table>
-consteval bool column_field_in_table() {
-    return []<std::size_t... Is>(std::index_sequence<Is...>) {
-        return (std::is_same_v<boost::pfr::tuple_element_t<Is, Table>, T> || ...);
-    }(std::make_index_sequence<boost::pfr::tuple_size_v<Table>>{});
-}
-
 template <typename T, typename Table>
-    requires ColumnFieldType<T>
-constexpr bool column_belongs_to_table_v<T, Table> = column_field_in_table<T, Table>();
+    requires ColumnFieldType<T> && requires { typename T::tag_type; }
+constexpr bool column_belongs_to_table_v<T, Table> = tag_is_nested_in_table<typename T::tag_type, Table>();
 
 // ===================================================================
 // qualified_col_name<Col> — table-qualified column name for JOINs
