@@ -5,6 +5,7 @@
 #include "ds_mysql/column_field.hpp"
 #include "ds_mysql/text_field.hpp"
 #include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/version.hpp"
 
 using namespace boost::ut;
 using namespace ds_mysql;
@@ -206,5 +207,25 @@ suite<"column_field string constructors"> column_field_string_suite = [] {
         std::string const str = "assigned";
         col = str;
         expect(col.value == "assigned");
+    };
+};
+
+// ===================================================================
+// version
+// ===================================================================
+
+static_assert(ds_mysql::version::major == 1u);
+static_assert(ds_mysql::version::minor == 0u);
+static_assert(ds_mysql::version::patch == 0u);
+static_assert(ds_mysql::version::value == 10000u);
+static_assert(ds_mysql::version::string == "1.0.0");
+
+suite<"version"> version_suite = [] {
+    "version struct fields are consistent"_test = [] {
+        expect(version::major == 1u);
+        expect(version::minor == 0u);
+        expect(version::patch == 0u);
+        expect(version::value == version::major * 10'000u + version::minor * 100u + version::patch);
+        expect(version::string == "1.0.0"sv);
     };
 };

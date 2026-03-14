@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  validate-version:
+    name: Validate version tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: extract
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches CMakeLists.txt version
+        run: |
+          cmake_version=$(grep -m1 'project(DSMySQL' CMakeLists.txt -A5 \
+            | grep 'VERSION' \
+            | grep -oP '\d+\.\d+\.\d+')
+          tag_version="${{ steps.extract.outputs.version }}"
+          echo "Tag version:    $tag_version"
+          echo "CMake version:  $cmake_version"
+          if [ "$tag_version" != "$cmake_version" ]; then
+            echo "::error::Tag version ($tag_version) does not match CMakeLists.txt version ($cmake_version)"
+            exit 1
+          fi
+
+  unit-tests:
+    name: Unit tests (GCC)
+    needs: validate-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y software-properties-common ca-certificates gpg wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
+            | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build g++-15 \
+            libmysqlclient-dev pkg-config
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Configure
+        run: |
+          cmake --preset release \
+            -DSKIP_DOCKER_MANAGEMENT=ON \
+            -DBUILD_INTEGRATION_TESTS=OFF
+        env:
+          CXX: g++-15
+          CC: gcc-15
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Unit tests
+        run: ctest --preset release -R tests_unit_ds_mysql --output-on-failure
+
+  release:
+    name: Create GitHub release
+    needs: [validate-version, unit-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install CMake (for configure_file)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y software-properties-common ca-certificates gpg wget
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
+            | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo apt-get update -q
+          sudo apt-get install -y cmake libmysqlclient-dev pkg-config g++-15
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Generate version.hpp
+        run: |
+          cmake -B _ver_build -DSKIP_DOCKER_MANAGEMENT=ON \
+            -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF \
+            -DBUILD_INTEGRATION_TESTS=OFF
+        env:
+          CXX: g++-15
+          CC: gcc-15
+
+      - name: Package headers
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          ARCHIVE="ds_mysql-v${VERSION}.tar.gz"
+
+          # Merge source headers with the generated version.hpp
+          mkdir -p _dist/ds_mysql
+          cp -r lib/include/ds_mysql/. _dist/ds_mysql/
+          cp _ver_build/lib/include/ds_mysql/version.hpp _dist/ds_mysql/version.hpp
+          rm -f _dist/ds_mysql/version.hpp.in
+
+          tar -czf "$ARCHIVE" -C _dist ds_mysql
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DSMySQL v${{ needs.validate-version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: ${{ env.ARCHIVE }}

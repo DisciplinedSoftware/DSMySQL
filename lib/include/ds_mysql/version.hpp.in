@@ -1,0 +1,29 @@
+#pragma once
+
+#include <cstdint>
+#include <string_view>
+
+namespace ds_mysql {
+
+/// Compile-time version information for DSMySQL.
+///
+/// The values are generated from the CMakeLists.txt project() declaration and
+/// therefore always match the authoritative version of the library.
+///
+/// Usage:
+///   static_assert(ds_mysql::version::major >= 1);
+///   if constexpr (ds_mysql::version::value >= 10001) { ... }
+struct version {
+    static constexpr std::uint32_t major  = @PROJECT_VERSION_MAJOR@;
+    static constexpr std::uint32_t minor  = @PROJECT_VERSION_MINOR@;
+    static constexpr std::uint32_t patch  = @PROJECT_VERSION_PATCH@;
+
+    /// Packed integer: major * 10000 + minor * 100 + patch.
+    /// Allows numeric comparisons: ds_mysql::version::value >= 10001u
+    static constexpr std::uint32_t value  = major * 10'000u + minor * 100u + patch;
+
+    /// Canonical "major.minor.patch" string.
+    static constexpr std::string_view string = "@PROJECT_VERSION@";
+};
+
+}  // namespace ds_mysql
