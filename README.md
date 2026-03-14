@@ -40,6 +40,16 @@ struct product {
     price price_;
 };
 
+// Alternatively, use the COLUMN_FIELD macro to reduce boilerplate:
+struct product_v2 {
+    COLUMN_FIELD(id,    uint32_t);
+    COLUMN_FIELD(sku,   varchar_field<64>);
+    COLUMN_FIELD(name,  varchar_field<255>);
+    COLUMN_FIELD(price, double);
+};
+// Each COLUMN_FIELD(tag, type) expands to: a tag struct, a type alias, and a member variable.
+// The two definitions are equivalent and produce the same SQL schema.
+
 // 2. Connect and query
 auto db = mysql_database::connect(mysql_config{
     host_name{"127.0.0.1"},
