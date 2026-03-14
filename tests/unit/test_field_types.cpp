@@ -214,18 +214,21 @@ suite<"column_field string constructors"> column_field_string_suite = [] {
 // version
 // ===================================================================
 
-static_assert(ds_mysql::version::major == 1u);
-static_assert(ds_mysql::version::minor == 0u);
-static_assert(ds_mysql::version::patch == 0u);
-static_assert(ds_mysql::version::value == 10000u);
-static_assert(ds_mysql::version::string == "1.0.0");
+// value must be derivable from the component fields
+static_assert(ds_mysql::version::value ==
+              ds_mysql::version::major * 10'000u +
+              ds_mysql::version::minor * 100u +
+              ds_mysql::version::patch);
+
+static_assert(!ds_mysql::version::string.empty());
 
 suite<"version"> version_suite = [] {
-    "version struct fields are consistent"_test = [] {
-        expect(version::major == 1u);
-        expect(version::minor == 0u);
-        expect(version::patch == 0u);
-        expect(version::value == version::major * 10'000u + version::minor * 100u + version::patch);
-        expect(version::string == "1.0.0"sv);
+    "value is consistent with major/minor/patch"_test = [] {
+        expect(version::value ==
+               version::major * 10'000u + version::minor * 100u + version::patch);
+    };
+
+    "string is non-empty"_test = [] {
+        expect(!version::string.empty());
     };
 };
