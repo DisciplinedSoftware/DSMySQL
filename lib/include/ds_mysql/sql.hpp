@@ -1599,52 +1599,117 @@ template <BuildsSql SelectQuery>
 
 }  // namespace ddl_detail
 
+// ===================================================================
+// tag_is_nested_in_table — compile-time ownership check for tagged fields
+//
+// Verifies that a tag struct was defined as a nested class of Table by
+// comparing the unqualified parent scope of the tag's fully-qualified name
+// with the unqualified name of Table.
+//
+//   struct my_table {
+//       struct id_tag {};   // nested → raw name "my_table::id_tag"
+//       ...
+//   };
+//   tag_is_nested_in_table<my_table::id_tag, my_table>()  →  true
+//   tag_is_nested_in_table<global_id_tag,    my_table>()  →  false
+// ===================================================================
+
+template <typename Tag, typename Table>
+consteval bool tag_is_nested_in_table() noexcept {
+    constexpr std::string_view full       = detail::raw_type_name<Tag>();
+    constexpr auto             last_scope = full.rfind("::");
+    if constexpr (last_scope == std::string_view::npos)
+        return false;  // no scope → defined at global/namespace level, not in a class
+    return detail::strip_type_qualifiers(full.substr(0, last_scope)) ==
+           detail::extract_type_name<Table>();
+}
+
+// Helper: returns true for projections that are not tagged_column_field, or
+// whose tag is nested inside Table. Used in the ValidTable concept.
+template <typename Proj, typename Table>
+consteval bool tag_nested_or_untagged() noexcept {
+    if constexpr (requires { typename Proj::tag_type; })
+        return tag_is_nested_in_table<typename Proj::tag_type, Table>();
+    else
+        return true;
+}
+
+// ===================================================================
+// ValidTable — concept for a well-formed table struct
+//
+// Satisfied when every tagged_column_field member of T has its tag struct
+// defined as a nested class of T (not at global/namespace scope).
+//
+// Use COLUMN_FIELD inside your struct to satisfy this automatically:
+//
+//   struct my_table {          // ✓ — COLUMN_FIELD generates nested tags
+//       COLUMN_FIELD(id,    uint32_t)
+//       COLUMN_FIELD(price, double)
+//   };
+//
+// Applied to every table entry point (create_table, insert_into, etc.)
+// so misuse is caught as early as possible.
+// ===================================================================
+
 template <typename T>
+consteval bool all_table_tags_nested() noexcept {
+    if constexpr (!std::is_aggregate_v<T>)
+        return false;
+    else
+        return []<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (tag_nested_or_untagged<boost::pfr::tuple_element_t<Is, T>, T>() && ...);
+        }(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+}
+
+template <typename T>
+concept ValidTable = !ColumnFieldType<T> && all_table_tags_nested<T>();
+
+template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_table() {
     return ddl_detail::create_table_builder<T>{};
 }
 
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table() {
     return ddl_detail::create_table_builder<T>{{}, true};
 }
 
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_table_builder<T> drop_table() {
     return ddl_detail::drop_table_builder<T>{};
 }
 
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table() {
     return ddl_detail::drop_table_builder<T>{{}, true};
 }
 
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] ddl_detail::create_view_builder<T> create_view() {
     return ddl_detail::create_view_builder<T>{};
 }
 
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_view_builder<T> drop_view() {
     return ddl_detail::drop_view_builder<T>{};
 }
 
-template <typename From, typename To>
+template <ValidTable From, ValidTable To>
 [[nodiscard]] ddl_detail::rename_table_builder<From, To> rename_table() {
     return ddl_detail::rename_table_builder<From, To>{};
 }
 
-template <typename Table, ColumnDescriptor... Cols>
+template <ValidTable Table, ColumnDescriptor... Cols>
 [[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(std::string name) {
     return ddl_detail::create_index_builder<Table, Cols...>{std::move(name)};
 }
 
-template <typename Table>
+template <ValidTable Table>
 [[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(std::string name) {
     return ddl_detail::drop_index_builder<Table>{std::move(name)};
 }
 
-template <typename Table>
+template <ValidTable Table>
 [[nodiscard]] ddl_detail::alter_table_builder<Table> alter_table() {
     return ddl_detail::alter_table_builder<Table>{};
 }
@@ -2039,7 +2104,7 @@ public:
 /**
  * describe<T>() — DESCRIBE <table>.
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::describe_builder<T> describe() {
     return {};
 }
@@ -2069,7 +2134,7 @@ template <typename T>
  *   // Bulk:
  *   db.execute(insert_into<symbol>().values(std::array{row1, row2}).build_sql());
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::insert_into_builder<T> insert_into() {
     return {};
 }
@@ -2083,7 +2148,7 @@ template <typename T>
  * Example:
  *   db.execute(update<symbol>().set(symbol::ticker{"MSFT"}).where(equal<symbol::id>(1u)));
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::update_builder<T> update() {
     return {};
 }
@@ -2094,7 +2159,7 @@ template <typename T>
  * Example:
  *   db.execute(delete_from<symbol>().where(equal<symbol::id>(1u)));
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::delete_from_builder<T> delete_from() {
     return {};
 }
@@ -3267,41 +3332,6 @@ template <typename T, typename Table>
 constexpr bool column_belongs_to_table_v<T, Table> = column_field_in_table<T, Table>();
 
 // ===================================================================
-// tag_is_nested_in_table — compile-time ownership check for tagged fields
-//
-// Verifies that a tag struct was defined as a nested class of Table by
-// comparing the unqualified parent scope of the tag's fully-qualified name
-// with the unqualified name of Table.
-//
-//   struct my_table {
-//       struct id_tag {};   // nested → raw name "my_table::id_tag"
-//       ...
-//   };
-//   tag_is_nested_in_table<my_table::id_tag, my_table>()  →  true
-//   tag_is_nested_in_table<global_id_tag,    my_table>()  →  false
-// ===================================================================
-
-template <typename Tag, typename Table>
-consteval bool tag_is_nested_in_table() noexcept {
-    constexpr std::string_view full       = detail::raw_type_name<Tag>();
-    constexpr auto             last_scope = full.rfind("::");
-    if constexpr (last_scope == std::string_view::npos)
-        return false;  // no scope → defined at global/namespace level, not in a class
-    return detail::strip_type_qualifiers(full.substr(0, last_scope)) ==
-           detail::extract_type_name<Table>();
-}
-
-// Helper: returns true for projections that are not tagged_column_field, or
-// whose tag is nested inside Table. Used in the from() static_assert.
-template <typename Proj, typename Table>
-consteval bool tag_nested_or_untagged() noexcept {
-    if constexpr (requires { typename Proj::tag_type; })
-        return tag_is_nested_in_table<typename Proj::tag_type, Table>();
-    else
-        return true;
-}
-
-// ===================================================================
 // qualified_col_name<Col> — table-qualified column name for JOINs
 //
 // For col<T, I> descriptors (which carry table info): "table_name.col_name".
@@ -3790,15 +3820,11 @@ template <typename... Projs>
 class select_builder {
 public:
     // Checked: all column projections must belong to Table (single-table query).
-    template <typename Table>
+    template <ValidTable Table>
     [[nodiscard]] select_query_builder<Table, Projs...> from() const {
         static_assert(((AggregateProjection<Projs> || column_belongs_to_table_v<Projs, Table>) && ...),
                       "All column projections must belong to the table passed to from<Table>(). "
                       "For JOIN queries spanning multiple tables, use .from_joined<Table>() instead.");
-        static_assert((tag_nested_or_untagged<Projs, Table>() && ...),
-                      "Tag structs used with tagged_column_field must be defined as nested classes "
-                      "of the table struct. Use COLUMN_FIELD or define 'struct tag_name {}' inside "
-                      "the table struct, not at global scope.");
         return {};
     }
 
@@ -3914,7 +3940,7 @@ template <Projection... Projs>
  *   auto rows = db.query(count<symbol>());
  *   auto rows = db.query(count<symbol>().where(equal<symbol::ticker>("AAPL")));
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] detail::select_query_builder<T, count_all> count() {
     return {};
 }
@@ -3927,7 +3953,7 @@ template <typename T>
  * Example:
  *   db.execute(truncate_table<symbol>());
  */
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table() {
     return {};
 }
@@ -4301,25 +4327,25 @@ private:
 }  // namespace dml_detail
 
 // insert_ignore_into<T>() — INSERT IGNORE INTO <table> (...) VALUES (...)
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::insert_ignore_into_builder<T> insert_ignore_into() {
     return {};
 }
 
 // insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
-template <typename T, AnySelectQuery Query>
+template <ValidTable T, AnySelectQuery Query>
 [[nodiscard]] dml_detail::insert_into_select_builder<T> insert_into_select(Query const& query) {
     return dml_detail::insert_into_select_builder<T>{query.build_sql()};
 }
 
 // replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
-template <typename T>
+template <ValidTable T>
 [[nodiscard]] dml_detail::replace_into_builder<T> replace_into() {
     return {};
 }
 
 // update_join<T1, T2>() — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
-template <typename T1, typename T2, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+template <ValidTable T1, ValidTable T2, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
 [[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join() {
     std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +
                               detail::qualified_col_name<LeftCol>() + " = " + detail::qualified_col_name<RightCol>();

@@ -42,6 +42,14 @@ namespace detail {
     return name;
 }
 
+consteval std::string_view remove_suffix(std::string_view name, std::string_view suffix) noexcept {
+    if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix)
+        return name.substr(0, name.size() - suffix.size());
+    else {
+        return name;
+    }
+}
+
 /**
  * Extract the fully-qualified type name from compiler intrinsics.
  * Unlike extract_type_name(), does NOT strip namespace/class scope prefixes.
@@ -70,8 +78,11 @@ consteval std::string_view raw_type_name() {
     constexpr auto start = marker_pos + marker.size();
 
 #if defined(__clang__) || defined(__GNUC__)
+    // GCC/Clang format: [with T = TYPE] or [with T = TYPE; ALIAS = EXPANSION, ...]
     constexpr auto end = min_find_pos(signature.find(';', start), signature.find(']', start));
 #elif defined(_MSC_VER)
+    // MSVC format: "...raw_type_name<TYPE>(void)..."
+    // The type ends at '>' (template arg close) or ',' (comma in multi-param templates).
     constexpr auto end = min_find_pos(signature.find('>', start), signature.find(',', start));
 #else
 #error ("raw_type_name requires Clang, GCC, or MSVC")
@@ -98,10 +109,7 @@ consteval std::string_view extract_type_name() {
 
     constexpr auto npos = std::string_view::npos;
     constexpr auto marker_pos = signature.find(marker);
-    if constexpr (marker_pos == npos) {
-        static_assert(false, "Failed to locate marker in compiler function signature");
-        return {};
-    }
+    static_assert(marker_pos != npos, "Failed to locate marker in compiler function signature");
 
     constexpr auto start = marker_pos + marker.size();
 
@@ -116,20 +124,8 @@ consteval std::string_view extract_type_name() {
 #error ("extract_type_name requires Clang, GCC, or MSVC")
 #endif
 
-    if constexpr (end == npos || end <= start) {
-        static_assert(false, "Failed to locate end of type name in compiler function signature");
-        return {};
-    }
-
+    static_assert(end != npos && end > start, "Failed to locate end of type name in compiler function signature");
     return strip_type_qualifiers(signature.substr(start, end - start));
-}
-
-consteval std::string_view remove_suffix(std::string_view name, std::string_view suffix) noexcept {
-    if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix)
-        return name.substr(0, name.size() - suffix.size());
-    else {
-        return name;
-    }
 }
 
 /**

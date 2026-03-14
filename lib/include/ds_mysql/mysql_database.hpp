@@ -250,7 +250,7 @@ public:
     //
     // Returns std::expected<void, std::string>.
     // On mismatch, the error string lists every discrepancy found.
-    template <typename T>
+    template <ValidTable T>
     [[nodiscard]] std::expected<void, std::string> validate_table() const {
         auto describe_result = query(describe<T>());
         if (!describe_result) {
