@@ -42,12 +42,34 @@ namespace detail {
     return name;
 }
 
+/**
+ * remove_suffix — returns name without a trailing suffix when present.
+ *
+ * If name ends with suffix, the returned view excludes that suffix.
+ * Otherwise the original view is returned unchanged.
+ *
+ * Examples:
+ *   remove_suffix("ticker_tag", "_tag") → "ticker"
+ *   remove_suffix("ticker", "_tag")     → "ticker"
+ */
 consteval std::string_view remove_suffix(std::string_view name, std::string_view suffix) noexcept {
     if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix)
         return name.substr(0, name.size() - suffix.size());
     else {
         return name;
     }
+}
+
+/**
+ * Construct a fixed_string<N> from a string_view at compile time.
+ * N must equal sv.size() + 1 (to include the null terminator).
+ */
+template <std::size_t N>
+consteval fixed_string<N> fixed_string_from_sv(std::string_view sv) noexcept {
+    fixed_string<N> result{};
+    for (std::size_t i = 0; i + 1 < N; ++i)
+        result.data[i] = sv[i];
+    return result;
 }
 
 /**
@@ -114,18 +136,6 @@ consteval std::string_view tag_to_column_name() noexcept {
     constexpr auto name = extract_type_name<Tag>();
     constexpr std::string_view suffix = "_tag";
     return remove_suffix(name, suffix);
-}
-
-/**
- * Construct a fixed_string<N> from a string_view at compile time.
- * N must equal sv.size() + 1 (to include the null terminator).
- */
-template <std::size_t N>
-consteval fixed_string<N> fixed_string_from_sv(std::string_view sv) noexcept {
-    fixed_string<N> result{};
-    for (std::size_t i = 0; i + 1 < N; ++i)
-        result.data[i] = sv[i];
-    return result;
 }
 
 /**
