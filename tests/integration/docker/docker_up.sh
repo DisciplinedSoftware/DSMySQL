@@ -61,14 +61,6 @@ echo "Waiting for MySQL to be ready..."
 for i in {1..60}; do
   if docker-compose -f "$COMPOSE_FILE" exec -T mysql mysqladmin ping -h localhost > /dev/null 2>&1; then
     echo "MySQL is ready"
-
-    # Apply init-db.sql unconditionally so seed data always exists,
-    # even when the data volume was created before changes were added.
-    # The script is idempotent (CREATE TABLE IF NOT EXISTS, INSERT IGNORE).
-    echo "Applying init-db.sql..."
-    docker-compose -f "$COMPOSE_FILE" exec -T mysql \
-      mysql -u root -proot < "$ROOT_DIR/tests/integration/docker/init-db.sql"
-    echo "Database initialisation complete"
     exit 0
   fi
   echo "Waiting... ($i/60)"
