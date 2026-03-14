@@ -21,6 +21,7 @@ add_executable(tests_unit_ds_mysql
     test_dql.cpp
     test_dql_extensions.cpp
     test_field_types.cpp
+    test_valid_table.cpp
 )
 
 set_target_properties(tests_unit_ds_mysql PROPERTIES
