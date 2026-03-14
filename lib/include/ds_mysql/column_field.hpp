@@ -574,7 +574,6 @@ public:
 
 }  // namespace ds_mysql
 
-// clang-format off
 /**
  * COLUMN_FIELD(tag, type) — one-liner macro to declare a tagged column field.
  *
@@ -590,8 +589,7 @@ public:
  * per-table type uniqueness and satisfying the compile-time membership
  * check in from<Table>().
  */
-#define COLUMN_FIELD(tag, type)                                    \
-    struct tag##_tag {};                                           \
-    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type>;  \
+#define COLUMN_FIELD(tag, type)                                   \
+    struct tag##_tag {};                                          \
+    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type>; \
     tag tag##_;
-// clang-format on
