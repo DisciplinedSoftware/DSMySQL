@@ -37,6 +37,14 @@ struct product {
     price price_;
 };
 
+// The COLUMN_FIELD(tag, type) macro is a one-liner convenience equivalent:
+// struct product {
+//     COLUMN_FIELD(id,    uint32_t)
+//     COLUMN_FIELD(sku,   varchar_field<64>)
+//     COLUMN_FIELD(name,  varchar_field<255>)
+//     COLUMN_FIELD(price, double)
+// };
+
 // 2. Connect and query
 auto db = mysql_database::connect(mysql_config{
     host_name{"127.0.0.1"},
