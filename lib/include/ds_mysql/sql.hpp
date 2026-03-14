@@ -20,33 +20,12 @@
 
 #include "ds_mysql/col.hpp"
 #include "ds_mysql/database_name.hpp"
+#include "ds_mysql/fixed_string.hpp"
 #include "ds_mysql/schema_generator.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
 
 namespace ds_mysql {
-
-template <std::size_t N>
-struct fixed_string {
-    std::array<char, N> value{};
-
-    constexpr fixed_string(char const (&str)[N]) {
-        for (std::size_t i = 0; i < N; ++i) {
-            value[i] = str[i];
-        }
-    }
-
-    [[nodiscard]] constexpr std::string_view view() const {
-        return {value.data(), N - 1};
-    }
-
-    [[nodiscard]] constexpr operator std::string_view() const {
-        return view();
-    }
-};
-
-template <std::size_t N>
-fixed_string(char const (&)[N]) -> fixed_string<N>;
 
 enum class sql_date_part {
     year,

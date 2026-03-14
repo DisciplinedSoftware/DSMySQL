@@ -85,28 +85,6 @@ consteval std::string_view extract_type_name() {
     return strip_type_qualifiers(signature.substr(start, end - start));
 }
 
-consteval std::string_view remove_suffix(std::string_view name, std::string_view suffix) noexcept {
-    if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix)
-        return name.substr(0, name.size() - suffix.size());
-    else {
-        return name;
-    }
-}
-
-/**
- * tag_to_column_name<Tag> — derive a SQL column name from a tag type at compile time.
- *
- * Extracts the unqualified type name of Tag and strips a trailing "_tag" suffix:
- *
- *   tag_to_column_name<id_tag>()       → "id"
- *   tag_to_column_name<ticker_tag>()   → "ticker"
- *   tag_to_column_name<my_col>()       → "my_col"
- */
-template <typename Tag>
-consteval std::string_view tag_to_column_name() noexcept {
-    return remove_suffix(extract_type_name<Tag>(), "_tag");
-}
-
 }  // namespace detail
 
 }  // namespace ds_mysql

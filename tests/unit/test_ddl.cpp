@@ -18,31 +18,31 @@ using namespace std::string_literals;
 
 namespace {
 struct test_table {
-    using id = column_field<struct id_tag, uint32_t>;
-    using name = column_field<struct name_tag, varchar_field<255>>;
-    id id_;
+    using id   = column_field<"id",   uint32_t>;
+    using name = column_field<"name", varchar_field<255>>;
+    id   id_;
     name name_;
 };
 
 struct new_table {
-    using id = column_field<struct id_tag, uint32_t>;
+    using id = column_field<"id", uint32_t>;
     id id_;
 };
 
 struct numeric_format_table {
-    using id = column_field<struct id_tag, uint32_t>;
-    using price = column_field<struct price_tag, float>;
-    using ratio = column_field<struct ratio_tag, double>;
-    using amount = column_field<struct amount_tag, std::optional<double>>;
-    id id_;
-    price price_;
-    ratio ratio_;
+    using id     = column_field<"id",     uint32_t>;
+    using price  = column_field<"price",  float>;
+    using ratio  = column_field<"ratio",  double>;
+    using amount = column_field<"amount", std::optional<double>>;
+    id     id_;
+    price  price_;
+    ratio  ratio_;
     amount amount_;
 };
 
 struct test_db : ds_mysql::database_schema {
     struct symbol {
-        using id = column_field<struct id_tag, uint32_t>;
+        using id = column_field<"id", uint32_t>;
         id id_;
     };
 };
@@ -50,16 +50,16 @@ struct test_db : ds_mysql::database_schema {
 struct custom_named_db : ds_mysql::database_schema {};
 
 struct renamed_table {
-    using id = column_field<struct renamed_id_tag, uint32_t>;
+    using id = column_field<"renamed_id", uint32_t>;
     id id_;
 };
 
 struct temporal_table {
-    using id = column_field<struct id_tag, uint32_t>;
-    using created_at = column_field<struct created_at_tag, std::chrono::system_clock::time_point>;
-    using updated_at = column_field<struct updated_at_tag, sql_timestamp>;
+    using id         = column_field<"id",         uint32_t>;
+    using created_at = column_field<"created_at", std::chrono::system_clock::time_point>;
+    using updated_at = column_field<"updated_at", sql_timestamp>;
 
-    id id_;
+    id         id_;
     created_at created_at_;
     updated_at updated_at_;
 };
@@ -368,14 +368,14 @@ suite<"DDL"> ddl_suite = [] {
 
 namespace {
 struct child_table {
-    using id = column_field<struct id_tag, uint32_t>;
-    using parent_id = column_field<struct parent_id_tag, uint32_t>;
-    id id_;
+    using id        = column_field<"id",        uint32_t>;
+    using parent_id = column_field<"parent_id", uint32_t>;
+    id        id_;
     parent_id parent_id_;
 };
 
 struct parent_table {
-    using id = column_field<struct id_tag, uint32_t>;
+    using id = column_field<"id", uint32_t>;
     id id_;
 };
 }  // namespace
@@ -398,9 +398,9 @@ struct ds_mysql::foreign_key_schema<child_table, 1> {
 };
 
 struct child_table_cascade {
-    using id = column_field<struct id_tag, uint32_t>;
-    using parent_id = column_field<struct parent_id_tag, uint32_t>;
-    id id_;
+    using id        = column_field<"id",        uint32_t>;
+    using parent_id = column_field<"parent_id", uint32_t>;
+    id        id_;
     parent_id parent_id_;
 };
 
@@ -632,16 +632,16 @@ static_assert(!Database<test_table>, "plain table must NOT satisfy Database conc
 
 namespace {
 struct text_table {
-    using id = column_field<struct id_tag, uint32_t>;
-    using description = column_field<struct description_tag, text_field<>>;
-    using notes = column_field<struct notes_tag, mediumtext_field>;
-    using body = column_field<struct body_tag, longtext_field>;
-    using opt_notes = column_field<struct opt_notes_tag, std::optional<text_field<>>>;
-    id id_;
+    using id          = column_field<"id",          uint32_t>;
+    using description = column_field<"description", text_field<>>;
+    using notes       = column_field<"notes",       mediumtext_field>;
+    using body        = column_field<"body",        longtext_field>;
+    using opt_notes   = column_field<"opt_notes",   std::optional<text_field<>>>;
+    id          id_;
     description description_;
-    notes notes_;
-    body body_;
-    opt_notes opt_notes_;
+    notes       notes_;
+    body        body_;
+    opt_notes   opt_notes_;
 };
 }  // namespace
 

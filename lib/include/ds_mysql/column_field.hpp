@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "ds_mysql/name_reflection.hpp"
+#include "ds_mysql/fixed_string.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
 
@@ -19,10 +19,10 @@ namespace ds_mysql {
  */
 struct column_field_tag {};
 
-// column_field<Tag, T> — the only user-facing form.
-// Tag determines the SQL column name (via tag_to_column_name); T is the stored value type.
-//   using id = column_field<struct id_tag, uint32_t>;
-template <typename Tag, typename T>
+// column_field<Name, T> — the only user-facing form.
+// Name is the SQL column name as a string literal; T is the stored value type.
+//   using id = column_field<"id", uint32_t>;
+template <fixed_string Name, typename T>
 struct column_field;
 
 // ===================================================================
@@ -451,19 +451,19 @@ struct base<std::optional<sql_timestamp>> : column_field_tag {
 }  // namespace column_field_detail
 
 // ===================================================================
-// column_field<Tag, T> — the only user-facing form
+// column_field<Name, T> — the only user-facing form
 // ===================================================================
 
 /**
- * column_field<Tag, T> — tagged column descriptor.
+ * column_field<Name, T> — named column descriptor.
  *
- * Tag determines the SQL column name (stripped of any trailing "_tag" suffix).
+ * Name is the SQL column name embedded directly as a string literal.
  * T is the stored value type. All constructors and operators are inherited
  * from the internal base type.
  *
- *   using id     = column_field<struct id_tag,     uint32_t>;
- *   using ticker = column_field<struct ticker_tag, varchar_field<32>>;
- *   using sector = column_field<struct sector_tag, std::optional<varchar_field<64>>>;
+ *   using id     = column_field<"id",     uint32_t>;
+ *   using ticker = column_field<"ticker", varchar_field<32>>;
+ *   using sector = column_field<"sector", std::optional<varchar_field<64>>>;
  *
  *   id     id_;
  *   ticker ticker_;
@@ -471,40 +471,15 @@ struct base<std::optional<sql_timestamp>> : column_field_tag {
  *
  * SQL column names: "id", "ticker", "sector"
  */
-template <typename Tag, typename T>
+template <fixed_string Name, typename T>
 struct column_field : column_field_detail::base<T> {
-    using tag_type = Tag;
     using column_field_detail::base<T>::base;
     using column_field_detail::base<T>::operator=;
 
     [[nodiscard]] static constexpr std::string_view column_name() noexcept {
-        return detail::tag_to_column_name<Tag>();
+        return Name;
     }
 };
-
-// ===================================================================
-// COLUMN_FIELD convenience macro
-// ===================================================================
-
-/**
- * COLUMN_FIELD(tag, type) — declares a column field with a member variable.
- *
- * Expands to:
- *   struct tag_tag {};
- *   using tag = column_field<tag_tag, type>;
- *   tag tag_;
- *
- * Example (inside a struct/class body):
- *   COLUMN_FIELD(id,     uint32_t)
- *   COLUMN_FIELD(ticker, varchar_field<32>)
- *   COLUMN_FIELD(sector, std::optional<varchar_field<64>>)
- *
- * SQL column names: "id", "ticker", "sector"
- */
-#define COLUMN_FIELD(tag, type)                            \
-    struct tag##_tag {};                                   \
-    using tag = ::ds_mysql::column_field<tag##_tag, type>; \
-    tag tag##_
 
 // ===================================================================
 // ColumnFieldType concept
@@ -514,8 +489,8 @@ struct column_field : column_field_detail::base<T> {
  * ColumnFieldType<T> — satisfied by any type that publicly derives from
  * column_field_tag and exposes a value_type alias.
  *
- * Only satisfied by the tagged form:
- *   using id = column_field<struct id_tag, uint32_t>;
+ * Only satisfied by the named form:
+ *   using id = column_field<"id", uint32_t>;
  */
 template <typename T>
 concept ColumnFieldType = std::derived_from<T, column_field_tag> && requires { typename T::value_type; };

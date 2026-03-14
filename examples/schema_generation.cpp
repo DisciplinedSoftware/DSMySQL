@@ -21,17 +21,11 @@
 // ===================================================================
 
 struct user {
-    struct id_tag {};
-    struct username_tag {};
-    struct email_tag {};
-    struct is_active_tag {};
-    struct created_at_tag {};
-
-    using id = ds_mysql::column_field<id_tag, uint32_t>;
-    using username = ds_mysql::column_field<username_tag, ds_mysql::varchar_field<64>>;
-    using email = ds_mysql::column_field<email_tag, ds_mysql::varchar_field<255>>;
-    using is_active = ds_mysql::column_field<is_active_tag, bool>;
-    using created_at = ds_mysql::column_field<created_at_tag, ds_mysql::sql_datetime>;
+    using id         = ds_mysql::column_field<"id",         uint32_t>;
+    using username   = ds_mysql::column_field<"username",   ds_mysql::varchar_field<64>>;
+    using email      = ds_mysql::column_field<"email",      ds_mysql::varchar_field<255>>;
+    using is_active  = ds_mysql::column_field<"is_active",  bool>;
+    using created_at = ds_mysql::column_field<"created_at", ds_mysql::sql_datetime>;
 
     id         id_;
     username   username_;
@@ -45,12 +39,12 @@ struct user {
 // ===================================================================
 
 struct order_row {
-    struct order_id_tag {};          using id         = ds_mysql::column_field<order_id_tag,          uint32_t>;
-    struct user_id_tag {};           using user_id    = ds_mysql::column_field<user_id_tag,           uint32_t>;
-    struct amount_tag {};            using amount     = ds_mysql::column_field<amount_tag,            double>;
-    struct fee_tag {};               using fee        = ds_mysql::column_field<fee_tag,               std::optional<double>>;
-    struct status_tag {};            using status     = ds_mysql::column_field<status_tag,            ds_mysql::varchar_field<32>>;
-    struct order_created_at_tag {};  using created_at = ds_mysql::column_field<order_created_at_tag, ds_mysql::sql_datetime>;
+    using id         = ds_mysql::column_field<"order_id",         uint32_t>;
+    using user_id    = ds_mysql::column_field<"user_id",          uint32_t>;
+    using amount     = ds_mysql::column_field<"amount",           double>;
+    using fee        = ds_mysql::column_field<"fee",              std::optional<double>>;
+    using status     = ds_mysql::column_field<"status",           ds_mysql::varchar_field<32>>;
+    using created_at = ds_mysql::column_field<"order_created_at", ds_mysql::sql_datetime>;
 
     id         id_;
     user_id    user_id_;

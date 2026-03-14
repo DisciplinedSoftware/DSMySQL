@@ -161,8 +161,7 @@ suite<"varchar_field"> varchar_field_suite = [] {
 // ===================================================================
 
 namespace {
-struct string_col_tag {};
-using string_column = column_field<string_col_tag, std::string>;
+using string_column = column_field<"string_col", std::string>;
 }  // namespace
 
 suite<"column_field string constructors"> column_field_string_suite = [] {

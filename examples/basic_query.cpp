@@ -35,36 +35,28 @@ constexpr unsigned int port = 3306;
 // ===================================================================
 // Define a typed table struct.
 //
-// Each field is a type alias for column_field<Tag, ValueType>.
-// The tag name drives the SQL column name: id_tag → "id".
+// Each field is a type alias for column_field<"name", ValueType>.
+// The string literal is the SQL column name.
 // Member variables use a trailing underscore to avoid shadowing the
 // column-descriptor aliases.
 // ===================================================================
 
 struct product {
-    struct id_tag {};
-    struct sku_tag {};
-    struct name_tag {};
-    struct price_tag {};
-    struct stock_tag {};
-    struct description_tag {};
-    struct created_at_tag {};
+    using id          = ds_mysql::column_field<"id",          uint32_t>;
+    using sku         = ds_mysql::column_field<"sku",         ds_mysql::varchar_field<64>>;
+    using name        = ds_mysql::column_field<"name",        ds_mysql::varchar_field<255>>;
+    using price       = ds_mysql::column_field<"price",       double>;
+    using stock       = ds_mysql::column_field<"stock",       uint32_t>;
+    using description = ds_mysql::column_field<"description", std::optional<ds_mysql::varchar_field<512>>>;
+    using created_at  = ds_mysql::column_field<"created_at",  ds_mysql::sql_datetime>;
 
-    using id = ds_mysql::column_field<id_tag, uint32_t>;
-    using sku = ds_mysql::column_field<sku_tag, ds_mysql::varchar_field<64>>;
-    using name = ds_mysql::column_field<name_tag, ds_mysql::varchar_field<255>>;
-    using price = ds_mysql::column_field<price_tag, double>;
-    using stock = ds_mysql::column_field<stock_tag, uint32_t>;
-    using description = ds_mysql::column_field<description_tag, std::optional<ds_mysql::varchar_field<512>>>;
-    using created_at = ds_mysql::column_field<created_at_tag, ds_mysql::sql_datetime>;
-
-    id id_;
-    sku sku_;
-    name name_;
-    price price_;
-    stock stock_;
+    id          id_;
+    sku         sku_;
+    name        name_;
+    price       price_;
+    stock       stock_;
     description description_;
-    created_at created_at_;
+    created_at  created_at_;
 };
 
 // ===================================================================

@@ -240,8 +240,8 @@ struct field_schema {
     static constexpr std::string_view name() {
         using field_t = boost::pfr::tuple_element_t<Index, T>;
         static_assert(ColumnFieldType<field_t>,
-                      "field_schema: field must be a column_field<Tag, T>. "
-                      "Use the tagged form: using foo = column_field<struct foo_tag, T>;");
+                      "field_schema: field must be a column_field<\"name\", T>. "
+                      "Use: using foo = column_field<\"foo\", T>;");
         return field_t::column_name();
     }
 

@@ -16,24 +16,24 @@ using namespace std::string_literals;
 
 namespace {
 struct asset {
-    using id = column_field<struct id_tag, uint32_t>;
-    using exchange_id = column_field<struct exchange_id_tag, std::optional<uint32_t>>;
-    using ticker = column_field<struct ticker_tag, varchar_field<32>>;
-    using instrument = column_field<struct instrument_tag, varchar_field<64>>;
-    using name = column_field<struct name_tag, std::optional<varchar_field<255>>>;
-    using sector = column_field<struct sector_tag, std::optional<varchar_field<255>>>;
-    using currency = column_field<struct currency_tag, std::optional<varchar_field<32>>>;
-    using created_date = column_field<struct created_date_tag, sql_datetime>;
-    using last_updated_date = column_field<struct last_updated_date_tag, sql_datetime>;
+    using id                = column_field<"id",                uint32_t>;
+    using exchange_id       = column_field<"exchange_id",       std::optional<uint32_t>>;
+    using ticker            = column_field<"ticker",            varchar_field<32>>;
+    using instrument        = column_field<"instrument",        varchar_field<64>>;
+    using name              = column_field<"name",              std::optional<varchar_field<255>>>;
+    using sector            = column_field<"sector",            std::optional<varchar_field<255>>>;
+    using currency          = column_field<"currency",          std::optional<varchar_field<32>>>;
+    using created_date      = column_field<"created_date",      sql_datetime>;
+    using last_updated_date = column_field<"last_updated_date", sql_datetime>;
 
-    id id_;
-    exchange_id exchange_id_;
-    ticker ticker_;
-    instrument instrument_;
-    name name_;
-    sector sector_;
-    currency currency_;
-    created_date created_date_;
+    id                id_;
+    exchange_id       exchange_id_;
+    ticker            ticker_;
+    instrument        instrument_;
+    name              name_;
+    sector            sector_;
+    currency          currency_;
+    created_date      created_date_;
     last_updated_date last_updated_date_;
 };
 }  // namespace

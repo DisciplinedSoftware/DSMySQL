@@ -22,33 +22,20 @@ DSMySQL provides a **header-only** library for building type-safe SQL queries an
 
 using namespace ds_mysql;
 
-// 1. Define your table as a C++ struct
+// 1. Define your table as a C++ struct.
+//    Each field is a type alias for column_field<"name", ValueType>.
+//    The string literal is the SQL column name — no tag structs needed.
 struct product {
-    struct id_tag {};
-    struct sku_tag {};
-    struct name_tag {};
-    struct price_tag {};
-
-    using id    = column_field<id_tag,    uint32_t>;
-    using sku   = column_field<sku_tag,   varchar_field<64>>;
-    using name  = column_field<name_tag,  varchar_field<255>>;
-    using price = column_field<price_tag, double>;
+    using id    = column_field<"id",    uint32_t>;
+    using sku   = column_field<"sku",   varchar_field<64>>;
+    using name  = column_field<"name",  varchar_field<255>>;
+    using price = column_field<"price", double>;
 
     id    id_;
     sku   sku_;
     name  name_;
     price price_;
 };
-
-// Alternatively, use the COLUMN_FIELD macro to reduce boilerplate:
-struct product_v2 {
-    COLUMN_FIELD(id,    uint32_t);
-    COLUMN_FIELD(sku,   varchar_field<64>);
-    COLUMN_FIELD(name,  varchar_field<255>);
-    COLUMN_FIELD(price, double);
-};
-// Each COLUMN_FIELD(tag, type) expands to: a tag struct, a type alias, and a member variable.
-// The two definitions are equivalent and produce the same SQL schema.
 
 // 2. Connect and query
 auto db = mysql_database::connect(mysql_config{

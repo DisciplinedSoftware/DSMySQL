@@ -11,91 +11,91 @@ namespace ds_mysql::mysql_metadata {
 // MySQL metadata catalogs exposed as typed database schemas.
 struct information_schema : database_schema {
     struct schemata {
-        using catalog_name = column_field<struct catalog_name_tag, std::string>;
-        using schema_name = column_field<struct schema_name_tag, std::string>;
-        using default_character_set_name = column_field<struct default_character_set_name_tag, std::string>;
-        using default_collation_name = column_field<struct default_collation_name_tag, std::string>;
+        using catalog_name                = column_field<"catalog_name",                std::string>;
+        using schema_name                 = column_field<"schema_name",                 std::string>;
+        using default_character_set_name  = column_field<"default_character_set_name",  std::string>;
+        using default_collation_name      = column_field<"default_collation_name",      std::string>;
 
-        catalog_name catalog_name_;
-        schema_name schema_name_;
+        catalog_name               catalog_name_;
+        schema_name                schema_name_;
         default_character_set_name default_character_set_name_;
-        default_collation_name default_collation_name_;
+        default_collation_name     default_collation_name_;
     };
 
     struct tables {
-        using table_schema = column_field<struct table_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
-        using table_type = column_field<struct table_type_tag, std::string>;
+        using table_schema = column_field<"table_schema", std::string>;
+        using table_name   = column_field<"table_name",   std::string>;
+        using table_type   = column_field<"table_type",   std::string>;
 
         table_schema table_schema_;
-        table_name table_name_;
-        table_type table_type_;
+        table_name   table_name_;
+        table_type   table_type_;
     };
 
     struct columns {
-        using table_schema = column_field<struct table_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
-        using column_name = column_field<struct column_name_tag, std::string>;
-        using data_type = column_field<struct data_type_tag, std::string>;
+        using table_schema = column_field<"table_schema", std::string>;
+        using table_name   = column_field<"table_name",   std::string>;
+        using column_name  = column_field<"column_name",  std::string>;
+        using data_type    = column_field<"data_type",    std::string>;
 
         table_schema table_schema_;
-        table_name table_name_;
-        column_name column_name_;
-        data_type data_type_;
+        table_name   table_name_;
+        column_name  column_name_;
+        data_type    data_type_;
     };
 
     struct views {
-        using table_schema = column_field<struct table_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
+        using table_schema = column_field<"table_schema", std::string>;
+        using table_name   = column_field<"table_name",   std::string>;
 
         table_schema table_schema_;
-        table_name table_name_;
+        table_name   table_name_;
     };
 
     struct table_constraints {
-        using constraint_schema = column_field<struct constraint_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
-        using constraint_name = column_field<struct constraint_name_tag, std::string>;
-        using constraint_type = column_field<struct constraint_type_tag, std::string>;
+        using constraint_schema = column_field<"constraint_schema", std::string>;
+        using table_name        = column_field<"table_name",        std::string>;
+        using constraint_name   = column_field<"constraint_name",   std::string>;
+        using constraint_type   = column_field<"constraint_type",   std::string>;
 
         constraint_schema constraint_schema_;
-        table_name table_name_;
-        constraint_name constraint_name_;
-        constraint_type constraint_type_;
+        table_name        table_name_;
+        constraint_name   constraint_name_;
+        constraint_type   constraint_type_;
     };
 
     struct key_column_usage {
-        using constraint_schema = column_field<struct constraint_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
-        using column_name = column_field<struct column_name_tag, std::string>;
+        using constraint_schema = column_field<"constraint_schema", std::string>;
+        using table_name        = column_field<"table_name",        std::string>;
+        using column_name       = column_field<"column_name",       std::string>;
 
         constraint_schema constraint_schema_;
-        table_name table_name_;
-        column_name column_name_;
+        table_name        table_name_;
+        column_name       column_name_;
     };
 
     struct referential_constraints {
-        using constraint_schema = column_field<struct constraint_schema_tag, std::string>;
-        using constraint_name = column_field<struct constraint_name_tag, std::string>;
-        using unique_constraint_schema = column_field<struct unique_constraint_schema_tag, std::string>;
-        using unique_constraint_name = column_field<struct unique_constraint_name_tag, std::string>;
+        using constraint_schema        = column_field<"constraint_schema",        std::string>;
+        using constraint_name          = column_field<"constraint_name",          std::string>;
+        using unique_constraint_schema = column_field<"unique_constraint_schema", std::string>;
+        using unique_constraint_name   = column_field<"unique_constraint_name",   std::string>;
 
-        constraint_schema constraint_schema_;
-        constraint_name constraint_name_;
+        constraint_schema        constraint_schema_;
+        constraint_name          constraint_name_;
         unique_constraint_schema unique_constraint_schema_;
-        unique_constraint_name unique_constraint_name_;
+        unique_constraint_name   unique_constraint_name_;
     };
 
     struct statistics {
-        using table_schema = column_field<struct table_schema_tag, std::string>;
-        using table_name = column_field<struct table_name_tag, std::string>;
-        using index_name = column_field<struct index_name_tag, std::string>;
-        using column_name = column_field<struct column_name_tag, std::string>;
+        using table_schema = column_field<"table_schema", std::string>;
+        using table_name   = column_field<"table_name",   std::string>;
+        using index_name   = column_field<"index_name",   std::string>;
+        using column_name  = column_field<"column_name",  std::string>;
 
         table_schema table_schema_;
-        table_name table_name_;
-        index_name index_name_;
-        column_name column_name_;
+        table_name   table_name_;
+        index_name   index_name_;
+        column_name  column_name_;
     };
 };
 
