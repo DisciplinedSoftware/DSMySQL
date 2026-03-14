@@ -21,6 +21,7 @@
 #include "ds_mysql/col.hpp"
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/fixed_string.hpp"
+#include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/schema_generator.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
@@ -1616,12 +1617,11 @@ template <BuildsSql SelectQuery>
 
 template <typename Tag, typename Table>
 consteval bool tag_is_nested_in_table() noexcept {
-    constexpr std::string_view full       = detail::raw_type_name<Tag>();
-    constexpr auto             last_scope = full.rfind("::");
+    constexpr std::string_view full = detail::raw_type_name<Tag>();
+    constexpr auto last_scope = full.rfind("::");
     if constexpr (last_scope == std::string_view::npos)
         return false;  // no scope → defined at global/namespace level, not in a class
-    return detail::strip_type_qualifiers(full.substr(0, last_scope)) ==
-           detail::extract_type_name<Table>();
+    return detail::strip_type_qualifiers(full.substr(0, last_scope)) == detail::extract_type_name<Table>();
 }
 
 // Helper: returns true for projections that are not tagged_column_field, or

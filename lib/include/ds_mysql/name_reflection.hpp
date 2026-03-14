@@ -97,35 +97,7 @@ consteval std::string_view raw_type_name() {
  */
 template <typename T>
 consteval std::string_view extract_type_name() {
-#if defined(__clang__) || defined(__GNUC__)
-    constexpr std::string_view signature = __PRETTY_FUNCTION__;
-    constexpr std::string_view marker = "T = ";
-#elif defined(_MSC_VER)
-    constexpr std::string_view signature = __FUNCSIG__;
-    constexpr std::string_view marker = "extract_type_name<";
-#else
-#error ("extract_type_name requires Clang, GCC, or MSVC")
-#endif
-
-    constexpr auto npos = std::string_view::npos;
-    constexpr auto marker_pos = signature.find(marker);
-    static_assert(marker_pos != npos, "Failed to locate marker in compiler function signature");
-
-    constexpr auto start = marker_pos + marker.size();
-
-#if defined(__clang__) || defined(__GNUC__)
-    // GCC/Clang format: [with T = TYPE] or [with T = TYPE; ALIAS = EXPANSION, ...]
-    constexpr auto end = min_find_pos(signature.find(';', start), signature.find(']', start));
-#elif defined(_MSC_VER)
-    // MSVC format: "...extract_type_name<TYPE>(void)..."
-    // The type ends at '>' (template arg close) or ',' (comma in multi-param templates).
-    constexpr auto end = min_find_pos(signature.find('>', start), signature.find(',', start));
-#else
-#error ("extract_type_name requires Clang, GCC, or MSVC")
-#endif
-
-    static_assert(end != npos && end > start, "Failed to locate end of type name in compiler function signature");
-    return strip_type_qualifiers(signature.substr(start, end - start));
+    return strip_type_qualifiers(raw_type_name<T>());
 }
 
 /**
@@ -139,7 +111,36 @@ consteval std::string_view extract_type_name() {
  */
 template <typename Tag>
 consteval std::string_view tag_to_column_name() noexcept {
-    return remove_suffix(extract_type_name<Tag>(), "_tag");
+    constexpr auto name = extract_type_name<Tag>();
+    constexpr std::string_view suffix = "_tag";
+    return remove_suffix(name, suffix);
+}
+
+/**
+ * Construct a fixed_string<N> from a string_view at compile time.
+ * N must equal sv.size() + 1 (to include the null terminator).
+ */
+template <std::size_t N>
+consteval fixed_string<N> fixed_string_from_sv(std::string_view sv) noexcept {
+    fixed_string<N> result{};
+    for (std::size_t i = 0; i + 1 < N; ++i)
+        result.data[i] = sv[i];
+    return result;
+}
+
+/**
+ * Derive the column name from a tag type at compile time.
+ * Strips a trailing "_tag" suffix if present, then returns a fixed_string.
+ *
+ * Examples:
+ *   column_name_from_tag<id_tag>()    →  fixed_string{"id"}
+ *   column_name_from_tag<price_tag>() →  fixed_string{"price"}
+ *   column_name_from_tag<foo>()       →  fixed_string{"foo"}   (no suffix)
+ */
+template <typename Tag>
+consteval auto column_name_from_tag() noexcept {
+    constexpr std::string_view name = tag_to_column_name<Tag>();
+    return fixed_string_from_sv<name.size() + 1>(name);
 }
 
 }  // namespace detail

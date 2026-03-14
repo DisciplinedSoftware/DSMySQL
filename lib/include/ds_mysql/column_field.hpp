@@ -528,41 +528,6 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
 
 namespace ds_mysql {
 
-namespace detail {
-
-/**
- * Construct a fixed_string<N> from a string_view at compile time.
- * N must equal sv.size() + 1 (to include the null terminator).
- */
-template <std::size_t N>
-consteval fixed_string<N> fixed_string_from_sv(std::string_view sv) noexcept {
-    fixed_string<N> result{};
-    for (std::size_t i = 0; i + 1 < N; ++i)
-        result.data[i] = sv[i];
-    return result;
-}
-
-/**
- * Derive the column name from a tag type at compile time.
- * Strips a trailing "_tag" suffix if present, then returns a fixed_string.
- *
- * Examples:
- *   column_name_from_tag<id_tag>()    →  fixed_string{"id"}
- *   column_name_from_tag<price_tag>() →  fixed_string{"price"}
- *   column_name_from_tag<foo>()       →  fixed_string{"foo"}   (no suffix)
- */
-template <typename Tag>
-consteval auto column_name_from_tag() noexcept {
-    constexpr std::string_view full   = extract_type_name<Tag>();
-    constexpr std::string_view suffix = "_tag";
-    constexpr std::string_view name   = full.ends_with(suffix)
-                                            ? full.substr(0, full.size() - suffix.size())
-                                            : full;
-    return fixed_string_from_sv<name.size() + 1>(name);
-}
-
-}  // namespace detail
-
 /**
  * tagged_column_field<Tag, T> — tag-struct based column descriptor.
  *
