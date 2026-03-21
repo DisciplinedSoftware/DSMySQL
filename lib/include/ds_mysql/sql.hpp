@@ -1317,6 +1317,78 @@ struct table_attributes {
     }
 };
 
+struct create_database_option {
+    void set(std::string key, std::string value_sql) {
+        auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
+            return kv.first == key;
+        });
+        if (it != options.end()) {
+            it->second = std::move(value_sql);
+        } else {
+            options.emplace_back(std::move(key), std::move(value_sql));
+        }
+    }
+
+    [[nodiscard]] std::string to_sql() const {
+        std::string out;
+        for (auto const& [_, value_sql] : options) {
+            out += " ";
+            out += value_sql;
+        }
+        return out;
+    }
+
+    create_database_option& default_charset(Charset value) {
+        return default_charset(to_sql_charset(value));
+    }
+
+    create_database_option& default_charset(std::string_view value) {
+        set("DEFAULT CHARACTER SET", std::string{"DEFAULT CHARACTER SET "} + std::string{value});
+        return *this;
+    }
+
+    create_database_option& collate(std::string_view value) {
+        set("DEFAULT COLLATE", std::string{"DEFAULT COLLATE "} + std::string{value});
+        return *this;
+    }
+
+    std::vector<std::pair<std::string, std::string>> options;
+};
+
+template <typename Derived>
+class create_database_attributes_mixin {
+public:
+    Derived& default_charset(Charset value) {
+        return default_charset(to_sql_charset(value));
+    }
+
+    Derived& default_charset(std::string_view value) {
+        return set("DEFAULT CHARACTER SET", std::string{"DEFAULT CHARACTER SET "} + std::string{value});
+    }
+
+    Derived& collate(std::string_view value) {
+        return set("DEFAULT COLLATE", std::string{"DEFAULT COLLATE "} + std::string{value});
+    }
+
+protected:
+    Derived& set(std::string key, std::string value_sql) {
+        derived().set_database_option(std::move(key), std::move(value_sql));
+        return derived();
+    }
+
+private:
+    Derived& derived() {
+        return static_cast<Derived&>(*this);
+    }
+};
+
+template <typename T>
+struct database_attributes {
+    static create_database_option get() {
+        return {};  // Empty by default
+    }
+};
+
 template <typename T, std::size_t... Is>
 void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
     std::size_t count = 0;
@@ -1989,11 +2061,14 @@ private:
 // create_database_if_not_exists_builder — after create_database<DB>().if_not_exists()
 // ---------------------------------------------------------------
 template <typename T>
-class create_database_if_not_exists_builder {
+class create_database_if_not_exists_builder
+    : public create_database_attributes_mixin<create_database_if_not_exists_builder<T>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_if_not_exists_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit create_database_if_not_exists_builder(std::string prior = {},
+                                                   create_database_option options = database_attributes<T>::get())
+        : prior_sql_(std::move(prior)), options_(std::move(options)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2003,31 +2078,39 @@ public:
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
         std::string s;
-        s.reserve(prior_sql_.size() + 22 + db_name.size() + 2);
+        s.reserve(prior_sql_.size() + 22 + db_name.size() + options_.to_sql().size() + 2);
         s += prior_sql_;
         s += "CREATE DATABASE IF NOT EXISTS ";
         s += db_name;
+        s += options_.to_sql();
         s += ";\n";
         return s;
     }
 
+    void set_database_option(std::string key, std::string value_sql) {
+        options_.set(std::move(key), std::move(value_sql));
+    }
+
 private:
     std::string prior_sql_;
+    create_database_option options_;
 };
 
 // ---------------------------------------------------------------
 // create_database_builder — after create_database<DB>()
 // ---------------------------------------------------------------
 template <typename T>
-class create_database_builder {
+class create_database_builder : public create_database_attributes_mixin<create_database_builder<T>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit create_database_builder(std::string prior = {},
+                                     create_database_option options = database_attributes<T>::get())
+        : prior_sql_(std::move(prior)), options_(std::move(options)) {
     }
 
     [[nodiscard]] create_database_if_not_exists_builder<T> if_not_exists() const {
-        return create_database_if_not_exists_builder<T>{prior_sql_};
+        return create_database_if_not_exists_builder<T>{prior_sql_, options_};
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2037,27 +2120,35 @@ public:
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
         std::string s;
-        s.reserve(prior_sql_.size() + 16 + db_name.size() + 2);
+        s.reserve(prior_sql_.size() + 16 + db_name.size() + options_.to_sql().size() + 2);
         s += prior_sql_;
         s += "CREATE DATABASE ";
         s += db_name;
+        s += options_.to_sql();
         s += ";\n";
         return s;
     }
 
+    void set_database_option(std::string key, std::string value_sql) {
+        options_.set(std::move(key), std::move(value_sql));
+    }
+
 private:
     std::string prior_sql_;
+    create_database_option options_;
 };
 
 // ---------------------------------------------------------------
 // create_database_named_if_not_exists_builder — runtime database name
 // ---------------------------------------------------------------
-class create_database_named_if_not_exists_builder {
+class create_database_named_if_not_exists_builder
+    : public create_database_attributes_mixin<create_database_named_if_not_exists_builder> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_named_if_not_exists_builder(database_name name, std::string prior = {})
-        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    explicit create_database_named_if_not_exists_builder(database_name name, std::string prior = {},
+                                                         create_database_option options = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)), options_(std::move(options)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2065,27 +2156,33 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "CREATE DATABASE IF NOT EXISTS " + name_.to_string() + ";\n";
+        return prior_sql_ + "CREATE DATABASE IF NOT EXISTS " + name_.to_string() + options_.to_sql() + ";\n";
+    }
+
+    void set_database_option(std::string key, std::string value_sql) {
+        options_.set(std::move(key), std::move(value_sql));
     }
 
 private:
     std::string prior_sql_;
     database_name name_;
+    create_database_option options_;
 };
 
 // ---------------------------------------------------------------
 // create_database_named_builder — runtime database name
 // ---------------------------------------------------------------
-class create_database_named_builder {
+class create_database_named_builder : public create_database_attributes_mixin<create_database_named_builder> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_named_builder(database_name name, std::string prior = {})
-        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    explicit create_database_named_builder(database_name name, std::string prior = {},
+                                           create_database_option options = {})
+        : prior_sql_(std::move(prior)), name_(std::move(name)), options_(std::move(options)) {
     }
 
     [[nodiscard]] create_database_named_if_not_exists_builder if_not_exists() const {
-        return create_database_named_if_not_exists_builder{name_, prior_sql_};
+        return create_database_named_if_not_exists_builder{name_, prior_sql_, options_};
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2093,12 +2190,17 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "CREATE DATABASE " + name_.to_string() + ";\n";
+        return prior_sql_ + "CREATE DATABASE " + name_.to_string() + options_.to_sql() + ";\n";
+    }
+
+    void set_database_option(std::string key, std::string value_sql) {
+        options_.set(std::move(key), std::move(value_sql));
     }
 
 private:
     std::string prior_sql_;
     database_name name_;
+    create_database_option options_;
 };
 
 // ---------------------------------------------------------------

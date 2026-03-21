@@ -584,6 +584,36 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
             auto const sql = create_database(database_name{"runtime_db"}).if_not_exists().build_sql();
             expect(sql == "CREATE DATABASE IF NOT EXISTS runtime_db;\n"s) << sql;
         };
+
+    "create_database with fluent charset - uses fluent API to set DEFAULT CHARACTER SET"_test = [] {
+        auto const sql = create_database<test_db>().default_charset(Charset::utf8mb4).build_sql();
+        expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET utf8mb4;\n"s) << sql;
+    };
+
+    "create_database.if_not_exists with fluent charset and collate - chains both attributes"_test = [] {
+        auto const sql = create_database<test_db>()
+                             .default_charset(Charset::utf8mb4)
+                             .collate("utf8mb4_unicode_ci")
+                             .if_not_exists()
+                             .build_sql();
+        expect(sql ==
+               "CREATE DATABASE IF NOT EXISTS test_db DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE "
+               "utf8mb4_unicode_ci;\n"s)
+            << sql;
+    };
+
+    "create_database with string overload default_charset - accepts string_view charset"_test = [] {
+        auto const sql = create_database<test_db>().default_charset("koi8r").build_sql();
+        expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET koi8r;\n"s) << sql;
+    };
+
+    "create_database(database_name) with fluent attributes - runtime name with charset and collate"_test = [] {
+        auto const sql = create_database(database_name{"my_db"})
+                             .default_charset(Charset::utf8mb4)
+                             .collate("utf8mb4_bin")
+                             .build_sql();
+        expect(sql == "CREATE DATABASE my_db DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_bin;\n"s) << sql;
+    };
 };
 
 // ===================================================================
