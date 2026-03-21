@@ -20,6 +20,7 @@ namespace {
 struct test_table {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, varchar_field<255>)
+    COLUMN_FIELD(tag, std::optional<varchar_field<64>>)
 };
 
 struct new_table {
@@ -344,9 +345,9 @@ suite<"DDL"> ddl_suite = [] {
     "create_table.as(select).with_where(is_not_null) - generates CREATE TABLE AS SELECT WHERE"_test = [] {
         auto const sql = create_table<new_table>()
                              .as(select<test_table::id, test_table::name>().from<test_table>().where(
-                                 is_not_null<test_table::name>()))
+                                 is_not_null<test_table::tag>()))
                              .build_sql();
-        expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE name IS NOT NULL;\n"s) << sql;
+        expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE tag IS NOT NULL;\n"s) << sql;
     };
 
     "drop_table.then.create_table.as(select) - chains DROP and CREATE AS SELECT"_test = [] {

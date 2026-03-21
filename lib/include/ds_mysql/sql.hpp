@@ -299,11 +299,13 @@ template <ColumnFieldType Col>
 }
 
 template <ColumnFieldType Col>
+    requires is_field_nullable_v<Col>
 [[nodiscard]] where_condition is_null() {
     return {column_traits<Col>::column_name(), " IS NULL", {}};
 }
 
 template <ColumnFieldType Col>
+    requires is_field_nullable_v<Col>
 [[nodiscard]] where_condition is_not_null() {
     return {column_traits<Col>::column_name(), " IS NOT NULL", {}};
 }
@@ -583,10 +585,14 @@ struct col_expr {
         return greater_than_or_equal<Col>(Col{val});
     }
 
-    [[nodiscard]] where_condition is_null() const noexcept {
+    [[nodiscard]] where_condition is_null() const noexcept
+        requires is_field_nullable_v<Col>
+    {
         return ds_mysql::is_null<Col>();
     }
-    [[nodiscard]] where_condition is_not_null() const noexcept {
+    [[nodiscard]] where_condition is_not_null() const noexcept
+        requires is_field_nullable_v<Col>
+    {
         return ds_mysql::is_not_null<Col>();
     }
 
