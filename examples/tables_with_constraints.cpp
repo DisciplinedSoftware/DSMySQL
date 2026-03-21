@@ -61,10 +61,10 @@ struct ds_mysql::table_constraints<symbol> {
         return {
             // Define table-level PRIMARY KEY(id)
             ds_mysql::table_constraint::primary_key<symbol::id>(),
-            
+
             // Define secondary index on exchange_id
             ds_mysql::table_constraint::key<symbol::exchange_id>("index_exchange_id"),
-            
+
             // Optional: add a unique index on ticker
             // ds_mysql::table_constraint::unique_key<symbol::ticker>("uq_ticker"),
         };
@@ -86,13 +86,13 @@ struct ds_mysql::table_constraints<order_detail> {
         return {
             // Define table-level PRIMARY KEY(id)
             ds_mysql::table_constraint::primary_key<order_detail::id>(),
-            
+
             // Define unique constraint on (order_id, line_number)
             ds_mysql::table_constraint::unique_key<order_detail::order_id, order_detail::line_number>("uq_order_line"),
-            
+
             // Define CHECK constraint: quantity > 0
             ds_mysql::table_constraint::check("quantity > 0", "chk_positive_quantity"),
-            
+
             // Define CHECK constraint: unit_price >= 0
             ds_mysql::table_constraint::check("unit_price >= 0", "chk_non_negative_price"),
         };
@@ -109,11 +109,9 @@ int main() {
     std::println("===============================================");
     std::println("Symbol table with PRIMARY KEY and secondary index");
     std::println("===============================================");
-    std::println("{}", create_table<symbol>()
-                           .engine(Engine::InnoDB)
-                           .auto_increment(1)
-                           .default_charset(Charset::utf8)
-                           .build_sql());
+    std::println(
+        "{}",
+        create_table<symbol>().engine(Engine::InnoDB).auto_increment(1).default_charset(Charset::utf8).build_sql());
 
     std::println("\n==================================================");
     std::println("Order detail table with UNIQUE and CHECK constraints");
