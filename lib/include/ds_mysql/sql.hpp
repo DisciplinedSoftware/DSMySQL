@@ -3534,7 +3534,7 @@ consteval std::size_t proj_index_in_pack() {
     for (std::size_t i = 0; i < matches.size(); ++i)
         if (matches[i])
             return i;
-    return std::size_t(-1);  // unreachable: guarded by requires clause
+    throw "proj_index_in_pack: type is not in the projection pack";
 }
 
 }  // namespace sql_detail
