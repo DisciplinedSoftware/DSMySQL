@@ -938,7 +938,7 @@ inline std::string to_sql_encryption(Encryption value) {
     return "N";
 }
 
-struct create_table_option_set {
+struct create_table_option {
     void set(std::string key, std::string value_sql) {
         auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
             return kv.first == key;
@@ -957,6 +957,186 @@ struct create_table_option_set {
             out += value_sql;
         }
         return out;
+    }
+
+    // Fluent API for table attributes
+    create_table_option& engine(Engine value) {
+        return engine(to_sql_engine(value));
+    }
+
+    create_table_option& engine(std::string_view value) {
+        set("ENGINE", std::string{"ENGINE="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& auto_increment(std::size_t value) {
+        set("AUTO_INCREMENT", std::format("AUTO_INCREMENT={}", value));
+        return *this;
+    }
+
+    create_table_option& avg_row_length(std::size_t value) {
+        set("AVG_ROW_LENGTH", std::format("AVG_ROW_LENGTH={}", value));
+        return *this;
+    }
+
+    create_table_option& default_charset(Charset value) {
+        return default_charset(to_sql_charset(value));
+    }
+
+    create_table_option& default_charset(std::string_view value) {
+        set("DEFAULT CHARSET", std::string{"DEFAULT CHARSET="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& collate(std::string_view value) {
+        set("COLLATE", std::string{"COLLATE="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& checksum(bool enabled) {
+        set("CHECKSUM", std::string{"CHECKSUM="} + (enabled ? "1" : "0"));
+        return *this;
+    }
+
+    create_table_option& checksum(std::size_t value) {
+        set("CHECKSUM", std::format("CHECKSUM={}", value));
+        return *this;
+    }
+
+    create_table_option& comment(std::string_view value) {
+        set("COMMENT", std::string{"COMMENT="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& compression(Compression value) {
+        return compression(to_sql_compression(value));
+    }
+
+    create_table_option& compression(std::string_view value) {
+        set("COMPRESSION", std::string{"COMPRESSION="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& connection(std::string_view value) {
+        set("CONNECTION", std::string{"CONNECTION="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& data_directory(std::string_view value) {
+        set("DATA DIRECTORY", std::string{"DATA DIRECTORY="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& index_directory(std::string_view value) {
+        set("INDEX DIRECTORY", std::string{"INDEX DIRECTORY="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& delay_key_write(bool enabled) {
+        set("DELAY_KEY_WRITE", std::string{"DELAY_KEY_WRITE="} + (enabled ? "1" : "0"));
+        return *this;
+    }
+
+    create_table_option& delay_key_write(std::size_t value) {
+        set("DELAY_KEY_WRITE", std::format("DELAY_KEY_WRITE={}", value));
+        return *this;
+    }
+
+    create_table_option& encryption(Encryption value) {
+        return encryption(to_sql_encryption(value));
+    }
+
+    create_table_option& encryption(std::string_view value) {
+        set("ENCRYPTION", std::string{"ENCRYPTION="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& insert_method(InsertMethod value) {
+        return insert_method(to_sql_insert_method(value));
+    }
+
+    create_table_option& insert_method(std::string_view value) {
+        set("INSERT_METHOD", std::string{"INSERT_METHOD="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& key_block_size(std::size_t value) {
+        set("KEY_BLOCK_SIZE", std::format("KEY_BLOCK_SIZE={}", value));
+        return *this;
+    }
+
+    create_table_option& max_rows(std::size_t value) {
+        set("MAX_ROWS", std::format("MAX_ROWS={}", value));
+        return *this;
+    }
+
+    create_table_option& min_rows(std::size_t value) {
+        set("MIN_ROWS", std::format("MIN_ROWS={}", value));
+        return *this;
+    }
+
+    create_table_option& pack_keys(PackKeys value) {
+        return pack_keys(to_sql_pack_keys(value));
+    }
+
+    create_table_option& pack_keys(std::string_view value) {
+        set("PACK_KEYS", std::string{"PACK_KEYS="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& password(std::string_view value) {
+        set("PASSWORD", std::string{"PASSWORD="} + quote_sql_string(value));
+        return *this;
+    }
+
+    create_table_option& row_format(RowFormat value) {
+        return row_format(to_sql_row_format(value));
+    }
+
+    create_table_option& row_format(std::string_view value) {
+        set("ROW_FORMAT", std::string{"ROW_FORMAT="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& stats_auto_recalc(StatsPolicy value) {
+        return stats_auto_recalc(to_sql_stats_policy(value));
+    }
+
+    create_table_option& stats_auto_recalc(std::string_view value) {
+        set("STATS_AUTO_RECALC", std::string{"STATS_AUTO_RECALC="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& stats_persistent(StatsPolicy value) {
+        return stats_persistent(to_sql_stats_policy(value));
+    }
+
+    create_table_option& stats_persistent(std::string_view value) {
+        set("STATS_PERSISTENT", std::string{"STATS_PERSISTENT="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& stats_sample_pages(std::size_t value) {
+        set("STATS_SAMPLE_PAGES", std::format("STATS_SAMPLE_PAGES={}", value));
+        return *this;
+    }
+
+    create_table_option& tablespace(std::string_view value) {
+        set("TABLESPACE", std::string{"TABLESPACE="} + std::string{value});
+        return *this;
+    }
+
+    create_table_option& union_tables(std::vector<std::string> table_names) {
+        std::string sql = "UNION=(";
+        for (std::size_t i = 0; i < table_names.size(); ++i) {
+            if (i > 0) {
+                sql += ",";
+            }
+            sql += table_names[i];
+        }
+        sql += ")";
+        set("UNION", std::move(sql));
+        return *this;
     }
 
     std::vector<std::pair<std::string, std::string>> options;
@@ -1126,6 +1306,14 @@ protected:
 private:
     Derived& derived() {
         return static_cast<Derived&>(*this);
+    }
+};
+
+// Table attributes trait - specialize for each table to define default CREATE TABLE options
+template <typename T>
+struct table_attributes {
+    static create_table_option get() {
+        return {};  // Empty by default
     }
 };
 
@@ -1590,7 +1778,7 @@ class create_table_cond_builder : public create_table_attributes_mixin<create_ta
 public:
     using ddl_tag_type = void;
 
-    create_table_cond_builder(std::string create_prefix, std::string cols, create_table_option_set options = {})
+    create_table_cond_builder(std::string create_prefix, std::string cols, create_table_option options = {})
         : create_prefix_(std::move(create_prefix)), column_defs_(std::move(cols)), options_(std::move(options)) {
     }
 
@@ -1628,7 +1816,7 @@ public:
 private:
     std::string create_prefix_;
     std::string column_defs_;
-    create_table_option_set options_;
+    create_table_option options_;
 };
 
 // ---------------------------------------------------------------
@@ -1640,7 +1828,10 @@ public:
     using ddl_tag_type = void;
 
     explicit create_table_builder(std::string prior = {}, bool temporary = false)
-        : prior_sql_(std::move(prior)), is_temporary_(temporary), column_defs_(ddl_detail::make_column_defs<T>()) {
+        : prior_sql_(std::move(prior)),
+          is_temporary_(temporary),
+          column_defs_(ddl_detail::make_column_defs<T>()),
+          options_(table_attributes<T>::get()) {
     }
 
     [[nodiscard]] create_table_cond_builder<T> if_not_exists() const {
@@ -1688,7 +1879,7 @@ private:
     std::string prior_sql_;
     bool is_temporary_;
     std::string column_defs_;
-    create_table_option_set options_;
+    create_table_option options_;
 };
 
 // ---------------------------------------------------------------
@@ -2145,7 +2336,7 @@ public:
     using ddl_tag_type = void;
 
     create_table_as_builder(std::string create_prefix, std::string select_sql, bool if_not_exists,
-                            create_table_option_set options = {})
+                            create_table_option options = {})
         : create_prefix_(std::move(create_prefix)),
           select_sql_(std::move(select_sql)),
           if_not_exists_(if_not_exists),
@@ -2179,7 +2370,7 @@ private:
     std::string create_prefix_;
     std::string select_sql_;
     bool if_not_exists_;
-    create_table_option_set options_;
+    create_table_option options_;
 };
 
 // Out-of-line .as() definition for create_table_cond_builder (needs create_table_as_builder to be complete)
