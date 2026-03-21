@@ -207,6 +207,16 @@ std::string to_sql_value(T const& v) {
 }  // namespace sql_detail
 
 // ===================================================================
+// SqlValue — concept matching every type accepted by sql_detail::to_sql_value.
+// Constrains template parameters that must produce a valid SQL literal.
+// ===================================================================
+template <typename T>
+concept SqlValue =
+    ColumnFieldType<T> || is_optional_v<T> || std::same_as<T, sql_datetime> || std::same_as<T, sql_timestamp> ||
+    std::same_as<T, std::chrono::system_clock::time_point> || std::same_as<T, bool> || std::integral<T> ||
+    std::floating_point<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
+
+// ===================================================================
 // where_condition — a typed SQL WHERE fragment
 //
 // Stores the column name (as a compile-time std::string_view),
@@ -2420,7 +2430,7 @@ struct arith_div {};
 //   → CASE WHEN cond1 THEN 'val1' WHEN cond2 THEN 'val2' ELSE 'default' END
 // ===================================================================
 
-template <typename ValueType>
+template <SqlValue ValueType>
 class case_when_builder {
 public:
     case_when_builder(where_condition cond, ValueType then_val) {
@@ -2469,14 +2479,14 @@ private:
     std::optional<ValueType> else_val_;
 };
 
-template <typename ValueType>
+template <SqlValue ValueType>
 [[nodiscard]] case_when_builder<ValueType> case_when(where_condition cond, ValueType then_val) {
     return case_when_builder<ValueType>{std::move(cond), std::move(then_val)};
 }
 
 // case_when_expr<VT> — type-erased wrapper for use as a Projection in select<>.
 // Constructed from a case_when_builder via .end().
-template <typename ValueType>
+template <SqlValue ValueType>
 class case_when_expr {
 public:
     using value_type = ValueType;
@@ -2525,6 +2535,29 @@ template <typename T>
 concept NullsWrapper = requires {
     typename T::col_type;
     { T::puts_nulls_last } -> std::convertible_to<bool>;
+} && ColumnDescriptor<typename T::col_type>;
+
+// qual<Col> — forces table-qualified name ("table.column") in order_by<>.
+//
+// Useful for ORDER BY on columns from joined tables that are not in the
+// SELECT list.  For col<T,I> descriptors this emits the fully-qualified
+// "table.column" name; for ColumnFieldType descriptors it degrades to
+// the bare column name (same as unqualified order_by<Col>()).
+//
+//   order_by<qual<col<category, 1>>>()     — ORDER BY category.label ASC
+//   order_by<qual<category::label>>()      — ORDER BY label ASC (no table info)
+
+template <ColumnDescriptor Col>
+struct qual {
+    using col_type = Col;
+    static constexpr bool is_qualified = true;
+};
+
+template <typename T>
+concept QualifiedCol = requires {
+    typename T::col_type;
+    { T::is_qualified } -> std::convertible_to<bool>;
+    requires T::is_qualified;
 } && ColumnDescriptor<typename T::col_type>;
 
 // ===================================================================
@@ -3610,9 +3643,10 @@ struct select_query_builder {
     // order_by<nulls_last<Col>>()                  — (col IS NULL) ASC, col ASC
     // order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
     // order_by<nulls_first<Col>>()                 — (col IS NULL) DESC, col ASC
+    // order_by<qual<col<Table, I>>>()              — table.column ASC  (qualified JOIN column)
     // Can be chained multiple times for multi-column ordering.
     template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec>)
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec>)
     [[nodiscard]] select_query_builder order_by() const& {
         auto copy = *this;
         if constexpr (NullsWrapper<ColSpec>) {
@@ -3621,6 +3655,9 @@ struct select_query_builder {
             copy.order_by_clauses_.push_back("(" + col_name +
                                              (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
             copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (QualifiedCol<ColSpec>) {
+            copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                              (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -3628,7 +3665,7 @@ struct select_query_builder {
         return copy;
     }
     template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec>)
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec>)
     [[nodiscard]] select_query_builder order_by() && {
         if constexpr (NullsWrapper<ColSpec>) {
             using Col = typename ColSpec::col_type;
@@ -3636,6 +3673,9 @@ struct select_query_builder {
             order_by_clauses_.push_back("(" + col_name +
                                         (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
             order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (QualifiedCol<ColSpec>) {
+            order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -3669,6 +3709,50 @@ struct select_query_builder {
     }
     [[nodiscard]] select_query_builder order_by_raw(std::string expr) && {
         order_by_clauses_.push_back(std::move(expr));
+        return std::move(*this);
+    }
+
+    // order_by(case_when_builder, dir) — ORDER BY CASE WHEN ... END
+    // Accepts a case_when_builder directly; calls .build_sql() at call time.
+    template <typename ValueType>
+    [[nodiscard]] select_query_builder order_by(case_when_builder<ValueType> expr,
+                                                sort_order dir = sort_order::asc) const& {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+    template <typename ValueType>
+    [[nodiscard]] select_query_builder order_by(case_when_builder<ValueType> expr,
+                                                sort_order dir = sort_order::asc) && {
+        order_by_clauses_.push_back(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
+        return std::move(*this);
+    }
+
+    // order_by_field<Col>(values, dir) — ORDER BY FIELD(col, v1, v2, ...) [ASC|DESC]
+    // Emits MySQL FIELD() for custom value-based ordering.
+    // Example: .order_by_field<product::type>({"electronics", "clothing", "food"})
+    //          → ORDER BY FIELD(type, 'electronics', 'clothing', 'food') ASC
+    template <ColumnDescriptor Col, SqlValue ValueType>
+    [[nodiscard]] select_query_builder order_by_field(std::initializer_list<ValueType> values,
+                                                      sort_order dir = sort_order::asc) const& {
+        auto copy = *this;
+        std::string expr = "FIELD(" + std::string(column_traits<Col>::column_name());
+        for (auto const& v : values) {
+            expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
+        }
+        expr += ")";
+        copy.order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+    template <ColumnDescriptor Col, SqlValue ValueType>
+    [[nodiscard]] select_query_builder order_by_field(std::initializer_list<ValueType> values,
+                                                      sort_order dir = sort_order::asc) && {
+        std::string expr = "FIELD(" + std::string(column_traits<Col>::column_name());
+        for (auto const& v : values) {
+            expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
+        }
+        expr += ")";
+        order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
         return std::move(*this);
     }
 

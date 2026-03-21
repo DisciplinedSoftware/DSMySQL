@@ -640,6 +640,63 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
                              .build_sql();
         expect(sql == "SELECT id FROM product ORDER BY type ASC, (name IS NULL) ASC, name ASC"s) << sql;
     };
+
+    // order_by(case_when_builder) — case 4
+    "order_by(case_when) — ORDER BY CASE WHEN ... END ASC"_test = [] {
+        auto const expr = case_when(equal<product::type>("widget"), 0).when(equal<product::type>("gadget"), 1).else_(2);
+        auto const sql = select<product::id>().from<product>().order_by(expr).build_sql();
+        expect(
+            sql ==
+            "SELECT id FROM product ORDER BY CASE WHEN type = 'widget' THEN 0 WHEN type = 'gadget' THEN 1 ELSE 2 END ASC"s)
+            << sql;
+    };
+
+    "order_by(case_when, desc) — ORDER BY CASE WHEN ... END DESC"_test = [] {
+        auto const expr = case_when(equal<product::type>("widget"), 0).else_(1);
+        auto const sql = select<product::id>().from<product>().order_by(expr, sort_order::desc).build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY CASE WHEN type = 'widget' THEN 0 ELSE 1 END DESC"s) << sql;
+    };
+
+    // order_by_field<Col> — case 4 (FIELD custom ordering)
+    "order_by_field<Col> — ORDER BY FIELD(col, ...) ASC"_test = [] {
+        auto const sql = select<product::id>()
+                             .from<product>()
+                             .order_by_field<product::type>(
+                                 {product::type{"electronics"}, product::type{"clothing"}, product::type{"food"}})
+                             .build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY FIELD(type, 'electronics', 'clothing', 'food') ASC"s) << sql;
+    };
+
+    "order_by_field<Col> desc — ORDER BY FIELD(col, ...) DESC"_test = [] {
+        auto const sql = select<product::id>()
+                             .from<product>()
+                             .order_by_field<product::type>({product::type{"electronics"}, product::type{"clothing"}},
+                                                            sort_order::desc)
+                             .build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY FIELD(type, 'electronics', 'clothing') DESC"s) << sql;
+    };
+
+    // order_by<qual<Col>> — case 7 (qualified join column)
+    "order_by<qual<col<T,I>>> — qualified table.column for JOIN ORDER BY"_test = [] {
+        auto const sql = select<product::sku, category::label>()
+                             .from<joined<product>>()
+                             .inner_join<category, product::category_id, category::id>()
+                             .order_by<qual<col<category, 1>>>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku, label FROM product INNER JOIN category ON category_id = id ORDER BY category.label ASC"s)
+            << sql;
+    };
+
+    "order_by<qual<col<T,I>>, desc> — qualified column DESC"_test = [] {
+        auto const sql = select<product::sku>()
+                             .from<joined<product>>()
+                             .inner_join<category, product::category_id, category::id>()
+                             .order_by<qual<col<category, 1>>, sort_order::desc>()
+                             .build_sql();
+        expect(sql == "SELECT sku FROM product INNER JOIN category ON category_id = id ORDER BY category.label DESC"s)
+            << sql;
+    };
 };
 
 // ===================================================================
