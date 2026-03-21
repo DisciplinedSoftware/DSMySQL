@@ -14,7 +14,7 @@
 #include <print>
 #include <string>
 
-#include "ds_mysql.hpp"
+#include "ds_mysql/ds_mysql.hpp"
 
 // ===================================================================
 // Define a 'user' table

@@ -18,7 +18,7 @@
 #include <print>
 #include <string>
 
-#include "ds_mysql.hpp"
+#include "ds_mysql/ds_mysql.hpp"
 
 // ===================================================================
 // Connection configuration — adjust to match your MySQL instance.
@@ -42,13 +42,13 @@ constexpr unsigned int port = 3306;
 // ===================================================================
 
 struct product {
-    COLUMN_FIELD(id,          uint32_t)
-    COLUMN_FIELD(sku,         ds_mysql::varchar_field<64>)
-    COLUMN_FIELD(name,        ds_mysql::varchar_field<255>)
-    COLUMN_FIELD(price,       double)
-    COLUMN_FIELD(stock,       uint32_t)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(sku, ds_mysql::varchar_field<64>)
+    COLUMN_FIELD(name, ds_mysql::varchar_field<255>)
+    COLUMN_FIELD(price, double)
+    COLUMN_FIELD(stock, uint32_t)
     COLUMN_FIELD(description, std::optional<ds_mysql::varchar_field<512>>)
-    COLUMN_FIELD(created_at,  ds_mysql::sql_datetime)
+    COLUMN_FIELD(created_at, ds_mysql::sql_datetime)
 };
 
 // ===================================================================
