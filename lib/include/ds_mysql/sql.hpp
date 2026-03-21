@@ -12,7 +12,6 @@
 #include <map>
 #include <optional>
 #include <ranges>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -412,34 +411,36 @@ concept AnySelectQuery = requires(Q const& q) {
 
 template <ColumnFieldType Col>
 [[nodiscard]] where_condition in(std::initializer_list<typename Col::value_type> values) {
-    std::ostringstream ss;
-    ss << '(';
+    std::string rhs;
+    rhs.reserve(2 + values.size() * 4);
+    rhs += '(';
     bool first = true;
     for (auto const& v : values) {
         if (!first) {
-            ss << ", ";
+            rhs += ", ";
         }
-        ss << sql_detail::to_sql_value(v);
+        rhs += sql_detail::to_sql_value(v);
         first = false;
     }
-    ss << ')';
-    return {column_traits<Col>::column_name(), " IN ", ss.str()};
+    rhs += ')';
+    return {column_traits<Col>::column_name(), " IN ", std::move(rhs)};
 }
 
 template <ColumnFieldType Col>
 [[nodiscard]] where_condition not_in(std::initializer_list<typename Col::value_type> values) {
-    std::ostringstream ss;
-    ss << '(';
+    std::string rhs;
+    rhs.reserve(2 + values.size() * 4);
+    rhs += '(';
     bool first = true;
     for (auto const& v : values) {
         if (!first) {
-            ss << ", ";
+            rhs += ", ";
         }
-        ss << sql_detail::to_sql_value(v);
+        rhs += sql_detail::to_sql_value(v);
         first = false;
     }
-    ss << ')';
-    return {column_traits<Col>::column_name(), " NOT IN ", ss.str()};
+    rhs += ')';
+    return {column_traits<Col>::column_name(), " NOT IN ", std::move(rhs)};
 }
 
 template <ColumnFieldType Col>
@@ -735,23 +736,26 @@ inline constexpr col_expr<Col> col_ref{};
 namespace ddl_detail {
 
 template <typename T, std::size_t... Is>
-void append_column_defs(std::ostringstream& sql, std::index_sequence<Is...>) {
+void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
     std::size_t count = 0;
     (
         [&] {
             using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
             if (count > 0) {
-                sql << ",\n";
+                sql += ",\n";
             }
             std::string_view field_name = field_schema<T, Is>::name();
             std::string sql_type_override = field_sql_type_override<T, Is>();
             std::string sql_type = sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
-            sql << "    " << field_name << " " << sql_type;
+            sql += "    ";
+            sql += field_name;
+            sql += " ";
+            sql += sql_type;
             if constexpr (!is_field_nullable_v<field_type>) {
-                sql << " NOT NULL";
+                sql += " NOT NULL";
             }
             if constexpr (Is == 0) {
-                sql << " PRIMARY KEY AUTO_INCREMENT";
+                sql += " PRIMARY KEY AUTO_INCREMENT";
             }
             ++count;
         }(),
@@ -761,14 +765,20 @@ void append_column_defs(std::ostringstream& sql, std::index_sequence<Is...>) {
     (
         [&] {
             if constexpr (has_foreign_key_v<T, Is>) {
-                sql << ",\n    FOREIGN KEY (" << field_schema<T, Is>::name() << ") REFERENCES "
-                    << foreign_key_schema<T, Is>::referenced_table() << "("
-                    << foreign_key_schema<T, Is>::referenced_column() << ")";
+                sql += ",\n    FOREIGN KEY (";
+                sql += field_schema<T, Is>::name();
+                sql += ") REFERENCES ";
+                sql += foreign_key_schema<T, Is>::referenced_table();
+                sql += "(";
+                sql += foreign_key_schema<T, Is>::referenced_column();
+                sql += ")";
                 if constexpr (!foreign_key_schema<T, Is>::on_delete().empty()) {
-                    sql << " ON DELETE " << foreign_key_schema<T, Is>::on_delete();
+                    sql += " ON DELETE ";
+                    sql += foreign_key_schema<T, Is>::on_delete();
                 }
                 if constexpr (!foreign_key_schema<T, Is>::on_update().empty()) {
-                    sql << " ON UPDATE " << foreign_key_schema<T, Is>::on_update();
+                    sql += " ON UPDATE ";
+                    sql += foreign_key_schema<T, Is>::on_update();
                 }
             }
         }(),
@@ -777,9 +787,9 @@ void append_column_defs(std::ostringstream& sql, std::index_sequence<Is...>) {
 
 template <typename T>
 std::string make_column_defs() {
-    std::ostringstream sql;
+    std::string sql;
     append_column_defs<T>(sql, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
-    return sql.str();
+    return sql;
 }
 
 template <typename T>
@@ -916,9 +926,7 @@ public:
 
     template <BuildsSql SelectQuery>
     [[nodiscard]] create_view_as_builder<T> as(SelectQuery const& query) const {
-        return create_view_as_builder<T>{prior_sql_, or_replace_, [query]() -> std::string {
-                                             return query.build_sql();
-                                         }};
+        return create_view_as_builder<T>{prior_sql_, or_replace_, query.build_sql()};
     }
 
 private:
@@ -931,8 +939,8 @@ class create_view_as_builder {
 public:
     using ddl_tag_type = void;
 
-    create_view_as_builder(std::string prior, bool or_replace, std::function<std::string()> select_sql_builder)
-        : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_builder_(std::move(select_sql_builder)) {
+    create_view_as_builder(std::string prior, bool or_replace, std::string select_sql)
+        : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_(std::move(select_sql)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -941,9 +949,8 @@ public:
 
     [[nodiscard]] std::string build_sql() const {
         const auto view_name = table_name_for<T>::value().to_string_view();
-        auto select_sql = select_sql_builder_();
         std::string s;
-        s.reserve(prior_sql_.size() + 20 + view_name.size() + select_sql.size());
+        s.reserve(prior_sql_.size() + 20 + view_name.size() + select_sql_.size());
         s += prior_sql_;
         s += "CREATE ";
         if (or_replace_) {
@@ -952,7 +959,7 @@ public:
         s += "VIEW ";
         s += view_name;
         s += " AS ";
-        s += select_sql;
+        s += select_sql_;
         s += ";\n";
         return s;
     }
@@ -960,7 +967,7 @@ public:
 private:
     std::string prior_sql_;
     bool or_replace_;
-    std::function<std::string()> select_sql_builder_;
+    std::string select_sql_;
 };
 
 template <typename T>
@@ -1046,16 +1053,22 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        std::ostringstream ss;
-        ss << prior_sql_ << "CREATE ";
+        std::string s;
+        s.reserve(prior_sql_.size() + 24 + name_.size() + table_name_for<Table>::value().to_string_view().size() + 4);
+        s += prior_sql_;
+        s += "CREATE ";
         if (unique_) {
-            ss << "UNIQUE ";
+            s += "UNIQUE ";
         }
-        ss << "INDEX " << name_ << " ON " << table_name_for<Table>::value().to_string_view() << " (";
+        s += "INDEX ";
+        s += name_;
+        s += " ON ";
+        s += table_name_for<Table>::value().to_string_view();
+        s += " (";
         bool first = true;
-        ((ss << (first ? "" : ", ") << column_traits<Cols>::column_name(), first = false), ...);
-        ss << ");\n";
-        return ss.str();
+        (((s += (first ? "" : ", "), s += column_traits<Cols>::column_name(), first = false)), ...);
+        s += ");\n";
+        return s;
     }
 
 private:
@@ -1152,18 +1165,22 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        std::ostringstream ss;
-        ss << prior_sql_ << "ALTER TABLE " << table_name_for<Table>::value().to_string_view() << ' ';
+        std::string s;
+        s.reserve(prior_sql_.size() + 16 + table_name_for<Table>::value().to_string_view().size() + 16);
+        s += prior_sql_;
+        s += "ALTER TABLE ";
+        s += table_name_for<Table>::value().to_string_view();
+        s += ' ';
         bool first = true;
         for (auto const& action : actions_) {
             if (!first) {
-                ss << ", ";
+                s += ", ";
             }
-            ss << action;
+            s += action;
             first = false;
         }
-        ss << ";\n";
-        return ss.str();
+        s += ";\n";
+        return s;
     }
 
 private:
@@ -1231,11 +1248,7 @@ public:
 
     template <BuildsSql SelectQuery>
     [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const {
-        return create_table_as_builder<T>{build_create_prefix(),
-                                          [query]() -> std::string {
-                                              return query.build_sql();
-                                          },
-                                          false};
+        return create_table_as_builder<T>{build_create_prefix(), query.build_sql(), false};
     }
 
     template <typename SourceT>
@@ -1723,11 +1736,8 @@ class create_table_as_builder {
 public:
     using ddl_tag_type = void;
 
-    create_table_as_builder(std::string create_prefix, std::function<std::string()> select_sql_builder,
-                            bool if_not_exists)
-        : create_prefix_(std::move(create_prefix)),
-          select_sql_builder_(std::move(select_sql_builder)),
-          if_not_exists_(if_not_exists) {
+    create_table_as_builder(std::string create_prefix, std::string select_sql, bool if_not_exists)
+        : create_prefix_(std::move(create_prefix)), select_sql_(std::move(select_sql)), if_not_exists_(if_not_exists) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -1736,22 +1746,21 @@ public:
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
-        auto select_sql = select_sql_builder_();
         std::string_view cond = if_not_exists_ ? std::string_view{"IF NOT EXISTS "} : std::string_view{};
         std::string s;
-        s.reserve(create_prefix_.size() + cond.size() + table_name.size() + 5 + select_sql.size() + 2);
+        s.reserve(create_prefix_.size() + cond.size() + table_name.size() + 5 + select_sql_.size() + 2);
         s += create_prefix_;
         s += cond;
         s += table_name;
         s += " AS ";
-        s += select_sql;
+        s += select_sql_;
         s += ";\n";
         return s;
     }
 
 private:
     std::string create_prefix_;
-    std::function<std::string()> select_sql_builder_;
+    std::string select_sql_;
     bool if_not_exists_;
 };
 
@@ -1759,11 +1768,7 @@ private:
 template <typename T>
 template <BuildsSql SelectQuery>
 [[nodiscard]] create_table_as_builder<T> create_table_cond_builder<T>::as(SelectQuery const& query) const {
-    return create_table_as_builder<T>{create_prefix_,
-                                      [query]() -> std::string {
-                                          return query.build_sql();
-                                      },
-                                      true};
+    return create_table_as_builder<T>{create_prefix_, query.build_sql(), true};
 }
 
 }  // namespace ddl_detail
@@ -1904,18 +1909,21 @@ concept FieldOf =
 
 template <typename T, std::size_t... Is>
 std::string generate_values_impl(T const& row, std::index_sequence<Is...>) {
-    std::ostringstream values;
+    std::string values;
+    if constexpr (sizeof...(Is) > 0) {
+        values.reserve(sizeof...(Is) * 8);
+    }
     std::size_t count = 0;
     (
         [&] {
             if (count > 0) {
-                values << ", ";
+                values += ", ";
             }
-            values << sql_detail::to_sql_value(boost::pfr::get<Is>(row));
+            values += sql_detail::to_sql_value(boost::pfr::get<Is>(row));
             ++count;
         }(),
         ...);
-    return values.str();
+    return values;
 }
 
 template <typename T>
@@ -1925,18 +1933,23 @@ std::string generate_values(T const& row) {
 
 template <typename T, std::size_t... Is>
 std::string generate_column_list_impl(std::index_sequence<Is...>) {
-    std::ostringstream columns;
+    constexpr std::size_t field_count = sizeof...(Is);
+    const std::size_t names_len = (std::size_t{} + ... + field_schema<T, Is>::name().size());
+    std::string columns;
+    if constexpr (field_count > 0) {
+        columns.reserve(names_len + (field_count - 1) * 2);
+    }
     std::size_t count = 0;
     (
         [&] {
             if (count > 0) {
-                columns << ", ";
+                columns += ", ";
             }
-            columns << field_schema<T, Is>::name();
+            columns += field_schema<T, Is>::name();
             ++count;
         }(),
         ...);
-    return columns.str();
+    return columns;
 }
 
 template <typename T>
@@ -2023,16 +2036,18 @@ public:
         const auto& column_list = dml_detail::generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            std::ostringstream values_sql;
+            std::string values;
+            values.reserve(rows_.size() * 4);
             bool first = true;
             for (auto const& row : rows_) {
                 if (!first) {
-                    values_sql << ", ";
+                    values += ", ";
                 }
-                values_sql << "(" << dml_detail::generate_values(row) << ")";
+                values += '(';
+                values += dml_detail::generate_values(row);
+                values += ')';
                 first = false;
             }
-            auto values = values_sql.str();
             s.reserve(12 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "INSERT INTO ";
             s += table_name;
@@ -2085,21 +2100,26 @@ public:
 // ---------------------------------------------------------------
 
 template <typename Col>
-void append_assignment_sql(std::ostringstream& ss, bool& first, Col const& field) {
+void append_assignment_sql(std::string& s, bool& first, Col const& field) {
     if (!first) {
-        ss << ", ";
+        s += ", ";
     }
     using C = std::decay_t<Col>;
-    ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
+    s += column_traits<C>::column_name();
+    s += " = ";
+    s += sql_detail::to_sql_value(field.value);
     first = false;
 }
 
 template <typename... Cols>
 [[nodiscard]] std::string build_assignment_sql(Cols const&... assignments) {
-    std::ostringstream ss;
+    std::string s;
+    if constexpr (sizeof...(Cols) > 0) {
+        s.reserve(sizeof...(Cols) * 12);
+    }
     bool first = true;
-    (append_assignment_sql(ss, first, assignments), ...);
-    return ss.str();
+    (append_assignment_sql(s, first, assignments), ...);
+    return s;
 }
 
 template <typename Tuple, std::size_t... Is>
@@ -2538,16 +2558,20 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        std::ostringstream ss;
-        ss << "CASE";
+        std::string s;
+        s += "CASE";
         for (auto const& [cond, val] : branches_) {
-            ss << " WHEN " << cond.build_sql() << " THEN " << sql_detail::to_sql_value(val);
+            s += " WHEN ";
+            s += cond.build_sql();
+            s += " THEN ";
+            s += sql_detail::to_sql_value(val);
         }
         if (else_val_.has_value()) {
-            ss << " ELSE " << sql_detail::to_sql_value(*else_val_);
+            s += " ELSE ";
+            s += sql_detail::to_sql_value(*else_val_);
         }
-        ss << " END";
-        return ss.str();
+        s += " END";
+        return s;
     }
 
     using value_type = ValueType;
@@ -3091,12 +3115,13 @@ template <Projection... Ps>
 struct projection_traits<concat_of<Ps...>> {
     using value_type = std::string;
     static std::string sql_expr() {
-        std::ostringstream ss;
-        ss << "CONCAT(";
+        std::string s;
+        s.reserve(8 + sizeof...(Ps) * 4);
+        s += "CONCAT(";
         bool first = true;
-        ((ss << (first ? "" : ", ") << projection_traits<Ps>::sql_expr(), first = false), ...);
-        ss << ")";
-        return ss.str();
+        (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
+        s += ")";
+        return s;
     }
 };
 
@@ -3329,18 +3354,19 @@ struct agg_expr {
     }
 
     [[nodiscard]] where_condition in(std::initializer_list<value_type> vals) const {
-        std::ostringstream ss;
-        ss << std::string(projection_traits<Agg>::sql_expr()) << " IN (";
+        std::string s;
+        s += std::string(projection_traits<Agg>::sql_expr());
+        s += " IN (";
         bool first = true;
         for (auto const& v : vals) {
             if (!first) {
-                ss << ", ";
+                s += ", ";
             }
-            ss << sql_detail::to_sql_value(v);
+            s += sql_detail::to_sql_value(v);
             first = false;
         }
-        ss << ')';
-        return {{}, {}, ss.str()};
+        s += ')';
+        return {{}, {}, std::move(s)};
     }
 
     [[nodiscard]] where_condition is_null() const noexcept {
@@ -3462,17 +3488,23 @@ enum class group_by_mode {
 // Free helpers used by both group_by_spec_traits and select_query_builder.
 template <ColumnDescriptor... Cols>
 [[nodiscard]] std::string build_group_by_cols_string() {
-    std::ostringstream ss;
+    constexpr std::size_t col_count = sizeof...(Cols);
+    const std::size_t names_len = (std::size_t{} + ... + column_traits<Cols>::column_name().size());
+    std::string s;
+    if constexpr (col_count > 0) {
+        s.reserve(names_len + (col_count - 1) * 2);
+    }
     bool first = true;
     (
         [&](std::string_view name) {
-            if (!first)
-                ss << ", ";
-            ss << name;
+            if (!first) {
+                s += ", ";
+            }
+            s += name;
             first = false;
         }(column_traits<Cols>::column_name()),
         ...);
-    return ss.str();
+    return s;
 }
 
 template <typename Set>
@@ -3481,12 +3513,15 @@ struct grouping_set_sql;
 template <typename... Cols>
 struct grouping_set_sql<grouping_set<Cols...>> {
     [[nodiscard]] static std::string value() {
-        std::ostringstream ss;
-        ss << '(';
+        constexpr std::size_t col_count = sizeof...(Cols);
+        const std::size_t names_len = (std::size_t{} + ... + column_traits<Cols>::column_name().size());
+        std::string s;
+        s.reserve(2 + names_len + (col_count > 0 ? (col_count - 1) * 2 : 0));
+        s += '(';
         bool first = true;
-        ((ss << (first ? "" : ", ") << column_traits<Cols>::column_name(), first = false), ...);
-        ss << ')';
-        return ss.str();
+        (((s += (first ? "" : ", "), s += column_traits<Cols>::column_name(), first = false)), ...);
+        s += ')';
+        return s;
     }
 };
 
@@ -3524,10 +3559,11 @@ struct group_by_spec_traits<cube<Cols...>> {
 template <typename... Sets>
 struct group_by_spec_traits<grouping_sets<Sets...>> {
     static std::string cols_string() {
-        std::ostringstream ss;
+        std::string s;
+        s.reserve(sizeof...(Sets) * 8);
         bool first = true;
-        ((ss << (first ? "" : ", ") << grouping_set_sql<Sets>::value(), first = false), ...);
-        return ss.str();
+        (((s += (first ? "" : ", "), s += grouping_set_sql<Sets>::value(), first = false)), ...);
+        return s;
     }
     static constexpr group_by_mode mode = group_by_mode::grouping_sets;
     static constexpr bool with_rollup = false;
@@ -4063,83 +4099,93 @@ struct select_query_builder {
     // ---- Terminal ----
 
     [[nodiscard]] std::string build_sql() const {
-        std::ostringstream sql;
-        sql << "SELECT ";
+        std::string sql;
+        sql.reserve(64 + joins_.size() + group_by_.size() + from_subquery_.size());
+        sql += "SELECT ";
         if (distinct_) {
-            sql << "DISTINCT ";
+            sql += "DISTINCT ";
         }
         std::size_t proj_idx = 0;
         bool first = true;
         (
             [&](auto expr) {
                 if (!first) {
-                    sql << ", ";
+                    sql += ", ";
                 }
-                sql << expr;
+                sql += expr;
                 auto it = aliases_.find(proj_idx);
                 if (it != aliases_.end()) {
-                    sql << " AS " << it->second;
+                    sql += " AS ";
+                    sql += it->second;
                 }
                 first = false;
                 ++proj_idx;
             }(projection_traits<Projs>::sql_expr()),
             ...);
 
-        if (from_subquery_builder_) {
-            sql << " FROM " << from_subquery_builder_();
-        } else if (!from_subquery_.empty()) {
-            sql << " FROM " << from_subquery_;
+        if (!from_subquery_.empty()) {
+            sql += " FROM ";
+            sql += from_subquery_;
         } else {
             if constexpr (!std::is_same_v<Table, subquery_source>) {
-                sql << " FROM " << table_name_for<Table>::value().to_string_view();
+                sql += " FROM ";
+                sql += table_name_for<Table>::value().to_string_view();
             }
         }
-        sql << joins_;
+        sql += joins_;
 
         if (where_.has_value()) {
-            sql << " WHERE " << where_->build_sql();
+            sql += " WHERE ";
+            sql += where_->build_sql();
         }
         if (!group_by_.empty()) {
-            sql << " GROUP BY ";
+            sql += " GROUP BY ";
             if (group_by_mode_ == group_by_mode::cube) {
-                sql << "CUBE(" << group_by_ << ")";
+                sql += "CUBE(";
+                sql += group_by_;
+                sql += ")";
             } else if (group_by_mode_ == group_by_mode::grouping_sets) {
-                sql << "GROUPING SETS (" << group_by_ << ")";
+                sql += "GROUPING SETS (";
+                sql += group_by_;
+                sql += ")";
             } else {
-                sql << group_by_;
+                sql += group_by_;
             }
             if (with_rollup_) {
-                sql << " WITH ROLLUP";
+                sql += " WITH ROLLUP";
             }
         }
         if (having_.has_value()) {
-            sql << " HAVING " << having_->build_sql();
+            sql += " HAVING ";
+            sql += having_->build_sql();
         }
         if (!order_by_clauses_.empty()) {
-            sql << " ORDER BY ";
+            sql += " ORDER BY ";
             bool f = true;
             for (auto const& item : order_by_clauses_) {
                 if (!f) {
-                    sql << ", ";
+                    sql += ", ";
                 }
                 if (std::holds_alternative<std::string>(item)) {
-                    sql << std::get<std::string>(item);
+                    sql += std::get<std::string>(item);
                 } else {
                     auto const& e = std::get<alias_order_entry>(item);
                     auto it = aliases_.find(e.proj_index);
-                    sql << (it != aliases_.end() ? it->second : e.fallback_expr);
-                    sql << (e.dir == sort_order::asc ? " ASC" : " DESC");
+                    sql += (it != aliases_.end() ? it->second : e.fallback_expr);
+                    sql += (e.dir == sort_order::asc ? " ASC" : " DESC");
                 }
                 f = false;
             }
         }
         if (limit_.has_value()) {
-            sql << " LIMIT " << *limit_;
+            sql += " LIMIT ";
+            sql += std::to_string(*limit_);
         }
         if (offset_.has_value()) {
-            sql << " OFFSET " << *offset_;
+            sql += " OFFSET ";
+            sql += std::to_string(*offset_);
         }
-        return sql.str();
+        return sql;
     }
 
     [[nodiscard]] select_query_builder add_join(std::string_view join_type, std::string_view right_table,
@@ -4176,10 +4222,11 @@ struct select_query_builder {
 
     template <typename... Sets>
     static std::string build_grouping_sets_string() {
-        std::ostringstream ss;
+        std::string s;
+        s.reserve(sizeof...(Sets) * 8);
         bool first = true;
-        ((ss << (first ? "" : ", ") << detail::grouping_set_sql<Sets>::value(), first = false), ...);
-        return ss.str();
+        (((s += (first ? "" : ", "), s += detail::grouping_set_sql<Sets>::value(), first = false)), ...);
+        return s;
     }
 
     std::optional<where_condition> where_;
@@ -4194,7 +4241,6 @@ struct select_query_builder {
     std::string joins_;
     std::map<std::size_t, std::string> aliases_;
     std::string from_subquery_;
-    std::function<std::string()> from_subquery_builder_;
 };
 
 // ===================================================================
@@ -4223,9 +4269,12 @@ public:
     template <AnySelectQuery Query>
     [[nodiscard]] select_query_builder<subquery_source, Projs...> from(Query const& subquery, std::string alias) const {
         select_query_builder<subquery_source, Projs...> builder;
-        builder.from_subquery_builder_ = [subquery, alias = std::move(alias)]() {
-            return "(" + subquery.build_sql() + ") AS " + alias;
-        };
+        auto sub_sql = subquery.build_sql();
+        builder.from_subquery_.reserve(2 + sub_sql.size() + 5 + alias.size());
+        builder.from_subquery_ += '(';
+        builder.from_subquery_ += std::move(sub_sql);
+        builder.from_subquery_ += ") AS ";
+        builder.from_subquery_ += std::move(alias);
         return builder;
     }
 };
@@ -4359,17 +4408,13 @@ class cte_builder {
 public:
     template <AnySelectQuery Q>
     cte_builder(std::string name, Q const& query) {
-        ctes_.emplace_back(std::move(name), [query]() {
-            return query.build_sql();
-        });
+        ctes_.emplace_back(std::move(name), query.build_sql());
     }
 
     template <AnySelectQuery Q>
     [[nodiscard]] cte_builder with_cte(std::string name, Q const& query) const {
         auto copy = *this;
-        copy.ctes_.emplace_back(std::move(name), [query]() {
-            return query.build_sql();
-        });
+        copy.ctes_.emplace_back(std::move(name), query.build_sql());
         return copy;
     }
 
@@ -4383,42 +4428,26 @@ public:
     [[nodiscard]] detail::select_query_builder<Table, Projs...> select_from_cte(std::string const& cte_name) const {
         detail::select_query_builder<Table, Projs...> builder;
         builder.from_subquery_ = cte_name;
-
-        // Build the WITH prefix and store it in a wrapper
-        std::ostringstream with_sql;
-        with_sql << "WITH ";
-        bool first = true;
-        for (auto const& [name, sql_builder] : ctes_) {
-            if (!first) {
-                with_sql << ", ";
-            }
-            with_sql << name << " AS (" << sql_builder() << ")";
-            first = false;
-        }
-        // We need to return a query that prepends the WITH clause.
-        // Use a thin wrapper.
-        builder.from_subquery_ = cte_name;
-        // Store with_prefix to be prepended in build_sql — we embed it in joins_ as a workaround
-        // since the builder doesn't have a dedicated CTE field. Actually let's use a dedicated approach.
-        // Since the builder copies by value, we set the from field to carry the CTE.
-
-        // Better approach: return a cte_select wrapper.
         return builder;
     }
 
     [[nodiscard]] std::string with_prefix() const {
-        std::ostringstream ss;
-        ss << (recursive_ ? "WITH RECURSIVE " : "WITH ");
+        std::string s;
+        s.reserve(16 + ctes_.size() * 8);
+        s += (recursive_ ? "WITH RECURSIVE " : "WITH ");
         bool first = true;
         for (auto const& [name, sql_builder] : ctes_) {
             if (!first) {
-                ss << ", ";
+                s += ", ";
             }
-            ss << name << " AS (" << sql_builder() << ")";
+            s += name;
+            s += " AS (";
+            s += sql_builder;
+            s += ")";
             first = false;
         }
-        ss << " ";
-        return ss.str();
+        s += " ";
+        return s;
     }
 
     // Terminal: build a full CTE query
@@ -4428,7 +4457,7 @@ public:
     }
 
 private:
-    std::vector<std::pair<std::string, std::function<std::string()>>> ctes_;
+    std::vector<std::pair<std::string, std::string>> ctes_;
     bool recursive_ = false;
 };
 
@@ -4486,16 +4515,18 @@ public:
         const auto& column_list = generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            std::ostringstream values_sql;
+            std::string values;
+            values.reserve(rows_.size() * 4);
             bool first = true;
             for (auto const& row : rows_) {
                 if (!first) {
-                    values_sql << ", ";
+                    values += ", ";
                 }
-                values_sql << "(" << generate_values(row) << ")";
+                values += '(';
+                values += generate_values(row);
+                values += ')';
                 first = false;
             }
-            auto values = values_sql.str();
             s.reserve(19 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "INSERT IGNORE INTO ";
             s += table_name;
@@ -4588,16 +4619,18 @@ public:
         const auto& column_list = generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            std::ostringstream values_sql;
+            std::string values;
+            values.reserve(rows_.size() * 4);
             bool first = true;
             for (auto const& row : rows_) {
                 if (!first) {
-                    values_sql << ", ";
+                    values += ", ";
                 }
-                values_sql << "(" << generate_values(row) << ")";
+                values += '(';
+                values += generate_values(row);
+                values += ')';
                 first = false;
             }
-            auto values = values_sql.str();
             s.reserve(13 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "REPLACE INTO ";
             s += table_name;
