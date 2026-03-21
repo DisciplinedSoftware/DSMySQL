@@ -2560,6 +2560,31 @@ concept QualifiedCol = requires {
     requires T::is_qualified;
 } && ColumnDescriptor<typename T::col_type>;
 
+// position<Proj> — ORDER BY the 1-based ordinal index of Proj in the SELECT list.
+//
+//   order_by<position<count_all>>()                  — ORDER BY 2 ASC
+//   order_by<position<count_all>, sort_order::desc>() — ORDER BY 2 DESC
+//
+// PositionWrapper concept is defined after the Projection concept (forward dependency).
+template <typename Proj>
+struct position {
+    using proj_type = Proj;
+};
+
+// col_index<N> — ORDER BY the Nth column (1-based) by literal numeric index.
+//
+//   order_by<col_index<2>>()                   — ORDER BY 2 ASC
+//   order_by<col_index<1>, sort_order::desc>() — ORDER BY 1 DESC
+//
+// Unlike position<Proj>, the index is fixed and does not track SELECT list reorderings.
+// ColIndexWrapper concept is defined after the Projection concept (forward dependency).
+template <std::size_t N>
+struct col_index {
+    static constexpr std::size_t value = N;
+    using col_index_tag = void;  // marker for ColIndexWrapper
+    static_assert(N >= 1, "col_index: column index must be >= 1 (1-based)");
+};
+
 // ===================================================================
 // Window function projections
 //
@@ -2841,6 +2866,17 @@ concept Projection = requires {
 // AggregateProjection — a Projection that is not a ColumnDescriptor.
 template <typename P>
 concept AggregateProjection = Projection<P> && !ColumnDescriptor<P>;
+
+// PositionWrapper — satisfied by position<Proj> where Proj is a Projection.
+template <typename T>
+concept PositionWrapper = requires { typename T::proj_type; } && Projection<typename T::proj_type>;
+
+// ColIndexWrapper — satisfied by col_index<N>.
+template <typename T>
+concept ColIndexWrapper = requires {
+    typename T::col_index_tag;
+    { T::value } -> std::same_as<const std::size_t&>;
+};
 
 // ===================================================================
 // projection_traits — specialisations for types that depend on Projection
@@ -3644,9 +3680,12 @@ struct select_query_builder {
     // order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
     // order_by<nulls_first<Col>>()                 — (col IS NULL) DESC, col ASC
     // order_by<qual<col<Table, I>>>()              — table.column ASC  (qualified JOIN column)
+    // order_by<position<Proj>>()                   — ORDER BY <ordinal of Proj in SELECT> ASC
+    // order_by<col_index<N>>()                     — ORDER BY N ASC (literal 1-based index)
     // Can be chained multiple times for multi-column ordering.
     template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec>)
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec>)
     [[nodiscard]] select_query_builder order_by() const& {
         auto copy = *this;
         if constexpr (NullsWrapper<ColSpec>) {
@@ -3658,6 +3697,17 @@ struct select_query_builder {
         } else if constexpr (QualifiedCol<ColSpec>) {
             copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
                                              (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (PositionWrapper<ColSpec>) {
+            static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                          "order_by<position<Proj>>: Proj must be one of the projections in this SELECT");
+            static constexpr std::size_t Index =
+                sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+            copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (ColIndexWrapper<ColSpec>) {
+            static_assert(ColSpec::value <= sizeof...(Projs),
+                          "order_by<col_index<N>>: N is out of range for this SELECT list");
+            copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                              (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -3665,7 +3715,8 @@ struct select_query_builder {
         return copy;
     }
     template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec>)
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec>)
     [[nodiscard]] select_query_builder order_by() && {
         if constexpr (NullsWrapper<ColSpec>) {
             using Col = typename ColSpec::col_type;
@@ -3676,6 +3727,16 @@ struct select_query_builder {
         } else if constexpr (QualifiedCol<ColSpec>) {
             order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (PositionWrapper<ColSpec>) {
+            static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                          "order_by<position<Proj>>: Proj must be one of the projections in this SELECT");
+            static constexpr std::size_t Index =
+                sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+            order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (ColIndexWrapper<ColSpec>) {
+            static_assert(ColSpec::value <= sizeof...(Projs),
+                          "order_by<col_index<N>>: N is out of range for this SELECT list");
+            order_by_clauses_.push_back(std::to_string(ColSpec::value) + (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -3773,25 +3834,6 @@ struct select_query_builder {
     [[nodiscard]] select_query_builder order_by_alias() && {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         order_by_clauses_.push_back(alias_order_entry{Index, std::string(projection_traits<Proj>::sql_expr()), Dir});
-        return std::move(*this);
-    }
-
-    // order_by_position<Proj>()      — ORDER BY N (1-based projection index)
-    // order_by_position<Proj, desc>() — ORDER BY N DESC
-    // Emits the ordinal position of Proj in the SELECT list.
-    template <Projection Proj, sort_order Dir = sort_order::asc>
-        requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder order_by_position() const& {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>() + 1;
-        auto copy = *this;
-        copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        return copy;
-    }
-    template <Projection Proj, sort_order Dir = sort_order::asc>
-        requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder order_by_position() && {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>() + 1;
-        order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
         return std::move(*this);
     }
 

@@ -576,29 +576,58 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY COUNT(*) DESC"s) << sql;
     };
 
-    // order_by_position
-    "order_by_position — emits 1-based column index"_test = [] {
+    // order_by<position<Proj>> — positional ORDER BY
+    "order_by<position<Proj>> — emits 1-based column index"_test = [] {
         auto const sql = select<product::type, count_all>()
                              .from<product>()
                              .group_by<product::type>()
-                             .order_by_position<count_all>()
+                             .order_by<position<count_all>>()
                              .build_sql();
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 2 ASC"s) << sql;
     };
 
-    "order_by_position desc — emits index DESC"_test = [] {
+    "order_by<position<Proj>, desc> — emits index DESC"_test = [] {
         auto const sql = select<product::type, count_all>()
                              .from<product>()
                              .group_by<product::type>()
-                             .order_by_position<count_all, sort_order::desc>()
+                             .order_by<position<count_all>, sort_order::desc>()
                              .build_sql();
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 2 DESC"s) << sql;
     };
 
-    "order_by_position first projection — emits index 1"_test = [] {
+    "order_by<position<Proj>> first projection — emits index 1"_test = [] {
         auto const sql =
-            select<product::type, count_all>().from<product>().order_by_position<product::type>().build_sql();
+            select<product::type, count_all>().from<product>().order_by<position<product::type>>().build_sql();
         expect(sql == "SELECT type, COUNT(*) FROM product ORDER BY 1 ASC"s) << sql;
+    };
+
+    // order_by<col_index<N>> — literal numeric positional ORDER BY
+    "order_by<col_index<2>> — emits literal index 2 ASC"_test = [] {
+        auto const sql = select<product::type, count_all>()
+                             .from<product>()
+                             .group_by<product::type>()
+                             .order_by<col_index<2>>()
+                             .build_sql();
+        expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 2 ASC"s) << sql;
+    };
+
+    "order_by<col_index<1>, desc> — emits literal index 1 DESC"_test = [] {
+        auto const sql = select<product::type, count_all>()
+                             .from<product>()
+                             .group_by<product::type>()
+                             .order_by<col_index<1>, sort_order::desc>()
+                             .build_sql();
+        expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 1 DESC"s) << sql;
+    };
+
+    "order_by<col_index<N>> chained — emits multiple positional clauses"_test = [] {
+        auto const sql = select<product::type, count_all>()
+                             .from<product>()
+                             .group_by<product::type>()
+                             .order_by<col_index<1>>()
+                             .order_by<col_index<2>, sort_order::desc>()
+                             .build_sql();
+        expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 1 ASC, 2 DESC"s) << sql;
     };
 
     // order_by_agg<rand_val> (random ordering)
