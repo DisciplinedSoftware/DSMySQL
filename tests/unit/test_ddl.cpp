@@ -77,6 +77,14 @@ struct symbol_with_indexes {
     COLUMN_FIELD(created_date, std::chrono::system_clock::time_point)
     COLUMN_FIELD(last_updated_date, std::chrono::system_clock::time_point)
 };
+
+struct audit_log {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(event_type, varchar_field<64>)
+    COLUMN_FIELD(user_id, uint32_t)
+    COLUMN_FIELD(description, varchar_field<255>)
+    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
+};
 }  // namespace
 
 template <>
@@ -131,6 +139,109 @@ struct ds_mysql::table_constraints<symbol_with_indexes> {
             table_constraint::primary_key<symbol_with_indexes::id>(),
             table_constraint::key<symbol_with_indexes::exchange_id>("index_exchange_id"),
         };
+    }
+};
+
+// Disable inline primary key for audit_log since we're using column attributes
+template <>
+struct ds_mysql::table_inline_primary_key<audit_log> {
+    static constexpr bool value = false;
+};
+
+// Define table constraints for audit_log
+template <>
+struct ds_mysql::table_constraints<audit_log> {
+    static std::vector<std::string> get() {
+        return {
+            table_constraint::primary_key<audit_log::id>(),
+        };
+    }
+};
+
+// Customize audit_log table to use column attributes
+// Column 0 (id): AUTO_INCREMENT
+// Column 4 (created_at): DEFAULT CURRENT_TIMESTAMP, cannot be updated
+template <>
+struct ds_mysql::column_attributes<audit_log, 0> {
+    static constexpr std::string_view auto_increment() {
+        return "AUTO_INCREMENT";
+    }
+    static constexpr std::string_view unique() {
+        return "";
+    }
+    static constexpr std::string_view default_value() {
+        return "";
+    }
+    static constexpr std::string_view comment() {
+        return "";
+    }
+    static constexpr std::string_view collate() {
+        return "";
+    }
+    static constexpr std::string_view on_update() {
+        return "";
+    }
+    static constexpr std::string_view generated() {
+        return "";
+    }
+    static std::string custom() {
+        return "";
+    }
+};
+
+template <>
+struct ds_mysql::column_attributes<audit_log, 2> {
+    static constexpr std::string_view auto_increment() {
+        return "";
+    }
+    static constexpr std::string_view unique() {
+        return "";
+    }
+    static constexpr std::string_view default_value() {
+        return "";
+    }
+    static constexpr std::string_view comment() {
+        return "COMMENT 'User who triggered the event'";
+    }
+    static constexpr std::string_view collate() {
+        return "";
+    }
+    static constexpr std::string_view on_update() {
+        return "";
+    }
+    static constexpr std::string_view generated() {
+        return "";
+    }
+    static std::string custom() {
+        return "";
+    }
+};
+
+template <>
+struct ds_mysql::column_attributes<audit_log, 4> {
+    static constexpr std::string_view auto_increment() {
+        return "";
+    }
+    static constexpr std::string_view unique() {
+        return "";
+    }
+    static constexpr std::string_view default_value() {
+        return "DEFAULT CURRENT_TIMESTAMP";
+    }
+    static constexpr std::string_view comment() {
+        return "";
+    }
+    static constexpr std::string_view collate() {
+        return "";
+    }
+    static constexpr std::string_view on_update() {
+        return "ON UPDATE CURRENT_TIMESTAMP";
+    }
+    static constexpr std::string_view generated() {
+        return "";
+    }
+    static std::string custom() {
+        return "";
     }
 };
 
@@ -423,7 +534,7 @@ suite<"DDL"> ddl_suite = [] {
                              .build_sql();
         expect(sql ==
                "CREATE TABLE symbol_with_indexes (\n"
-               "    id INT NOT NULL AUTO_INCREMENT,\n"
+               "    id INT NOT NULL,\n"
                "    exchange_id INT,\n"
                "    ticker VARCHAR(32) NOT NULL,\n"
                "    instrument VARCHAR(64) NOT NULL,\n"
@@ -443,6 +554,20 @@ suite<"DDL"> ddl_suite = [] {
         expect(table_constraint::fulltext_key<test_table::name>("ft_test_name") == "FULLTEXT KEY ft_test_name (name)"s);
         expect(table_constraint::spatial_key<test_table::id>("sp_test_id") == "SPATIAL KEY sp_test_id (id)"s);
         expect(table_constraint::check("id > 0", "chk_positive_id") == "CONSTRAINT chk_positive_id CHECK (id > 0)"s);
+    };
+
+    "create_table with column_attributes - emits AUTO_INCREMENT, COMMENT, DEFAULT, ON UPDATE"_test = [] {
+        auto const sql = create_table<audit_log>().default_charset(Charset::utf8).build_sql();
+        expect(sql ==
+               "CREATE TABLE audit_log (\n"
+               "    id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n"
+               "    event_type VARCHAR(64) NOT NULL,\n"
+               "    user_id INT UNSIGNED NOT NULL COMMENT 'User who triggered the event',\n"
+               "    description VARCHAR(255) NOT NULL,\n"
+               "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n"
+               "    PRIMARY KEY (id)\n"
+               ") DEFAULT CHARSET=utf8;\n"s)
+            << sql;
     };
 
     "drop_table.then.create_table.as(select) - chains DROP and CREATE AS SELECT"_test = [] {

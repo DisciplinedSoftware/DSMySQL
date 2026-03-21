@@ -1553,9 +1553,42 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
             if constexpr (Is == 0) {
                 if constexpr (table_inline_primary_key<T>::value) {
                     sql += " PRIMARY KEY AUTO_INCREMENT";
-                } else {
-                    sql += " AUTO_INCREMENT";
                 }
+                // When inline PK is disabled, column_attributes should handle AUTO_INCREMENT
+            }
+            // Emit column-level attributes from column_attributes<T, Is>
+            if constexpr (!column_attributes<T, Is>::auto_increment().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::auto_increment();
+            }
+            if constexpr (!column_attributes<T, Is>::unique().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::unique();
+            }
+            if constexpr (!column_attributes<T, Is>::default_value().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::default_value();
+            }
+            if constexpr (!column_attributes<T, Is>::collate().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::collate();
+            }
+            if constexpr (!column_attributes<T, Is>::on_update().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::on_update();
+            }
+            if constexpr (!column_attributes<T, Is>::generated().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::generated();
+            }
+            if constexpr (!column_attributes<T, Is>::comment().empty()) {
+                sql += " ";
+                sql += column_attributes<T, Is>::comment();
+            }
+            auto custom_attrs = column_attributes<T, Is>::custom();
+            if (!custom_attrs.empty()) {
+                sql += " ";
+                sql += custom_attrs;
             }
             ++count;
         }(),
