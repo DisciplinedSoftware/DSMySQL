@@ -1554,41 +1554,35 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
                 if constexpr (table_inline_primary_key<T>::value) {
                     sql += " PRIMARY KEY AUTO_INCREMENT";
                 }
-                // When inline PK is disabled, column_attributes should handle AUTO_INCREMENT
+                // When inline PK is disabled, typed column attributes should handle AUTO_INCREMENT
             }
-            // Emit column-level attributes from column_attributes<T, Is>
-            if constexpr (!column_attributes<T, Is>::auto_increment().empty()) {
+            if constexpr (requires { field_type::ddl_auto_increment; } && field_type::ddl_auto_increment) {
                 sql += " ";
-                sql += column_attributes<T, Is>::auto_increment();
+                sql += "AUTO_INCREMENT";
             }
-            if constexpr (!column_attributes<T, Is>::unique().empty()) {
+            if constexpr (requires { field_type::ddl_unique; } && field_type::ddl_unique) {
                 sql += " ";
-                sql += column_attributes<T, Is>::unique();
+                sql += "UNIQUE";
             }
-            if constexpr (!column_attributes<T, Is>::default_value().empty()) {
+            if constexpr (requires { field_type::ddl_default_current_timestamp; } &&
+                          field_type::ddl_default_current_timestamp) {
                 sql += " ";
-                sql += column_attributes<T, Is>::default_value();
+                sql += "DEFAULT CURRENT_TIMESTAMP";
             }
-            if constexpr (!column_attributes<T, Is>::collate().empty()) {
+            if constexpr (requires { field_type::ddl_collate; } && !field_type::ddl_collate.empty()) {
                 sql += " ";
-                sql += column_attributes<T, Is>::collate();
+                sql += "COLLATE ";
+                sql += field_type::ddl_collate;
             }
-            if constexpr (!column_attributes<T, Is>::on_update().empty()) {
+            if constexpr (requires { field_type::ddl_on_update_current_timestamp; } &&
+                          field_type::ddl_on_update_current_timestamp) {
                 sql += " ";
-                sql += column_attributes<T, Is>::on_update();
+                sql += "ON UPDATE CURRENT_TIMESTAMP";
             }
-            if constexpr (!column_attributes<T, Is>::generated().empty()) {
+            if constexpr (requires { field_type::ddl_comment; } && !field_type::ddl_comment.empty()) {
                 sql += " ";
-                sql += column_attributes<T, Is>::generated();
-            }
-            if constexpr (!column_attributes<T, Is>::comment().empty()) {
-                sql += " ";
-                sql += column_attributes<T, Is>::comment();
-            }
-            auto custom_attrs = column_attributes<T, Is>::custom();
-            if (!custom_attrs.empty()) {
-                sql += " ";
-                sql += custom_attrs;
+                sql += "COMMENT ";
+                sql += quote_sql_string(field_type::ddl_comment);
             }
             ++count;
         }(),

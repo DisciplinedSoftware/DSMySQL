@@ -310,53 +310,6 @@ template <typename T, std::size_t Index>
 constexpr bool has_foreign_key_v = !foreign_key_schema<T, Index>::referenced_table().empty();
 
 // ===================================================================
-// Column Attributes Schema
-//
-// Declare per-column SQL attributes (AUTO_INCREMENT, DEFAULT, UNIQUE, etc.)
-// by specializing column_attributes<T, Index>:
-//
-//   template <>
-//   struct column_attributes<my_table, 0> {
-//       // Column attributes are returned as individual SQL fragments
-//       static constexpr std::string_view auto_increment() { return "AUTO_INCREMENT"; }
-//       static constexpr std::string_view unique() { return ""; }
-//       static constexpr std::string_view default_value() { return ""; }
-//       static constexpr std::string_view comment() { return ""; }
-//   };
-//
-// The primary template returns empty strings for all attributes.
-// ===================================================================
-
-template <typename T, std::size_t Index>
-struct column_attributes {
-    static constexpr std::string_view auto_increment() {
-        return "";
-    }
-    static constexpr std::string_view unique() {
-        return "";
-    }
-    static constexpr std::string_view default_value() {
-        return "";
-    }
-    static constexpr std::string_view comment() {
-        return "";
-    }
-    static constexpr std::string_view collate() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "";
-    }
-    static constexpr std::string_view generated() {
-        return "";
-    }
-    // Additional custom attributes
-    static std::string custom() {
-        return "";
-    }
-};
-
-// ===================================================================
 // ValidTable — concept for a well-formed table struct
 //
 // Satisfied when every tagged_column_field member of T has its tag struct

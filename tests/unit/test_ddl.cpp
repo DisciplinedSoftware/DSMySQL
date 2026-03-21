@@ -79,11 +79,14 @@ struct symbol_with_indexes {
 };
 
 struct audit_log {
-    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(id, uint32_t, column_attr::auto_increment)
     COLUMN_FIELD(event_type, varchar_field<64>)
-    COLUMN_FIELD(user_id, uint32_t)
+    COLUMN_FIELD(user_id, uint32_t, column_attr::comment<"User who triggered the event">)
     COLUMN_FIELD(description, varchar_field<255>)
-    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
+    COLUMN_FIELD(created_at,
+                 std::chrono::system_clock::time_point,
+                 column_attr::default_current_timestamp,
+                 column_attr::on_update_current_timestamp)
 };
 }  // namespace
 
@@ -155,93 +158,6 @@ struct ds_mysql::table_constraints<audit_log> {
         return {
             table_constraint::primary_key<audit_log::id>(),
         };
-    }
-};
-
-// Customize audit_log table to use column attributes
-// Column 0 (id): AUTO_INCREMENT
-// Column 4 (created_at): DEFAULT CURRENT_TIMESTAMP, cannot be updated
-template <>
-struct ds_mysql::column_attributes<audit_log, 0> {
-    static constexpr std::string_view auto_increment() {
-        return "AUTO_INCREMENT";
-    }
-    static constexpr std::string_view unique() {
-        return "";
-    }
-    static constexpr std::string_view default_value() {
-        return "";
-    }
-    static constexpr std::string_view comment() {
-        return "";
-    }
-    static constexpr std::string_view collate() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "";
-    }
-    static constexpr std::string_view generated() {
-        return "";
-    }
-    static std::string custom() {
-        return "";
-    }
-};
-
-template <>
-struct ds_mysql::column_attributes<audit_log, 2> {
-    static constexpr std::string_view auto_increment() {
-        return "";
-    }
-    static constexpr std::string_view unique() {
-        return "";
-    }
-    static constexpr std::string_view default_value() {
-        return "";
-    }
-    static constexpr std::string_view comment() {
-        return "COMMENT 'User who triggered the event'";
-    }
-    static constexpr std::string_view collate() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "";
-    }
-    static constexpr std::string_view generated() {
-        return "";
-    }
-    static std::string custom() {
-        return "";
-    }
-};
-
-template <>
-struct ds_mysql::column_attributes<audit_log, 4> {
-    static constexpr std::string_view auto_increment() {
-        return "";
-    }
-    static constexpr std::string_view unique() {
-        return "";
-    }
-    static constexpr std::string_view default_value() {
-        return "DEFAULT CURRENT_TIMESTAMP";
-    }
-    static constexpr std::string_view comment() {
-        return "";
-    }
-    static constexpr std::string_view collate() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "ON UPDATE CURRENT_TIMESTAMP";
-    }
-    static constexpr std::string_view generated() {
-        return "";
-    }
-    static std::string custom() {
-        return "";
     }
 };
 

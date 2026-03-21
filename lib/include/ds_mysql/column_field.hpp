@@ -20,10 +20,26 @@ namespace ds_mysql {
  */
 struct column_field_tag {};
 
+namespace column_attr {
+
+struct auto_increment {};
+struct unique {};
+struct default_current_timestamp {};
+struct on_update_current_timestamp {};
+
+template <fixed_string Text>
+struct comment {};
+
+template <fixed_string Name>
+struct collate {};
+
+}  // namespace column_attr
+
 // column_field<Name, T> — the only user-facing form.
 // Name is the SQL column name as a string literal; T is the stored value type.
 //   using id = column_field<"id", uint32_t>;
-template <fixed_string Name, typename T>
+// Optional Attrs are typed DDL modifiers (e.g. column_attr::auto_increment).
+template <fixed_string Name, typename T, typename... Attrs>
 struct column_field;
 
 // ===================================================================
@@ -35,6 +51,36 @@ struct column_field;
 // ===================================================================
 
 namespace column_field_detail {
+
+template <typename... Attrs>
+struct comment_attr_value {
+    static constexpr std::string_view value = "";
+};
+
+template <fixed_string Text, typename... Rest>
+struct comment_attr_value<column_attr::comment<Text>, Rest...> {
+    static constexpr std::string_view value = Text;
+};
+
+template <typename First, typename... Rest>
+struct comment_attr_value<First, Rest...> {
+    static constexpr std::string_view value = comment_attr_value<Rest...>::value;
+};
+
+template <typename... Attrs>
+struct collate_attr_value {
+    static constexpr std::string_view value = "";
+};
+
+template <fixed_string Name, typename... Rest>
+struct collate_attr_value<column_attr::collate<Name>, Rest...> {
+    static constexpr std::string_view value = Name;
+};
+
+template <typename First, typename... Rest>
+struct collate_attr_value<First, Rest...> {
+    static constexpr std::string_view value = collate_attr_value<Rest...>::value;
+};
 
 template <typename T>
 struct base : column_field_tag {
@@ -456,11 +502,12 @@ struct base<std::optional<sql_timestamp>> : column_field_tag {
 // ===================================================================
 
 /**
- * column_field<Name, T> — named column descriptor.
+ * column_field<Name, T, Attrs...> — named column descriptor.
  *
  * Name is the SQL column name embedded directly as a string literal.
- * T is the stored value type. All constructors and operators are inherited
- * from the internal base type.
+ * T is the stored value type. Attrs are optional typed DDL modifiers
+ * (column_attr::*). All constructors and operators are inherited from the
+ * internal base type.
  *
  *   using id     = column_field<"id",     uint32_t>;
  *   using ticker = column_field<"ticker", varchar_field<32>>;
@@ -472,10 +519,24 @@ struct base<std::optional<sql_timestamp>> : column_field_tag {
  *
  * SQL column names: "id", "ticker", "sector"
  */
-template <fixed_string Name, typename T>
+template <fixed_string Name, typename T, typename... Attrs>
 struct column_field : column_field_detail::base<T> {
     using column_field_detail::base<T>::base;
     using column_field_detail::base<T>::operator=;
+
+    static constexpr bool ddl_auto_increment = (std::same_as<Attrs, column_attr::auto_increment> || ...);
+    static constexpr bool ddl_unique = (std::same_as<Attrs, column_attr::unique> || ...);
+    static constexpr bool ddl_default_current_timestamp =
+        (std::same_as<Attrs, column_attr::default_current_timestamp> || ...);
+    static constexpr bool ddl_on_update_current_timestamp =
+        (std::same_as<Attrs, column_attr::on_update_current_timestamp> || ...);
+    static constexpr std::string_view ddl_comment = column_field_detail::comment_attr_value<Attrs...>::value;
+    static constexpr std::string_view ddl_collate = column_field_detail::collate_attr_value<Attrs...>::value;
+
+    template <typename Attr>
+    [[nodiscard]] static consteval bool has_attribute() noexcept {
+        return (std::same_as<Attr, Attrs> || ...);
+    }
 
     [[nodiscard]] static constexpr std::string_view column_name() noexcept {
         return Name;
@@ -490,8 +551,9 @@ struct column_field : column_field_detail::base<T> {
  * ColumnFieldType<T> — satisfied by any type that publicly derives from
  * column_field_tag and exposes a value_type alias.
  *
- * Only satisfied by the named form:
+ * Satisfied by named column descriptors (with or without typed attributes):
  *   using id = column_field<"id", uint32_t>;
+ *   using id = column_field<"id", uint32_t, column_attr::auto_increment>;
  */
 template <typename T>
 concept ColumnFieldType = std::derived_from<T, column_field_tag> && requires { typename T::value_type; };
@@ -560,12 +622,12 @@ namespace ds_mysql {
  *
  * Both produce the SQL column name "id" (derived from the tag name).
  */
-template <typename Tag, typename T>
-struct tagged_column_field : column_field<detail::column_name_from_tag<Tag>(), T> {
+template <typename Tag, typename T, typename... Attrs>
+struct tagged_column_field : column_field<detail::column_name_from_tag<Tag>(), T, Attrs...> {
     using tag_type = Tag;
 
 private:
-    using base = column_field<detail::column_name_from_tag<Tag>(), T>;
+    using base = column_field<detail::column_name_from_tag<Tag>(), T, Attrs...>;
 
 public:
     using base::base;
@@ -575,7 +637,8 @@ public:
 }  // namespace ds_mysql
 
 /**
- * COLUMN_FIELD(tag, type) — one-liner macro to declare a tagged column field.
+ * COLUMN_FIELD(tag, type[, attrs...]) — one-liner macro to declare a tagged
+ * column field, optionally with typed DDL attribute tags.
  *
  * Generates a nested tag struct, a type alias, and a member variable:
  *
@@ -584,12 +647,17 @@ public:
  *   struct id_tag {};
  *   using id = ::ds_mysql::tagged_column_field<id_tag, uint32_t>;
  *   id id_;
+
+ *   COLUMN_FIELD(created_at,
+ *                ::ds_mysql::sql_timestamp,
+ *                ::ds_mysql::column_attr::default_current_timestamp,
+ *                ::ds_mysql::column_attr::on_update_current_timestamp)
  *
  * The tag struct is nested inside the enclosing class, guaranteeing
  * per-table type uniqueness and satisfying the compile-time membership
  * check in from<Table>().
  */
-#define COLUMN_FIELD(tag, type)                                   \
-    struct tag##_tag {};                                          \
-    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type>; \
+#define COLUMN_FIELD(tag, type, ...)                                                         \
+    struct tag##_tag {};                                                                     \
+    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type __VA_OPT__(, ) __VA_ARGS__>; \
     tag tag##_;
