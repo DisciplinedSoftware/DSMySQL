@@ -503,29 +503,29 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
 // ===================================================================
 
 suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
-    "order_by_agg<count_all>() — ORDER BY COUNT(*)"_test = [] {
+    "order_by<aggregate<count_all>>() — ORDER BY COUNT(*)"_test = [] {
         auto const sql = select<product::type, count_all>()
                              .from<product>()
                              .group_by<product::type>()
-                             .order_by_agg<count_all>()
+                             .order_by<aggregate<count_all>>()
                              .build_sql();
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY COUNT(*) ASC"s) << sql;
     };
 
-    "order_by_agg<count_all, desc>() — ORDER BY COUNT(*) DESC"_test = [] {
+    "order_by<aggregate<count_all, desc>>() — ORDER BY COUNT(*) DESC"_test = [] {
         auto const sql = select<product::type, count_all>()
                              .from<product>()
                              .group_by<product::type>()
-                             .order_by_agg<count_all, sort_order::desc>()
+                             .order_by<aggregate<count_all, sort_order::desc>>()
                              .build_sql();
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY COUNT(*) DESC"s) << sql;
     };
 
-    "order_by_agg<sum<Col>>() — ORDER BY SUM(col)"_test = [] {
+    "order_by<aggregate<sum<Col>>>() — ORDER BY SUM(col)"_test = [] {
         auto const sql = select<product::type, sum<product::price_val>>()
                              .from<product>()
                              .group_by<product::type>()
-                             .order_by_agg<sum<product::price_val>, sort_order::desc>()
+                             .order_by<aggregate<sum<product::price_val>, sort_order::desc>>()
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) FROM product GROUP BY type ORDER BY SUM(price_val) DESC"s) << sql;
     };
@@ -630,9 +630,9 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
         expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY 1 ASC, 2 DESC"s) << sql;
     };
 
-    // order_by_agg<rand_val> (random ordering)
-    "order_by_agg<rand_val> — ORDER BY RAND()"_test = [] {
-        auto const sql = select<product::id>().from<product>().order_by_agg<rand_val>().build_sql();
+    // order_by<aggregate<rand_val>> (random ordering)
+    "order_by<aggregate<rand_val>>() — ORDER BY RAND()"_test = [] {
+        auto const sql = select<product::id>().from<product>().order_by<aggregate<rand_val>>().build_sql();
         expect(sql == "SELECT id FROM product ORDER BY RAND() ASC"s) << sql;
     };
 
