@@ -15,3 +15,4 @@
 #include "ds_mysql/mysql_database.hpp"
 #include "ds_mysql/mysql_metadata.hpp"
 #include "ds_mysql/sql_extension.hpp"
+#include "ds_mysql/version.hpp"
