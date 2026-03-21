@@ -30,30 +30,41 @@ struct table_with_macro {
 struct table_with_explicit_tags {
     struct id_tag {};
     struct price_tag {};
-    using id    = tagged_column_field<id_tag, uint32_t>;
+    using id = tagged_column_field<id_tag, uint32_t>;
     using price = tagged_column_field<price_tag, double>;
-    id    id_;
+    id id_;
     price price_;
 };
 
 // 3. Untagged columns — fixed_string NTTP style (no tags to check)
 struct table_with_nttp_columns {
-    using id    = column_field<"id",    uint32_t>;
+    using id = column_field<"id", uint32_t>;
     using price = column_field<"price", double>;
-    id    id_;
+    id id_;
     price price_;
 };
 
-// 4. Empty struct
-struct empty_table {};
+// 4. Empty table with explicit opt-in marker
+struct empty_table {
+    using ds_mysql_table_tag = table_schema;
+};
 
-// 5. Second table that also has an "id" column (cross-table isolation)
+// 5. Empty struct without marker is not a table
+struct plain_empty_struct {};
+
+// 6. Second table that also has an "id" column (cross-table isolation)
 struct other_table {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(value, double)
 };
 
 // ── Structures that should NOT satisfy ValidTable ──────────────────
+
+// Plain non-column fields (int, double) are not table columns
+struct plain_fields_struct {
+    int i;
+    double d;
+};
 
 // Tag defined outside the owning table (at anonymous-namespace scope)
 struct outer_tag {};
@@ -76,16 +87,16 @@ struct table_with_borrowed_tag {
 // column_belongs_to_table_v must therefore be false for both directions
 // to prevent cross-table column misuse from silently compiling.
 struct nttp_table_a {
-    using id    = column_field<"id",    uint32_t>;
+    using id = column_field<"id", uint32_t>;
     using price = column_field<"price", double>;
-    id    id_;
+    id id_;
     price price_;
 };
 
 struct nttp_table_b {
-    using id    = column_field<"id",    uint32_t>;
+    using id = column_field<"id", uint32_t>;
     using value = column_field<"value", double>;
-    id    id_;
+    id id_;
     value value_;
 };
 
@@ -118,6 +129,8 @@ static_assert(ValidTable<table_with_explicit_tags>);
 static_assert(ValidTable<table_with_nttp_columns>);
 static_assert(ValidTable<empty_table>);
 static_assert(ValidTable<other_table>);
+static_assert(!ValidTable<plain_empty_struct>);
+static_assert(!ValidTable<plain_fields_struct>);
 
 // Negative: column field types are not tables
 static_assert(!ValidTable<column_field<"id", uint32_t>>);
@@ -138,12 +151,15 @@ static_assert(!std::is_same_v<table_with_macro::id, other_table::id>);
 
 // Tagged columns belong only to their own table.
 static_assert(ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, table_with_macro>, "id in macro table");
-static_assert(ds_mysql::detail::column_belongs_to_table_v<table_with_macro::price, table_with_macro>, "price in macro table");
+static_assert(ds_mysql::detail::column_belongs_to_table_v<table_with_macro::price, table_with_macro>,
+              "price in macro table");
 static_assert(ds_mysql::detail::column_belongs_to_table_v<other_table::id, other_table>, "id in other_table");
 
 // Tagged columns do NOT belong to a different table.
-static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, other_table>, "macro id not in other_table");
-static_assert(!ds_mysql::detail::column_belongs_to_table_v<other_table::id, table_with_macro>, "other id not in macro table");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_with_macro::id, other_table>,
+              "macro id not in other_table");
+static_assert(!ds_mysql::detail::column_belongs_to_table_v<other_table::id, table_with_macro>,
+              "other id not in macro table");
 
 // NTTP column_field has no tag → cannot verify ownership → always false.
 // This prevents cross-table misuse from silently compiling.
@@ -208,13 +224,13 @@ suite<"tag_is_nested_in_table"> tag_nested_suite = [] {
     };
 
     "all COLUMN_FIELD tags are nested in their table"_test = [] {
-        expect(tag_is_nested_in_table<table_with_macro::id_tag,       table_with_macro>());
-        expect(tag_is_nested_in_table<table_with_macro::quantity_tag,  table_with_macro>());
-        expect(tag_is_nested_in_table<table_with_macro::price_tag,     table_with_macro>());
+        expect(tag_is_nested_in_table<table_with_macro::id_tag, table_with_macro>());
+        expect(tag_is_nested_in_table<table_with_macro::quantity_tag, table_with_macro>());
+        expect(tag_is_nested_in_table<table_with_macro::price_tag, table_with_macro>());
     };
 
     "explicit nested tags are recognised"_test = [] {
-        expect(tag_is_nested_in_table<table_with_explicit_tags::id_tag,    table_with_explicit_tags>());
+        expect(tag_is_nested_in_table<table_with_explicit_tags::id_tag, table_with_explicit_tags>());
         expect(tag_is_nested_in_table<table_with_explicit_tags::price_tag, table_with_explicit_tags>());
     };
 
@@ -225,7 +241,7 @@ suite<"tag_is_nested_in_table"> tag_nested_suite = [] {
 
     "tag nested in wrong table returns false"_test = [] {
         expect(!tag_is_nested_in_table<table_with_macro::id_tag, other_table>());
-        expect(!tag_is_nested_in_table<other_table::id_tag,      table_with_macro>());
+        expect(!tag_is_nested_in_table<other_table::id_tag, table_with_macro>());
     };
 };
 
@@ -238,8 +254,7 @@ suite<"raw_type_name"> raw_type_name_suite = [] {
         auto const name = ds_mysql::detail::raw_type_name<table_with_macro::id_tag>();
         expect(name.find("table_with_macro") != std::string_view::npos)
             << "expected parent class in raw name, got: " << name;
-        expect(name.find("id_tag") != std::string_view::npos)
-            << "expected tag name in raw name, got: " << name;
+        expect(name.find("id_tag") != std::string_view::npos) << "expected tag name in raw name, got: " << name;
     };
 
     "raw_type_name of outer tag does not include table name"_test = [] {
@@ -253,8 +268,7 @@ suite<"raw_type_name"> raw_type_name_suite = [] {
     "raw_type_name distinguishes same-named tags in different tables"_test = [] {
         auto const name_a = ds_mysql::detail::raw_type_name<table_with_macro::id_tag>();
         auto const name_b = ds_mysql::detail::raw_type_name<other_table::id_tag>();
-        expect(name_a != name_b)
-            << "same-named tags in different tables must have different raw names";
+        expect(name_a != name_b) << "same-named tags in different tables must have different raw names";
     };
 };
 
@@ -350,18 +364,16 @@ suite<"ValidTable entry points"> entry_points_suite = [] {
 
     "insert_into compiles for valid table"_test = [] {
         table_with_macro row;
-        row.id_       = 1u;
+        row.id_ = 1u;
         row.quantity_ = 10u;
-        row.price_    = 9.99;
+        row.price_ = 9.99;
         auto const sql = insert_into<table_with_macro>().values(row).build_sql();
         expect(sql.find("INSERT INTO") != std::string::npos);
         expect(sql.find("table_with_macro") != std::string::npos);
     };
 
     "select from valid table compiles"_test = [] {
-        auto const sql = select<table_with_macro::id>()
-            .from<table_with_macro>()
-            .build_sql();
+        auto const sql = select<table_with_macro::id>().from<table_with_macro>().build_sql();
         expect(sql.find("SELECT") != std::string::npos);
         expect(sql.find("id") != std::string::npos);
     };

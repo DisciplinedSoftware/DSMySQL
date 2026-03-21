@@ -106,6 +106,8 @@ template <Database T>
  */
 template <Database T>
 [[nodiscard]] ddl_detail::use_builder<T> use() {
+    using _ = typename database_tables<T>::type;
+    (void)sizeof(_);
     return ddl_detail::use_builder<T>{};
 }
 

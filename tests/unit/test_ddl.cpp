@@ -18,7 +18,7 @@ using namespace std::string_literals;
 
 namespace {
 struct test_table {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, varchar_field<255>)
 };
 
@@ -27,9 +27,9 @@ struct new_table {
 };
 
 struct numeric_format_table {
-    COLUMN_FIELD(id,     uint32_t)
-    COLUMN_FIELD(price,  float)
-    COLUMN_FIELD(ratio,  double)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(price, float)
+    COLUMN_FIELD(ratio, double)
     COLUMN_FIELD(amount, std::optional<double>)
 };
 
@@ -37,6 +37,18 @@ struct test_db : ds_mysql::database_schema {
     struct symbol {
         COLUMN_FIELD(id, uint32_t)
     };
+};
+
+struct schema_bootstrap_db : ds_mysql::database_schema {
+    struct account {
+        COLUMN_FIELD(id, uint32_t)
+    };
+
+    struct trade {
+        COLUMN_FIELD(id, uint32_t)
+    };
+
+    using tables = std::tuple<account, trade>;
 };
 
 struct custom_named_db : ds_mysql::database_schema {};
@@ -48,7 +60,7 @@ struct renamed_table {
 };
 
 struct temporal_table {
-    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
     COLUMN_FIELD(updated_at, sql_timestamp)
 };
@@ -357,7 +369,7 @@ suite<"DDL"> ddl_suite = [] {
 
 namespace {
 struct child_table {
-    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(parent_id, uint32_t)
 };
 
@@ -384,7 +396,7 @@ struct ds_mysql::foreign_key_schema<child_table, 1> {
 };
 
 struct child_table_cascade {
-    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(parent_id, uint32_t)
 };
 
@@ -482,6 +494,41 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS test_db;\n"
                "CREATE TABLE IF NOT EXISTS symbol (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_database.then.create_all_tables - chains CREATE DATABASE and CREATE TABLE for all DB tables"_test = [] {
+        auto const sql = create_database<schema_bootstrap_db>()
+                             .if_not_exists()
+                             .then()
+                             .create_all_tables<schema_bootstrap_db>()
+                             .build_sql();
+        expect(sql ==
+               "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
+               "CREATE TABLE account (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE TABLE trade (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_database.then.create_all_tables.if_not_exists - emits IF NOT EXISTS for each table"_test = [] {
+        auto const sql = create_database<schema_bootstrap_db>()
+                             .if_not_exists()
+                             .then()
+                             .create_all_tables<schema_bootstrap_db>()
+                             .if_not_exists()
+                             .build_sql();
+        expect(sql ==
+               "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
+               "CREATE TABLE IF NOT EXISTS account (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE TABLE IF NOT EXISTS trade (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
                ");\n"s)
             << sql;
@@ -616,11 +663,11 @@ static_assert(!Database<test_table>, "plain table must NOT satisfy Database conc
 
 namespace {
 struct text_table {
-    COLUMN_FIELD(id,          uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(description, text_field<>)
-    COLUMN_FIELD(notes,       mediumtext_field)
-    COLUMN_FIELD(body,        longtext_field)
-    COLUMN_FIELD(opt_notes,   std::optional<text_field<>>)
+    COLUMN_FIELD(notes, mediumtext_field)
+    COLUMN_FIELD(body, longtext_field)
+    COLUMN_FIELD(opt_notes, std::optional<text_field<>>)
 };
 }  // namespace
 

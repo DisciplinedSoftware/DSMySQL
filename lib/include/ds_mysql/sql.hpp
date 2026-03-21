@@ -780,6 +780,34 @@ concept BuildsSql = requires(T const& t) {
     { t.build_sql() } -> std::convertible_to<std::string>;
 };
 
+template <typename Table>
+void append_create_table_sql(std::string& sql, bool if_not_exists) {
+    const auto table_name = table_name_for<Table>::value().to_string_view();
+    const auto column_defs = make_column_defs<Table>();
+    sql += "CREATE TABLE ";
+    if (if_not_exists) {
+        sql += "IF NOT EXISTS ";
+    }
+    sql += table_name;
+    sql += " (\n";
+    sql += column_defs;
+    sql += "\n);\n";
+}
+
+template <Database DB, bool IfNotExists, std::size_t... Is>
+std::string build_create_all_tables_sql_impl(std::string prior_sql, std::index_sequence<Is...>) {
+    using tables_tuple = typename database_tables<DB>::type;
+    (append_create_table_sql<std::tuple_element_t<Is, tables_tuple>>(prior_sql, IfNotExists), ...);
+    return prior_sql;
+}
+
+template <Database DB, bool IfNotExists>
+std::string build_create_all_tables_sql(std::string prior_sql) {
+    using tables_tuple = typename database_tables<DB>::type;
+    return build_create_all_tables_sql_impl<DB, IfNotExists>(
+        std::move(prior_sql), std::make_index_sequence<std::tuple_size_v<tables_tuple>>{});
+}
+
 // Forward declarations
 class ddl_continuation;
 template <typename T>
@@ -806,6 +834,10 @@ class create_database_named_builder;
 class create_database_named_if_not_exists_builder;
 class drop_database_named_builder;
 class drop_database_named_if_exists_builder;
+template <Database DB>
+class create_all_tables_builder;
+template <Database DB>
+class create_all_tables_cond_builder;
 template <typename T>
 class use_builder;  // defined in sql_extension.hpp
 
@@ -851,6 +883,9 @@ public:
 
     template <typename From, typename To>
     [[nodiscard]] auto rename_table() const;
+
+    template <Database DB>
+    [[nodiscard]] create_all_tables_builder<DB> create_all_tables() const;
 
 private:
     std::string sql_;
@@ -1441,6 +1476,56 @@ private:
 };
 
 // ---------------------------------------------------------------
+// create_all_tables_cond_builder — after create_all_tables<DB>().if_not_exists()
+// ---------------------------------------------------------------
+template <Database DB>
+class create_all_tables_cond_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_all_tables_cond_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return build_create_all_tables_sql<DB, true>(prior_sql_);
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
+// create_all_tables_builder — emits CREATE TABLE for every table in DB
+// ---------------------------------------------------------------
+template <Database DB>
+class create_all_tables_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit create_all_tables_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] create_all_tables_cond_builder<DB> if_not_exists() const {
+        return create_all_tables_cond_builder<DB>{prior_sql_};
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return build_create_all_tables_sql<DB, false>(prior_sql_);
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// ---------------------------------------------------------------
 // drop_database_if_exists_builder — after drop_database<DB>().if_exists()
 // ---------------------------------------------------------------
 template <typename T>
@@ -1610,6 +1695,11 @@ auto ddl_continuation::rename_table() const {
     return rename_table_builder<From, To>{sql_};
 }
 
+template <Database DB>
+create_all_tables_builder<DB> ddl_continuation::create_all_tables() const {
+    return create_all_tables_builder<DB>{sql_};
+}
+
 // ---------------------------------------------------------------
 // create_table_as_builder — after create_table<T>().as(query) or
 //                           create_table<T>().if_not_exists().as(query)
@@ -1655,70 +1745,6 @@ template <BuildsSql SelectQuery>
 }
 
 }  // namespace ddl_detail
-
-// ===================================================================
-// tag_is_nested_in_table — compile-time ownership check for tagged fields
-//
-// Verifies that a tag struct was defined as a nested class of Table by
-// comparing the unqualified parent scope of the tag's fully-qualified name
-// with the unqualified name of Table.
-//
-//   struct my_table {
-//       struct id_tag {};   // nested → raw name "my_table::id_tag"
-//       ...
-//   };
-//   tag_is_nested_in_table<my_table::id_tag, my_table>()  →  true
-//   tag_is_nested_in_table<global_id_tag,    my_table>()  →  false
-// ===================================================================
-
-template <typename Tag, typename Table>
-consteval bool tag_is_nested_in_table() noexcept {
-    constexpr std::string_view full = detail::raw_type_name<Tag>();
-    constexpr auto last_scope = full.rfind("::");
-    if constexpr (last_scope == std::string_view::npos)
-        return false;  // no scope → defined at global/namespace level, not in a class
-    return detail::strip_type_qualifiers(full.substr(0, last_scope)) == detail::extract_type_name<Table>();
-}
-
-// Helper: returns true for projections that are not tagged_column_field, or
-// whose tag is nested inside Table. Used in the ValidTable concept.
-template <typename Proj, typename Table>
-consteval bool tag_nested_or_untagged() noexcept {
-    if constexpr (requires { typename Proj::tag_type; })
-        return tag_is_nested_in_table<typename Proj::tag_type, Table>();
-    else
-        return true;
-}
-
-// ===================================================================
-// ValidTable — concept for a well-formed table struct
-//
-// Satisfied when every tagged_column_field member of T has its tag struct
-// defined as a nested class of T (not at global/namespace scope).
-//
-// Use COLUMN_FIELD inside your struct to satisfy this automatically:
-//
-//   struct my_table {          // ✓ — COLUMN_FIELD generates nested tags
-//       COLUMN_FIELD(id,    uint32_t)
-//       COLUMN_FIELD(price, double)
-//   };
-//
-// Applied to every table entry point (create_table, insert_into, etc.)
-// so misuse is caught as early as possible.
-// ===================================================================
-
-template <typename T>
-consteval bool all_table_tags_nested() noexcept {
-    if constexpr (!std::is_aggregate_v<T>)
-        return false;
-    else
-        return []<std::size_t... Is>(std::index_sequence<Is...>) {
-            return (tag_nested_or_untagged<boost::pfr::tuple_element_t<Is, T>, T>() && ...);
-        }(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
-}
-
-template <typename T>
-concept ValidTable = !ColumnFieldType<T> && all_table_tags_nested<T>();
 
 template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_table() {
@@ -1786,6 +1812,8 @@ template <ValidTable Table>
  */
 template <Database T>
 [[nodiscard]] ddl_detail::create_database_builder<T> create_database() {
+    using _ = typename database_tables<T>::type;
+    (void)sizeof(_);
     return ddl_detail::create_database_builder<T>{};
 }
 
@@ -1800,6 +1828,8 @@ template <Database T>
  */
 template <Database T>
 [[nodiscard]] ddl_detail::drop_database_builder<T> drop_database() {
+    using _ = typename database_tables<T>::type;
+    (void)sizeof(_);
     return ddl_detail::drop_database_builder<T>{};
 }
 

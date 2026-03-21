@@ -21,10 +21,10 @@
 // ===================================================================
 
 struct user {
-    COLUMN_FIELD(id,         uint32_t)
-    COLUMN_FIELD(username,   ds_mysql::varchar_field<64>)
-    COLUMN_FIELD(email,      ds_mysql::varchar_field<255>)
-    COLUMN_FIELD(is_active,  bool)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(username, ds_mysql::varchar_field<64>)
+    COLUMN_FIELD(email, ds_mysql::varchar_field<255>)
+    COLUMN_FIELD(is_active, bool)
     COLUMN_FIELD(created_at, ds_mysql::sql_datetime)
 };
 
@@ -38,9 +38,9 @@ struct order_row {
     id id_;
 
     COLUMN_FIELD(user_id, uint32_t)
-    COLUMN_FIELD(amount,  double)
-    COLUMN_FIELD(fee,     std::optional<double>)
-    COLUMN_FIELD(status,  ds_mysql::varchar_field<32>)
+    COLUMN_FIELD(amount, double)
+    COLUMN_FIELD(fee, std::optional<double>)
+    COLUMN_FIELD(status, ds_mysql::varchar_field<32>)
 
     struct order_created_at_tag {};
     using created_at = ds_mysql::tagged_column_field<order_created_at_tag, ds_mysql::sql_datetime>;
@@ -50,15 +50,23 @@ struct order_row {
 // Override 'amount' (index 2) to use DECIMAL(18,6) instead of DOUBLE
 template <>
 struct ds_mysql::field_schema<order_row, 2> {
-    static constexpr std::string_view name() { return order_row::amount::column_name(); }
-    static std::string sql_type() { return ds_mysql::sql_type_format::decimal_type(18, 6); }
+    static constexpr std::string_view name() {
+        return order_row::amount::column_name();
+    }
+    static std::string sql_type() {
+        return ds_mysql::sql_type_format::decimal_type(18, 6);
+    }
 };
 
 // Override 'fee' (index 3) to use DECIMAL(18,6)
 template <>
 struct ds_mysql::field_schema<order_row, 3> {
-    static constexpr std::string_view name() { return order_row::fee::column_name(); }
-    static std::string sql_type() { return ds_mysql::sql_type_format::decimal_type(18, 6); }
+    static constexpr std::string_view name() {
+        return order_row::fee::column_name();
+    }
+    static std::string sql_type() {
+        return ds_mysql::sql_type_format::decimal_type(18, 6);
+    }
 };
 
 // ===================================================================
@@ -71,7 +79,9 @@ struct example_db : ds_mysql::database_schema {
 
 template <>
 struct ds_mysql::database_name_for<example_db> {
-    static constexpr std::string_view value() noexcept { return "example_db"; }
+    static /*constexpr*/ std::string_view value() noexcept {
+        return "specialized_db_name";
+    }
 };
 
 // ===================================================================
@@ -80,6 +90,9 @@ struct ds_mysql::database_name_for<example_db> {
 
 int main() {
     std::println("=== Generated CREATE TABLE SQL ===\n");
+
+    std::println("-- database:");
+    std::println("{}\n", ds_mysql::create_database<example_db>().if_not_exists().build_sql());
 
     // Generate CREATE TABLE SQL for each table
     std::println("-- user table:");
@@ -99,4 +112,3 @@ int main() {
     std::println("Schema generation complete — no database connection required!");
     return 0;
 }
-

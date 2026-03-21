@@ -8,6 +8,14 @@ namespace ds_mysql {
 // Enables the Database concept and constrains create_database<T>() and use<T>().
 struct database_schema {};
 
+// Marker token type — use as a nested alias to explicitly identify an empty
+// aggregate type as a table:
+//
+//   struct audit_log {
+//       using ds_mysql_table_tag = ds_mysql::table_schema;
+//   };
+struct table_schema {};
+
 // Strong type for SQL table identifiers.
 class table_name {
     std::string_view value_;

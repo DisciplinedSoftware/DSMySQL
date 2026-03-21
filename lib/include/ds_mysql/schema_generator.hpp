@@ -310,6 +310,60 @@ template <typename T, std::size_t Index>
 constexpr bool has_foreign_key_v = !foreign_key_schema<T, Index>::referenced_table().empty();
 
 // ===================================================================
+// ValidTable — concept for a well-formed table struct
+//
+// Satisfied when every tagged_column_field member of T has its tag struct
+// defined as a nested class of T (not at global/namespace scope).
+//
+// Empty tables are allowed only if they explicitly declare:
+//
+//   using ds_mysql_table_tag = ds_mysql::table_schema;
+//
+// Use COLUMN_FIELD inside your struct to satisfy this automatically:
+//
+//   struct my_table {          // ✓ — COLUMN_FIELD generates nested tags
+//       COLUMN_FIELD(id,    uint32_t)
+//       COLUMN_FIELD(price, double)
+//   };
+// ===================================================================
+
+template <typename Tag, typename Table>
+consteval bool tag_is_nested_in_table() noexcept {
+    constexpr std::string_view full = detail::raw_type_name<Tag>();
+    constexpr auto last_scope = full.rfind("::");
+    if constexpr (last_scope == std::string_view::npos)
+        return false;
+    return detail::strip_type_qualifiers(full.substr(0, last_scope)) == detail::extract_type_name<Table>();
+}
+
+template <typename Proj, typename Table>
+consteval bool tag_nested_or_untagged() noexcept {
+    if constexpr (requires { typename Proj::tag_type; })
+        return tag_is_nested_in_table<typename Proj::tag_type, Table>();
+    else
+        return ColumnFieldType<Proj>;  // NTTP column_field<> passes; plain int/double/etc. does not
+}
+
+template <typename T>
+concept EmptyTableOptIn =
+    requires { typename T::ds_mysql_table_tag; } && std::same_as<typename T::ds_mysql_table_tag, table_schema>;
+
+template <typename T>
+consteval bool all_table_tags_nested() noexcept {
+    if constexpr (!std::is_aggregate_v<T>)
+        return false;
+    else if constexpr (boost::pfr::tuple_size_v<T> == 0)
+        return EmptyTableOptIn<T>;
+    else
+        return []<std::size_t... Is>(std::index_sequence<Is...>) {
+            return (tag_nested_or_untagged<boost::pfr::tuple_element_t<Is, T>, T>() && ...);
+        }(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
+}
+
+template <typename T>
+concept ValidTable = !ColumnFieldType<T> && all_table_tags_nested<T>();
+
+// ===================================================================
 // database_tables<DB> — register the table types for a database.
 //
 // Enables validate_database<DB>() on mysql_database.
@@ -336,6 +390,12 @@ namespace detail {
 template <typename DB>
 concept HasTablesAlias = requires { typename DB::tables; };
 
+template <typename Tuple>
+struct all_valid_tables_in_tuple;
+
+template <typename... Ts>
+struct all_valid_tables_in_tuple<std::tuple<Ts...>> : std::bool_constant<(ValidTable<Ts> && ...)> {};
+
 }  // namespace detail
 
 template <Database DB>
@@ -346,6 +406,10 @@ struct database_tables {
 template <Database DB>
     requires detail::HasTablesAlias<DB>
 struct database_tables<DB> {
+    static_assert(detail::all_valid_tables_in_tuple<typename DB::tables>::value,
+                  "database_schema::tables must be a std::tuple of ValidTable types. "
+                  "Each table must either be a non-empty valid table struct or "
+                  "an empty aggregate with 'using ds_mysql_table_tag = ds_mysql::table_schema;'.");
     using type = typename DB::tables;
 };
 
