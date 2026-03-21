@@ -164,7 +164,8 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -174,7 +175,8 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -184,7 +186,8 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -214,7 +217,8 @@ suite<"DDL"> ddl_suite = [] {
                "DROP TABLE IF EXISTS test_table;\n"
                "CREATE TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -225,7 +229,8 @@ suite<"DDL"> ddl_suite = [] {
                "DROP TABLE test_table;\n"
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -239,7 +244,8 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "CREATE TEMPORARY TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -249,7 +255,8 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "CREATE TEMPORARY TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -283,7 +290,8 @@ suite<"DDL"> ddl_suite = [] {
                "DROP TEMPORARY TABLE IF EXISTS test_table;\n"
                "CREATE TEMPORARY TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -294,7 +302,8 @@ suite<"DDL"> ddl_suite = [] {
                "DROP TEMPORARY TABLE test_table;\n"
                "CREATE TEMPORARY TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
@@ -343,10 +352,10 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table.as(select).with_where(is_not_null) - generates CREATE TABLE AS SELECT WHERE"_test = [] {
-        auto const sql = create_table<new_table>()
-                             .as(select<test_table::id, test_table::name>().from<test_table>().where(
-                                 is_not_null<test_table::tag>()))
-                             .build_sql();
+        auto const sql =
+            create_table<new_table>()
+                .as(select<test_table::id, test_table::name>().from<test_table>().where(is_not_null<test_table::tag>()))
+                .build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE tag IS NOT NULL;\n"s) << sql;
     };
 
@@ -445,7 +454,8 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
-               "    name VARCHAR(255) NOT NULL\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };

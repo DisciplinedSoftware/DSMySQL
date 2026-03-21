@@ -7,6 +7,7 @@
 #include <concepts>
 #include <cstddef>
 #include <format>
+#include <functional>
 #include <iomanip>
 #include <map>
 #include <optional>
@@ -915,7 +916,9 @@ public:
 
     template <BuildsSql SelectQuery>
     [[nodiscard]] create_view_as_builder<T> as(SelectQuery const& query) const {
-        return create_view_as_builder<T>{prior_sql_, or_replace_, query.build_sql()};
+        return create_view_as_builder<T>{prior_sql_, or_replace_, [query]() -> std::string {
+                                             return query.build_sql();
+                                         }};
     }
 
 private:
@@ -928,8 +931,8 @@ class create_view_as_builder {
 public:
     using ddl_tag_type = void;
 
-    create_view_as_builder(std::string prior, bool or_replace, std::string select_sql)
-        : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_(std::move(select_sql)) {
+    create_view_as_builder(std::string prior, bool or_replace, std::function<std::string()> select_sql_builder)
+        : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_builder_(std::move(select_sql_builder)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -938,8 +941,9 @@ public:
 
     [[nodiscard]] std::string build_sql() const {
         const auto view_name = table_name_for<T>::value().to_string_view();
+        auto select_sql = select_sql_builder_();
         std::string s;
-        s.reserve(prior_sql_.size() + 20 + view_name.size() + select_sql_.size());
+        s.reserve(prior_sql_.size() + 20 + view_name.size() + select_sql.size());
         s += prior_sql_;
         s += "CREATE ";
         if (or_replace_) {
@@ -948,7 +952,7 @@ public:
         s += "VIEW ";
         s += view_name;
         s += " AS ";
-        s += select_sql_;
+        s += select_sql;
         s += ";\n";
         return s;
     }
@@ -956,7 +960,7 @@ public:
 private:
     std::string prior_sql_;
     bool or_replace_;
-    std::string select_sql_;
+    std::function<std::string()> select_sql_builder_;
 };
 
 template <typename T>
@@ -1227,7 +1231,11 @@ public:
 
     template <BuildsSql SelectQuery>
     [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const {
-        return create_table_as_builder<T>{build_create_prefix(), query.build_sql(), false};
+        return create_table_as_builder<T>{build_create_prefix(),
+                                          [query]() -> std::string {
+                                              return query.build_sql();
+                                          },
+                                          false};
     }
 
     template <typename SourceT>
@@ -1715,8 +1723,11 @@ class create_table_as_builder {
 public:
     using ddl_tag_type = void;
 
-    create_table_as_builder(std::string create_prefix, std::string select_sql, bool if_not_exists)
-        : create_prefix_(std::move(create_prefix)), select_sql_(std::move(select_sql)), if_not_exists_(if_not_exists) {
+    create_table_as_builder(std::string create_prefix, std::function<std::string()> select_sql_builder,
+                            bool if_not_exists)
+        : create_prefix_(std::move(create_prefix)),
+          select_sql_builder_(std::move(select_sql_builder)),
+          if_not_exists_(if_not_exists) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -1725,21 +1736,22 @@ public:
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        auto select_sql = select_sql_builder_();
         std::string_view cond = if_not_exists_ ? std::string_view{"IF NOT EXISTS "} : std::string_view{};
         std::string s;
-        s.reserve(create_prefix_.size() + cond.size() + table_name.size() + 5 + select_sql_.size() + 2);
+        s.reserve(create_prefix_.size() + cond.size() + table_name.size() + 5 + select_sql.size() + 2);
         s += create_prefix_;
         s += cond;
         s += table_name;
         s += " AS ";
-        s += select_sql_;
+        s += select_sql;
         s += ";\n";
         return s;
     }
 
 private:
     std::string create_prefix_;
-    std::string select_sql_;
+    std::function<std::string()> select_sql_builder_;
     bool if_not_exists_;
 };
 
@@ -1747,7 +1759,11 @@ private:
 template <typename T>
 template <BuildsSql SelectQuery>
 [[nodiscard]] create_table_as_builder<T> create_table_cond_builder<T>::as(SelectQuery const& query) const {
-    return create_table_as_builder<T>{create_prefix_, query.build_sql(), true};
+    return create_table_as_builder<T>{create_prefix_,
+                                      [query]() -> std::string {
+                                          return query.build_sql();
+                                      },
+                                      true};
 }
 
 }  // namespace ddl_detail
@@ -1954,80 +1970,92 @@ public:
 // insert_into_values_builder / insert_into_builder
 // ---------------------------------------------------------------
 template <typename T>
+class insert_into_values_builder;
+
+template <typename T>
+class insert_into_builder;
+
+template <typename... Cols>
+[[nodiscard]] std::string build_assignment_sql_from_tuple(std::tuple<Cols...> const& assignments);
+
+template <typename T, typename... Cols>
 class insert_into_upsert_builder {
 public:
-    insert_into_upsert_builder(std::string insert_sql, std::string update_clause)
-        : insert_sql_(std::move(insert_sql)), update_clause_(std::move(update_clause)) {
+    insert_into_upsert_builder(insert_into_values_builder<T> values_builder, std::tuple<Cols...> assignments)
+        : values_builder_(std::move(values_builder)), assignments_(std::move(assignments)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
+        auto insert_sql = values_builder_.build_sql();
+        auto update_clause = build_assignment_sql_from_tuple(assignments_);
         std::string sql;
-        sql.reserve(insert_sql_.size() + 26 + update_clause_.size());
-        sql += insert_sql_;
+        sql.reserve(insert_sql.size() + 26 + update_clause.size());
+        sql += insert_sql;
         sql += " ON DUPLICATE KEY UPDATE ";
-        sql += update_clause_;
+        sql += update_clause;
         return sql;
     }
 
 private:
-    std::string insert_sql_;
-    std::string update_clause_;
+    insert_into_values_builder<T> values_builder_;
+    std::tuple<Cols...> assignments_;
 };
 
 template <typename T>
 class insert_into_values_builder {
 public:
-    insert_into_values_builder(std::string column_list, std::string values, bool bulk = false)
-        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    explicit insert_into_values_builder(T row) : rows_{std::move(row)}, bulk_(false) {
+    }
+
+    insert_into_values_builder(std::vector<T> rows, bool bulk) : rows_(std::move(rows)), bulk_(bulk) {
     }
 
     // on_duplicate_key_update(col1, col2, ...) — appends ON DUPLICATE KEY UPDATE clause.
     // Each argument must be a FieldOf<T> column_field instance carrying the new value.
     template <FieldOf<T>... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] insert_into_upsert_builder<T> on_duplicate_key_update(Cols const&... assignments) const {
-        std::ostringstream ss;
-        bool first = true;
-        (
-            [&](auto const& field) {
-                if (!first) {
-                    ss << ", ";
-                }
-                using C = std::decay_t<decltype(field)>;
-                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
-                first = false;
-            }(assignments),
-            ...);
-        return insert_into_upsert_builder<T>{build_sql(), ss.str()};
+    [[nodiscard]] insert_into_upsert_builder<T, Cols...> on_duplicate_key_update(Cols const&... assignments) const {
+        return insert_into_upsert_builder<T, Cols...>{*this, std::tuple<Cols...>{assignments...}};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto& column_list = dml_detail::generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            s.reserve(12 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            std::ostringstream values_sql;
+            bool first = true;
+            for (auto const& row : rows_) {
+                if (!first) {
+                    values_sql << ", ";
+                }
+                values_sql << "(" << dml_detail::generate_values(row) << ")";
+                first = false;
+            }
+            auto values = values_sql.str();
+            s.reserve(12 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "INSERT INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES ";
-            s += values_;
+            s += values;
         } else {
-            s.reserve(12 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            auto values = rows_.empty() ? std::string{} : dml_detail::generate_values(rows_.front());
+            s.reserve(12 + table_name.size() + 2 + column_list.size() + 10 + values.size() + 1);
             s += "INSERT INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES (";
-            s += values_;
+            s += values;
             s += ')';
         }
         return s;
     }
 
 private:
-    std::string column_list_;
-    std::string values_;
+    std::vector<T> rows_;
     bool bulk_ = false;
 };
 
@@ -2035,25 +2063,20 @@ template <typename T>
 class insert_into_builder {
 public:
     [[nodiscard]] insert_into_values_builder<T> values(T const& row) const {
-        return {dml_detail::generate_column_list<T>(), dml_detail::generate_values(row)};
+        return insert_into_values_builder<T>{row};
     }
 
     template <std::ranges::input_range Rows>
         requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
     [[nodiscard]] insert_into_values_builder<T> values(Rows&& rows) const {
-        std::ostringstream values_sql;
-        bool first = true;
+        std::vector<T> collected_rows;
         for (auto const& row : rows) {
-            if (!first) {
-                values_sql << ", ";
-            }
-            values_sql << "(" << dml_detail::generate_values(row) << ")";
-            first = false;
+            collected_rows.push_back(row);
         }
-        if (first) {
-            return {dml_detail::generate_column_list<T>(), {}};
+        if (collected_rows.empty()) {
+            return {std::vector<T>{}, false};
         }
-        return {dml_detail::generate_column_list<T>(), values_sql.str(), /*bulk=*/true};
+        return {std::move(collected_rows), /*bulk=*/true};
     }
 };
 
@@ -2061,54 +2084,85 @@ public:
 // update builders
 // ---------------------------------------------------------------
 
-template <typename T>
+template <typename Col>
+void append_assignment_sql(std::ostringstream& ss, bool& first, Col const& field) {
+    if (!first) {
+        ss << ", ";
+    }
+    using C = std::decay_t<Col>;
+    ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
+    first = false;
+}
+
+template <typename... Cols>
+[[nodiscard]] std::string build_assignment_sql(Cols const&... assignments) {
+    std::ostringstream ss;
+    bool first = true;
+    (append_assignment_sql(ss, first, assignments), ...);
+    return ss.str();
+}
+
+template <typename Tuple, std::size_t... Is>
+[[nodiscard]] std::string build_assignment_sql_from_tuple_impl(Tuple const& assignments, std::index_sequence<Is...>) {
+    return build_assignment_sql(std::get<Is>(assignments)...);
+}
+
+template <typename... Cols>
+[[nodiscard]] std::string build_assignment_sql_from_tuple(std::tuple<Cols...> const& assignments) {
+    return build_assignment_sql_from_tuple_impl(assignments, std::index_sequence_for<Cols...>{});
+}
+
+template <typename T, typename... Cols>
 class update_set_where_builder {
 public:
-    update_set_where_builder(std::string set, where_condition where) : set_(std::move(set)), where_(std::move(where)) {
+    update_set_where_builder(std::tuple<Cols...> assignments, where_condition where)
+        : assignments_(std::move(assignments)), where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        auto set_sql = build_assignment_sql_from_tuple(assignments_);
         auto where_sql = where_.build_sql();
         std::string s;
-        s.reserve(7 + table_name.size() + 5 + set_.size() + 7 + where_sql.size());
+        s.reserve(7 + table_name.size() + 5 + set_sql.size() + 7 + where_sql.size());
         s += "UPDATE ";
         s += table_name;
         s += " SET ";
-        s += set_;
+        s += set_sql;
         s += " WHERE ";
         s += std::move(where_sql);
         return s;
     }
 
 private:
-    std::string set_;
+    std::tuple<Cols...> assignments_;
     where_condition where_;
 };
 
-template <typename T>
+template <typename T, typename... Cols>
 class update_set_builder {
 public:
-    explicit update_set_builder(std::string set) : set_(std::move(set)) {
+    explicit update_set_builder(std::tuple<Cols...> assignments) : assignments_(std::move(assignments)) {
     }
 
-    [[nodiscard]] update_set_where_builder<T> where(where_condition condition) const {
-        return {set_, std::move(condition)};
+    [[nodiscard]] update_set_where_builder<T, Cols...> where(where_condition condition) const {
+        return {assignments_, std::move(condition)};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        auto set_sql = build_assignment_sql_from_tuple(assignments_);
         std::string s;
-        s.reserve(7 + table_name.size() + 5 + set_.size());
+        s.reserve(7 + table_name.size() + 5 + set_sql.size());
         s += "UPDATE ";
         s += table_name;
         s += " SET ";
-        s += set_;
+        s += set_sql;
         return s;
     }
 
 private:
-    std::string set_;
+    std::tuple<Cols...> assignments_;
 };
 
 template <typename T>
@@ -2116,20 +2170,8 @@ class update_builder {
 public:
     template <FieldOf<T>... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] update_set_builder<T> set(Cols const&... assignments) const {
-        std::ostringstream ss;
-        bool first = true;
-        (
-            [&](auto const& field) {
-                if (!first) {
-                    ss << ", ";
-                }
-                using C = std::decay_t<decltype(field)>;
-                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
-                first = false;
-            }(assignments),
-            ...);
-        return update_set_builder<T>{ss.str()};
+    [[nodiscard]] update_set_builder<T, Cols...> set(Cols const&... assignments) const {
+        return update_set_builder<T, Cols...>{std::tuple<Cols...>{assignments...}};
     }
 };
 
@@ -2139,22 +2181,22 @@ public:
 template <typename T>
 class delete_from_where_builder {
 public:
-    delete_from_where_builder(std::string base_sql, where_condition where)
-        : base_sql_(std::move(base_sql)), where_(std::move(where)) {
+    explicit delete_from_where_builder(where_condition where) : where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
         auto where_sql = where_.build_sql();
         std::string s;
-        s.reserve(base_sql_.size() + 7 + where_sql.size());
-        s += base_sql_;
+        s.reserve(12 + table_name.size() + 7 + where_sql.size());
+        s += "DELETE FROM ";
+        s += table_name;
         s += " WHERE ";
         s += std::move(where_sql);
         return s;
     }
 
 private:
-    std::string base_sql_;
     where_condition where_;
 };
 
@@ -2162,7 +2204,7 @@ template <typename T>
 class delete_from_builder {
 public:
     [[nodiscard]] delete_from_where_builder<T> where(where_condition condition) const {
-        return {build_sql(), std::move(condition)};
+        return delete_from_where_builder<T>{std::move(condition)};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -4043,7 +4085,9 @@ struct select_query_builder {
             }(projection_traits<Projs>::sql_expr()),
             ...);
 
-        if (!from_subquery_.empty()) {
+        if (from_subquery_builder_) {
+            sql << " FROM " << from_subquery_builder_();
+        } else if (!from_subquery_.empty()) {
             sql << " FROM " << from_subquery_;
         } else {
             if constexpr (!std::is_same_v<Table, subquery_source>) {
@@ -4150,6 +4194,7 @@ struct select_query_builder {
     std::string joins_;
     std::map<std::size_t, std::string> aliases_;
     std::string from_subquery_;
+    std::function<std::string()> from_subquery_builder_;
 };
 
 // ===================================================================
@@ -4178,7 +4223,9 @@ public:
     template <AnySelectQuery Query>
     [[nodiscard]] select_query_builder<subquery_source, Projs...> from(Query const& subquery, std::string alias) const {
         select_query_builder<subquery_source, Projs...> builder;
-        builder.from_subquery_ = "(" + subquery.build_sql() + ") AS " + std::move(alias);
+        builder.from_subquery_builder_ = [subquery, alias = std::move(alias)]() {
+            return "(" + subquery.build_sql() + ") AS " + alias;
+        };
         return builder;
     }
 };
@@ -4312,13 +4359,17 @@ class cte_builder {
 public:
     template <AnySelectQuery Q>
     cte_builder(std::string name, Q const& query) {
-        ctes_.emplace_back(std::move(name), query.build_sql());
+        ctes_.emplace_back(std::move(name), [query]() {
+            return query.build_sql();
+        });
     }
 
     template <AnySelectQuery Q>
     [[nodiscard]] cte_builder with_cte(std::string name, Q const& query) const {
         auto copy = *this;
-        copy.ctes_.emplace_back(std::move(name), query.build_sql());
+        copy.ctes_.emplace_back(std::move(name), [query]() {
+            return query.build_sql();
+        });
         return copy;
     }
 
@@ -4337,11 +4388,11 @@ public:
         std::ostringstream with_sql;
         with_sql << "WITH ";
         bool first = true;
-        for (auto const& [name, sql] : ctes_) {
+        for (auto const& [name, sql_builder] : ctes_) {
             if (!first) {
                 with_sql << ", ";
             }
-            with_sql << name << " AS (" << sql << ")";
+            with_sql << name << " AS (" << sql_builder() << ")";
             first = false;
         }
         // We need to return a query that prepends the WITH clause.
@@ -4359,11 +4410,11 @@ public:
         std::ostringstream ss;
         ss << (recursive_ ? "WITH RECURSIVE " : "WITH ");
         bool first = true;
-        for (auto const& [name, sql] : ctes_) {
+        for (auto const& [name, sql_builder] : ctes_) {
             if (!first) {
                 ss << ", ";
             }
-            ss << name << " AS (" << sql << ")";
+            ss << name << " AS (" << sql_builder() << ")";
             first = false;
         }
         ss << " ";
@@ -4377,7 +4428,7 @@ public:
     }
 
 private:
-    std::vector<std::pair<std::string, std::string>> ctes_;
+    std::vector<std::pair<std::string, std::function<std::string()>>> ctes_;
     bool recursive_ = false;
 };
 
@@ -4424,37 +4475,50 @@ namespace dml_detail {
 template <typename T>
 class insert_ignore_values_builder {
 public:
-    insert_ignore_values_builder(std::string column_list, std::string values, bool bulk = false)
-        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    explicit insert_ignore_values_builder(T row) : rows_{std::move(row)}, bulk_(false) {
+    }
+
+    insert_ignore_values_builder(std::vector<T> rows, bool bulk) : rows_(std::move(rows)), bulk_(bulk) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto& column_list = generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            s.reserve(19 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            std::ostringstream values_sql;
+            bool first = true;
+            for (auto const& row : rows_) {
+                if (!first) {
+                    values_sql << ", ";
+                }
+                values_sql << "(" << generate_values(row) << ")";
+                first = false;
+            }
+            auto values = values_sql.str();
+            s.reserve(19 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "INSERT IGNORE INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES ";
-            s += values_;
+            s += values;
         } else {
-            s.reserve(19 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            auto values = rows_.empty() ? std::string{} : generate_values(rows_.front());
+            s.reserve(19 + table_name.size() + 2 + column_list.size() + 10 + values.size() + 1);
             s += "INSERT IGNORE INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES (";
-            s += values_;
+            s += values;
             s += ')';
         }
         return s;
     }
 
 private:
-    std::string column_list_;
-    std::string values_;
+    std::vector<T> rows_;
     bool bulk_ = false;
 };
 
@@ -4462,53 +4526,49 @@ template <typename T>
 class insert_ignore_into_builder {
 public:
     [[nodiscard]] insert_ignore_values_builder<T> values(T const& row) const {
-        return {generate_column_list<T>(), generate_values(row)};
+        return insert_ignore_values_builder<T>{row};
     }
 
     template <std::ranges::input_range Rows>
         requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
     [[nodiscard]] insert_ignore_values_builder<T> values(Rows&& rows) const {
-        std::ostringstream values_sql;
-        bool first = true;
+        std::vector<T> collected_rows;
         for (auto const& row : rows) {
-            if (!first) {
-                values_sql << ", ";
-            }
-            values_sql << "(" << generate_values(row) << ")";
-            first = false;
+            collected_rows.push_back(row);
         }
-        if (first) {
-            return {generate_column_list<T>(), {}};
+        if (collected_rows.empty()) {
+            return {std::vector<T>{}, false};
         }
-        return {generate_column_list<T>(), values_sql.str(), true};
+        return {std::move(collected_rows), true};
     }
 };
 
 // ---------------------------------------------------------------
 // insert_into_select_builder — INSERT INTO T (...) SELECT ...
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, AnySelectQuery Query>
 class insert_into_select_builder {
 public:
-    explicit insert_into_select_builder(std::string select_sql) : select_sql_(std::move(select_sql)) {
+    explicit insert_into_select_builder(Query query) : query_(std::move(query)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
         const auto columns = generate_column_list<T>();
+        auto select_sql = query_.build_sql();
         std::string s;
-        s.reserve(12 + table_name.size() + 2 + columns.size() + 2 + select_sql_.size());
+        s.reserve(12 + table_name.size() + 2 + columns.size() + 2 + select_sql.size());
         s += "INSERT INTO ";
         s += table_name;
         s += " (";
         s += columns;
         s += ") ";
-        s += select_sql_;
+        s += select_sql;
         return s;
     }
 
 private:
-    std::string select_sql_;
+    Query query_;
 };
 
 // ---------------------------------------------------------------
@@ -4517,37 +4577,50 @@ private:
 template <typename T>
 class replace_into_values_builder {
 public:
-    replace_into_values_builder(std::string column_list, std::string values, bool bulk = false)
-        : column_list_(std::move(column_list)), values_(std::move(values)), bulk_(bulk) {
+    explicit replace_into_values_builder(T row) : rows_{std::move(row)}, bulk_(false) {
+    }
+
+    replace_into_values_builder(std::vector<T> rows, bool bulk) : rows_(std::move(rows)), bulk_(bulk) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto& column_list = generate_column_list<T>();
         std::string s;
         if (bulk_) {
-            s.reserve(13 + table_name.size() + 2 + column_list_.size() + 9 + values_.size());
+            std::ostringstream values_sql;
+            bool first = true;
+            for (auto const& row : rows_) {
+                if (!first) {
+                    values_sql << ", ";
+                }
+                values_sql << "(" << generate_values(row) << ")";
+                first = false;
+            }
+            auto values = values_sql.str();
+            s.reserve(13 + table_name.size() + 2 + column_list.size() + 9 + values.size());
             s += "REPLACE INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES ";
-            s += values_;
+            s += values;
         } else {
-            s.reserve(13 + table_name.size() + 2 + column_list_.size() + 10 + values_.size() + 1);
+            auto values = rows_.empty() ? std::string{} : generate_values(rows_.front());
+            s.reserve(13 + table_name.size() + 2 + column_list.size() + 10 + values.size() + 1);
             s += "REPLACE INTO ";
             s += table_name;
             s += " (";
-            s += column_list_;
+            s += column_list;
             s += ") VALUES (";
-            s += values_;
+            s += values;
             s += ')';
         }
         return s;
     }
 
 private:
-    std::string column_list_;
-    std::string values_;
+    std::vector<T> rows_;
     bool bulk_ = false;
 };
 
@@ -4555,78 +4628,90 @@ template <typename T>
 class replace_into_builder {
 public:
     [[nodiscard]] replace_into_values_builder<T> values(T const& row) const {
-        return {generate_column_list<T>(), generate_values(row)};
+        return replace_into_values_builder<T>{row};
     }
 
     template <std::ranges::input_range Rows>
         requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
     [[nodiscard]] replace_into_values_builder<T> values(Rows&& rows) const {
-        std::ostringstream values_sql;
-        bool first = true;
+        std::vector<T> collected_rows;
         for (auto const& row : rows) {
-            if (!first) {
-                values_sql << ", ";
-            }
-            values_sql << "(" << generate_values(row) << ")";
-            first = false;
+            collected_rows.push_back(row);
         }
-        if (first) {
-            return {generate_column_list<T>(), {}};
+        if (collected_rows.empty()) {
+            return {std::vector<T>{}, false};
         }
-        return {generate_column_list<T>(), values_sql.str(), true};
+        return {std::move(collected_rows), true};
     }
 };
 
 // ---------------------------------------------------------------
 // update_join_builder — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, typename... Cols>
 class update_join_set_where_builder {
 public:
-    update_join_set_where_builder(std::string prefix, std::string set, where_condition where)
-        : prefix_(std::move(prefix)), set_(std::move(set)), where_(std::move(where)) {
+    update_join_set_where_builder(std::string join_clause, std::tuple<Cols...> assignments, where_condition where)
+        : join_clause_(std::move(join_clause)), assignments_(std::move(assignments)), where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        auto set_sql = std::apply(
+            [](auto const&... fields) {
+                return build_assignment_sql(fields...);
+            },
+            assignments_);
         auto where_sql = where_.build_sql();
         std::string s;
-        s.reserve(prefix_.size() + 5 + set_.size() + 7 + where_sql.size());
-        s += prefix_;
+        s.reserve(7 + table_name.size() + join_clause_.size() + 5 + set_sql.size() + 7 + where_sql.size());
+        s += "UPDATE ";
+        s += table_name;
+        s += join_clause_;
         s += " SET ";
-        s += set_;
+        s += set_sql;
         s += " WHERE ";
         s += std::move(where_sql);
         return s;
     }
 
 private:
-    std::string prefix_;
-    std::string set_;
+    std::string join_clause_;
+    std::tuple<Cols...> assignments_;
     where_condition where_;
 };
 
-template <typename T>
+template <typename T, typename... Cols>
 class update_join_set_builder {
 public:
-    update_join_set_builder(std::string prefix, std::string set) : prefix_(std::move(prefix)), set_(std::move(set)) {
+    update_join_set_builder(std::string join_clause, std::tuple<Cols...> assignments)
+        : join_clause_(std::move(join_clause)), assignments_(std::move(assignments)) {
     }
 
-    [[nodiscard]] update_join_set_where_builder<T> where(where_condition condition) const {
-        return {prefix_, set_, std::move(condition)};
+    [[nodiscard]] update_join_set_where_builder<T, Cols...> where(where_condition condition) const {
+        return {join_clause_, assignments_, std::move(condition)};
     }
 
     [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        auto set_sql = std::apply(
+            [](auto const&... fields) {
+                return build_assignment_sql(fields...);
+            },
+            assignments_);
         std::string s;
-        s.reserve(prefix_.size() + 5 + set_.size());
-        s += prefix_;
+        s.reserve(7 + table_name.size() + join_clause_.size() + 5 + set_sql.size());
+        s += "UPDATE ";
+        s += table_name;
+        s += join_clause_;
         s += " SET ";
-        s += set_;
+        s += set_sql;
         return s;
     }
 
 private:
-    std::string prefix_;
-    std::string set_;
+    std::string join_clause_;
+    std::tuple<Cols...> assignments_;
 };
 
 template <typename T1, typename T2>
@@ -4637,27 +4722,8 @@ public:
 
     template <FieldOf<T1>... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] update_join_set_builder<T1> set(Cols... assignments) const {
-        const auto t1_name = table_name_for<T1>::value().to_string_view();
-        std::string prefix;
-        prefix.reserve(7 + t1_name.size() + join_clause_.size());
-        prefix += "UPDATE ";
-        prefix += t1_name;
-        prefix += join_clause_;
-
-        std::ostringstream ss;
-        bool first = true;
-        (
-            [&](auto const& field) {
-                if (!first) {
-                    ss << ", ";
-                }
-                using C = std::decay_t<decltype(field)>;
-                ss << column_traits<C>::column_name() << " = " << sql_detail::to_sql_value(field.value);
-                first = false;
-            }(assignments),
-            ...);
-        return update_join_set_builder<T1>{std::move(prefix), ss.str()};
+    [[nodiscard]] update_join_set_builder<T1, Cols...> set(Cols... assignments) const {
+        return update_join_set_builder<T1, Cols...>{join_clause_, std::tuple<Cols...>{assignments...}};
     }
 
 private:
@@ -4674,8 +4740,8 @@ template <ValidTable T>
 
 // insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
 template <ValidTable T, AnySelectQuery Query>
-[[nodiscard]] dml_detail::insert_into_select_builder<T> insert_into_select(Query const& query) {
-    return dml_detail::insert_into_select_builder<T>{query.build_sql()};
+[[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(Query&& query) {
+    return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
 }
 
 // replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
