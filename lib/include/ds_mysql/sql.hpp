@@ -765,6 +765,148 @@ template <ColumnFieldType Col>
 inline constexpr col_expr<Col> col_ref{};
 
 // ===================================================================
+// CREATE TABLE constraint customization
+//
+// table_inline_primary_key<T>
+//   - true  (default): first column is emitted as `PRIMARY KEY AUTO_INCREMENT`
+//   - false          : first column is emitted as `AUTO_INCREMENT` only,
+//                      allowing table_constraints<T> to define table-level PK
+//
+// table_constraints<T>
+//   - return additional table-level constraints/index definitions appended
+//     inside CREATE TABLE (...)
+// ===================================================================
+
+template <typename T>
+struct table_inline_primary_key {
+    static constexpr bool value = true;
+};
+
+template <typename T>
+struct table_constraints {
+    static std::vector<std::string> get() {
+        return {};
+    }
+};
+
+namespace table_constraint {
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string columns_sql() {
+    std::string s;
+    s += '(';
+    bool first = true;
+    (((s += (first ? "" : ", "), s += column_traits<Cols>::column_name(), first = false)), ...);
+    s += ')';
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string primary_key(std::string_view constraint_name = {}) {
+    std::string s;
+    if (!constraint_name.empty()) {
+        s += "CONSTRAINT ";
+        s += constraint_name;
+        s += ' ';
+    }
+    s += "PRIMARY KEY ";
+    s += columns_sql<Cols...>();
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string key(std::string_view index_name) {
+    std::string s;
+    s += "KEY ";
+    s += index_name;
+    s += ' ';
+    s += columns_sql<Cols...>();
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string unique_key(std::string_view index_name) {
+    std::string s;
+    s += "UNIQUE KEY ";
+    s += index_name;
+    s += ' ';
+    s += columns_sql<Cols...>();
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string fulltext_key(std::string_view index_name) {
+    std::string s;
+    s += "FULLTEXT KEY ";
+    s += index_name;
+    s += ' ';
+    s += columns_sql<Cols...>();
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string spatial_key(std::string_view index_name) {
+    std::string s;
+    s += "SPATIAL KEY ";
+    s += index_name;
+    s += ' ';
+    s += columns_sql<Cols...>();
+    return s;
+}
+
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string foreign_key(std::string_view constraint_name, std::string_view referenced_table,
+                                             std::string_view referenced_columns,
+                                             std::string_view on_delete_action = {},
+                                             std::string_view on_update_action = {}) {
+    std::string s;
+    s += "CONSTRAINT ";
+    s += constraint_name;
+    s += " FOREIGN KEY ";
+    s += columns_sql<Cols...>();
+    s += " REFERENCES ";
+    s += referenced_table;
+    s += '(';
+    s += referenced_columns;
+    s += ')';
+    if (!on_delete_action.empty()) {
+        s += " ON DELETE ";
+        s += on_delete_action;
+    }
+    if (!on_update_action.empty()) {
+        s += " ON UPDATE ";
+        s += on_update_action;
+    }
+    return s;
+}
+
+[[nodiscard]] inline std::string check(std::string_view expression, std::string_view constraint_name = {}) {
+    std::string s;
+    if (!constraint_name.empty()) {
+        s += "CONSTRAINT ";
+        s += constraint_name;
+        s += ' ';
+    }
+    s += "CHECK (";
+    s += expression;
+    s += ')';
+    return s;
+}
+
+[[nodiscard]] inline std::string raw(std::string sql_fragment) {
+    return sql_fragment;
+}
+
+}  // namespace table_constraint
+
+// ===================================================================
 // DDL Command Builders — CREATE TABLE, DROP TABLE, CREATE DATABASE, etc.
 //
 // Entry points are free functions:
@@ -1409,7 +1551,11 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
                 sql += " NOT NULL";
             }
             if constexpr (Is == 0) {
-                sql += " PRIMARY KEY AUTO_INCREMENT";
+                if constexpr (table_inline_primary_key<T>::value) {
+                    sql += " PRIMARY KEY AUTO_INCREMENT";
+                } else {
+                    sql += " AUTO_INCREMENT";
+                }
             }
             ++count;
         }(),
@@ -1437,6 +1583,14 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
             }
         }(),
         ...);
+
+    // Emit additional table-level constraints and index definitions.
+    for (auto const& constraint_sql : table_constraints<T>::get()) {
+        if (!constraint_sql.empty()) {
+            sql += ",\n    ";
+            sql += constraint_sql;
+        }
+    }
 }
 
 template <typename T>

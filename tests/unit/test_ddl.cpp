@@ -65,6 +65,18 @@ struct temporal_table {
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
     COLUMN_FIELD(updated_at, sql_timestamp)
 };
+
+struct symbol_with_indexes {
+    COLUMN_FIELD(id, int32_t)
+    COLUMN_FIELD(exchange_id, std::optional<int32_t>)
+    COLUMN_FIELD(ticker, varchar_field<32>)
+    COLUMN_FIELD(instrument, varchar_field<64>)
+    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(sector, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(created_date, std::chrono::system_clock::time_point)
+    COLUMN_FIELD(last_updated_date, std::chrono::system_clock::time_point)
+};
 }  // namespace
 
 template <>
@@ -104,6 +116,21 @@ template <>
 struct ds_mysql::database_name_for<custom_named_db> {
     static constexpr std::string_view value() noexcept {
         return "my_custom_db";
+    }
+};
+
+template <>
+struct ds_mysql::table_inline_primary_key<symbol_with_indexes> {
+    static constexpr bool value = false;
+};
+
+template <>
+struct ds_mysql::table_constraints<symbol_with_indexes> {
+    static std::vector<std::string> get() {
+        return {
+            table_constraint::primary_key<symbol_with_indexes::id>(),
+            table_constraint::key<symbol_with_indexes::exchange_id>("index_exchange_id"),
+        };
     }
 };
 
@@ -386,6 +413,36 @@ suite<"DDL"> ddl_suite = [] {
                "    tag VARCHAR(64)\n"
                ") ENGINE=MyCustomEngine DEFAULT CHARSET=koi8r ROW_FORMAT=DYNAMIC COLLATE=koi8r_general_ci;\n"s)
             << sql;
+    };
+
+    "create_table with table_constraints trait - emits table-level PRIMARY KEY and KEY"_test = [] {
+        auto const sql = create_table<symbol_with_indexes>()
+                             .engine(Engine::InnoDB)
+                             .auto_increment(1)
+                             .default_charset(Charset::utf8)
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE symbol_with_indexes (\n"
+               "    id INT NOT NULL AUTO_INCREMENT,\n"
+               "    exchange_id INT,\n"
+               "    ticker VARCHAR(32) NOT NULL,\n"
+               "    instrument VARCHAR(64) NOT NULL,\n"
+               "    name VARCHAR(255),\n"
+               "    sector VARCHAR(255),\n"
+               "    currency VARCHAR(32),\n"
+               "    created_date DATETIME NOT NULL,\n"
+               "    last_updated_date DATETIME NOT NULL,\n"
+               "    PRIMARY KEY (id),\n"
+               "    KEY index_exchange_id (exchange_id)\n"
+               ") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;\n"s)
+            << sql;
+    };
+
+    "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL/CHECK"_test = [] {
+        expect(table_constraint::unique_key<test_table::name>("uq_test_name") == "UNIQUE KEY uq_test_name (name)"s);
+        expect(table_constraint::fulltext_key<test_table::name>("ft_test_name") == "FULLTEXT KEY ft_test_name (name)"s);
+        expect(table_constraint::spatial_key<test_table::id>("sp_test_id") == "SPATIAL KEY sp_test_id (id)"s);
+        expect(table_constraint::check("id > 0", "chk_positive_id") == "CONSTRAINT chk_positive_id CHECK (id > 0)"s);
     };
 
     "drop_table.then.create_table.as(select) - chains DROP and CREATE AS SELECT"_test = [] {
