@@ -67,6 +67,52 @@ template <typename T>
 inline constexpr bool is_grouping_set_v = is_grouping_set<T>::value;
 
 // ===================================================================
+// GROUP BY modifier wrappers
+//
+// Pass a single wrapper as the template argument to group_by<> to
+// select the grouping modifier — exactly like nulls_last/nulls_first
+// work with order_by<>.
+//
+//   group_by<rollup<Col1, Col2>>()             — GROUP BY col1, col2 WITH ROLLUP
+//   group_by<cube<Col1, Col2>>()               — GROUP BY CUBE(col1, col2)
+//   group_by<grouping_sets<Set1, Set2, ...>>() — GROUP BY GROUPING SETS(...)
+// ===================================================================
+
+template <typename... Cols>
+    requires((ColumnDescriptor<Cols> && ...) && sizeof...(Cols) > 0)
+struct rollup {};
+
+template <typename... Cols>
+    requires((ColumnDescriptor<Cols> && ...) && sizeof...(Cols) > 0)
+struct cube {};
+
+template <typename... Sets>
+    requires((is_grouping_set_v<Sets> && ...) && sizeof...(Sets) > 0)
+struct grouping_sets {};
+
+// joined<Table> — suppresses column-membership check in from<>
+//
+//   select<...>().from<joined<Table>>()  is equivalent to the former
+//   select<...>().from_joined<Table>()   (which is now removed).
+template <typename Table>
+struct joined {
+    using table_type = Table;
+};
+
+template <typename T>
+struct is_joined : std::false_type {};
+template <typename T>
+struct is_joined<joined<T>> : std::true_type {};
+template <typename T>
+inline constexpr bool is_joined_v = is_joined<T>::value;
+
+// subquery_source — phantom Table type for derived-table builders.
+// Used as the Table template argument of select_query_builder when the
+// source is a subquery rather than a real table.  The name is never
+// emitted; build_sql() uses the pre-built from_subquery_ string instead.
+struct subquery_source {};
+
+// ===================================================================
 // Shared SQL detail helpers
 // ===================================================================
 
@@ -2208,6 +2254,9 @@ struct count_distinct {};
 template <ColumnDescriptor Col>
 struct group_concat {};
 
+// rand_val — RAND() for ORDER BY RAND() via order_by_agg<rand_val>()
+struct rand_val {};
+
 // ===================================================================
 // aliased_projection — wraps any Projection with a SQL alias
 //
@@ -2449,6 +2498,35 @@ private:
 
 enum class sort_order { asc, desc };
 
+// nulls_last<Col> / nulls_first<Col> — NULL-placement modifiers for order_by
+//
+// MySQL has no NULLS LAST / NULLS FIRST syntax. These wrappers are accepted
+// by order_by<> and expand to the standard two-term workaround:
+//
+//   order_by<nulls_last<Col>>()              — (col IS NULL) ASC, col ASC
+//   order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
+//   order_by<nulls_first<Col>>()             — (col IS NULL) DESC, col ASC
+//
+// NullsWrapper<T> — satisfied by nulls_last<Col> and nulls_first<Col>.
+
+template <ColumnDescriptor Col>
+struct nulls_last {
+    using col_type = Col;
+    static constexpr bool puts_nulls_last = true;
+};
+
+template <ColumnDescriptor Col>
+struct nulls_first {
+    using col_type = Col;
+    static constexpr bool puts_nulls_last = false;
+};
+
+template <typename T>
+concept NullsWrapper = requires {
+    typename T::col_type;
+    { T::puts_nulls_last } -> std::convertible_to<bool>;
+} && ColumnDescriptor<typename T::col_type>;
+
 // ===================================================================
 // Window function projections
 //
@@ -2563,6 +2641,14 @@ struct projection_traits<group_concat<Col>> {
     using value_type = std::string;
     static std::string sql_expr() {
         return "GROUP_CONCAT(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <>
+struct projection_traits<rand_val> {
+    using value_type = double;
+    static constexpr std::string_view sql_expr() {
+        return "RAND()";
     }
 };
 
@@ -3226,6 +3312,22 @@ enum class group_by_mode {
     grouping_sets,
 };
 
+// Free helpers used by both group_by_spec_traits and select_query_builder.
+template <ColumnDescriptor... Cols>
+[[nodiscard]] std::string build_group_by_cols_string() {
+    std::ostringstream ss;
+    bool first = true;
+    (
+        [&](std::string_view name) {
+            if (!first)
+                ss << ", ";
+            ss << name;
+            first = false;
+        }(column_traits<Cols>::column_name()),
+        ...);
+    return ss.str();
+}
+
 template <typename Set>
 struct grouping_set_sql;
 
@@ -3246,6 +3348,42 @@ struct grouping_set_sql<grouping_set<>> {
     [[nodiscard]] static std::string value() {
         return "()";
     }
+};
+
+// group_by_spec_traits — associates each GROUP BY wrapper type with the
+// information needed by group_by() to set group_by_, group_by_mode_ and
+// with_rollup_ on the builder.
+template <typename T>
+struct group_by_spec_traits;  // undefined → not a GroupBySpec
+
+template <typename... Cols>
+struct group_by_spec_traits<rollup<Cols...>> {
+    static std::string cols_string() {
+        return build_group_by_cols_string<Cols...>();
+    }
+    static constexpr group_by_mode mode = group_by_mode::standard;
+    static constexpr bool with_rollup = true;
+};
+
+template <typename... Cols>
+struct group_by_spec_traits<cube<Cols...>> {
+    static std::string cols_string() {
+        return build_group_by_cols_string<Cols...>();
+    }
+    static constexpr group_by_mode mode = group_by_mode::cube;
+    static constexpr bool with_rollup = false;
+};
+
+template <typename... Sets>
+struct group_by_spec_traits<grouping_sets<Sets...>> {
+    static std::string cols_string() {
+        std::ostringstream ss;
+        bool first = true;
+        ((ss << (first ? "" : ", ") << grouping_set_sql<Sets>::value(), first = false), ...);
+        return ss.str();
+    }
+    static constexpr group_by_mode mode = group_by_mode::grouping_sets;
+    static constexpr bool with_rollup = false;
 };
 
 // ===================================================================
@@ -3368,6 +3506,23 @@ consteval std::size_t proj_index_in_pack() {
 
 }  // namespace sql_detail
 
+// GroupBySpec — satisfied by rollup<>, cube<>, grouping_sets<>.
+template <typename T>
+concept GroupBySpec = requires {
+    { detail::group_by_spec_traits<T>::cols_string() } -> std::convertible_to<std::string>;
+};
+
+// alias_order_entry — deferred alias lookup for order_by_alias<Proj>()
+// Resolved at build_sql() time: emits the alias name if set, otherwise
+// falls back to the projection's sql_expr().
+struct alias_order_entry {
+    std::size_t proj_index;
+    std::string fallback_expr;  // sql_expr() of the projection
+    sort_order dir;
+};
+
+using order_by_item = std::variant<std::string, alias_order_entry>;
+
 // ===================================================================
 // select_query_builder — unified builder for all SELECT clauses
 // ===================================================================
@@ -3400,78 +3555,43 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
+    // group_by<Col1, Col2, ...>()          — GROUP BY col1, col2, ...
+    // group_by<rollup<Col1, Col2>>()        — GROUP BY col1, col2 WITH ROLLUP
+    // group_by<cube<Col1, Col2>>()          — GROUP BY CUBE(col1, col2)
+    // group_by<grouping_sets<Set1, Set2>>() — GROUP BY GROUPING SETS(...)
+    template <typename... Specs>
+        requires(sizeof...(Specs) > 0 &&
+                 ((sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) ||
+                  (ColumnDescriptor<Specs> && ...)))
     [[nodiscard]] select_query_builder group_by() const& {
         auto copy = *this;
-        copy.group_by_ = build_group_by_string<GroupCols...>();
-        copy.group_by_mode_ = group_by_mode::standard;
-        copy.with_rollup_ = false;
+        if constexpr (sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) {
+            using Spec = std::tuple_element_t<0, std::tuple<Specs...>>;
+            copy.group_by_ = detail::group_by_spec_traits<Spec>::cols_string();
+            copy.group_by_mode_ = detail::group_by_spec_traits<Spec>::mode;
+            copy.with_rollup_ = detail::group_by_spec_traits<Spec>::with_rollup;
+        } else {
+            copy.group_by_ = detail::build_group_by_cols_string<Specs...>();
+            copy.group_by_mode_ = detail::group_by_mode::standard;
+            copy.with_rollup_ = false;
+        }
         return copy;
     }
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
+    template <typename... Specs>
+        requires(sizeof...(Specs) > 0 &&
+                 ((sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) ||
+                  (ColumnDescriptor<Specs> && ...)))
     [[nodiscard]] select_query_builder group_by() && {
-        group_by_ = build_group_by_string<GroupCols...>();
-        group_by_mode_ = group_by_mode::standard;
-        with_rollup_ = false;
-        return std::move(*this);
-    }
-
-    // group_by_rollup<Col1, Col2, ...>() — GROUP BY col1, col2, ... WITH ROLLUP
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
-    [[nodiscard]] select_query_builder group_by_rollup() const& {
-        auto copy = *this;
-        copy.group_by_ = build_group_by_string<GroupCols...>();
-        copy.with_rollup_ = true;
-        copy.group_by_mode_ = group_by_mode::standard;
-        return copy;
-    }
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
-    [[nodiscard]] select_query_builder group_by_rollup() && {
-        group_by_ = build_group_by_string<GroupCols...>();
-        with_rollup_ = true;
-        group_by_mode_ = group_by_mode::standard;
-        return std::move(*this);
-    }
-
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
-    [[nodiscard]] select_query_builder group_by_cube() const& {
-        auto copy = *this;
-        copy.group_by_ = build_group_by_string<GroupCols...>();
-        copy.group_by_mode_ = group_by_mode::cube;
-        copy.with_rollup_ = false;
-        return copy;
-    }
-
-    template <ColumnDescriptor... GroupCols>
-        requires(sizeof...(GroupCols) > 0)
-    [[nodiscard]] select_query_builder group_by_cube() && {
-        group_by_ = build_group_by_string<GroupCols...>();
-        group_by_mode_ = group_by_mode::cube;
-        with_rollup_ = false;
-        return std::move(*this);
-    }
-
-    template <typename... Sets>
-        requires((is_grouping_set_v<Sets> && ...) && sizeof...(Sets) > 0)
-    [[nodiscard]] select_query_builder group_by_grouping_sets() const& {
-        auto copy = *this;
-        copy.group_by_ = build_grouping_sets_string<Sets...>();
-        copy.group_by_mode_ = group_by_mode::grouping_sets;
-        copy.with_rollup_ = false;
-        return copy;
-    }
-
-    template <typename... Sets>
-        requires((is_grouping_set_v<Sets> && ...) && sizeof...(Sets) > 0)
-    [[nodiscard]] select_query_builder group_by_grouping_sets() && {
-        group_by_ = build_grouping_sets_string<Sets...>();
-        group_by_mode_ = group_by_mode::grouping_sets;
-        with_rollup_ = false;
+        if constexpr (sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) {
+            using Spec = std::tuple_element_t<0, std::tuple<Specs...>>;
+            group_by_ = detail::group_by_spec_traits<Spec>::cols_string();
+            group_by_mode_ = detail::group_by_spec_traits<Spec>::mode;
+            with_rollup_ = detail::group_by_spec_traits<Spec>::with_rollup;
+        } else {
+            group_by_ = detail::build_group_by_cols_string<Specs...>();
+            group_by_mode_ = detail::group_by_mode::standard;
+            with_rollup_ = false;
+        }
         return std::move(*this);
     }
 
@@ -3485,20 +3605,41 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    // order_by<Col>()                       — appends "col ASC" to ORDER BY
-    // order_by<Col, sort_order::desc>()     — appends "col DESC" to ORDER BY
+    // order_by<Col>()                              — appends "col ASC" to ORDER BY
+    // order_by<Col, sort_order::desc>()            — appends "col DESC" to ORDER BY
+    // order_by<nulls_last<Col>>()                  — (col IS NULL) ASC, col ASC
+    // order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
+    // order_by<nulls_first<Col>>()                 — (col IS NULL) DESC, col ASC
     // Can be chained multiple times for multi-column ordering.
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    template <typename ColSpec, sort_order Dir = sort_order::asc>
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec>)
     [[nodiscard]] select_query_builder order_by() const& {
         auto copy = *this;
-        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
-                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        if constexpr (NullsWrapper<ColSpec>) {
+            using Col = typename ColSpec::col_type;
+            const std::string col_name(column_traits<Col>::column_name());
+            copy.order_by_clauses_.push_back("(" + col_name +
+                                             (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+            copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else {
+            copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
+        }
         return copy;
     }
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    template <typename ColSpec, sort_order Dir = sort_order::asc>
+        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec>)
     [[nodiscard]] select_query_builder order_by() && {
-        order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
-                                    (Dir == sort_order::asc ? " ASC" : " DESC"));
+        if constexpr (NullsWrapper<ColSpec>) {
+            using Col = typename ColSpec::col_type;
+            const std::string col_name(column_traits<Col>::column_name());
+            order_by_clauses_.push_back("(" + col_name +
+                                        (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+            order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else {
+            order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
+        }
         return std::move(*this);
     }
 
@@ -3528,6 +3669,45 @@ struct select_query_builder {
     }
     [[nodiscard]] select_query_builder order_by_raw(std::string expr) && {
         order_by_clauses_.push_back(std::move(expr));
+        return std::move(*this);
+    }
+
+    // order_by_alias<Proj>()        — ORDER BY the alias assigned to Proj via with_alias<Proj>()
+    // order_by_alias<Proj, desc>()  — ORDER BY alias DESC
+    // Falls back to the projection's sql_expr() if no alias has been set.
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_alias() const& {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(
+            alias_order_entry{Index, std::string(projection_traits<Proj>::sql_expr()), Dir});
+        return copy;
+    }
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_alias() && {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        order_by_clauses_.push_back(alias_order_entry{Index, std::string(projection_traits<Proj>::sql_expr()), Dir});
+        return std::move(*this);
+    }
+
+    // order_by_position<Proj>()      — ORDER BY N (1-based projection index)
+    // order_by_position<Proj, desc>() — ORDER BY N DESC
+    // Emits the ordinal position of Proj in the SELECT list.
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_position() const& {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>() + 1;
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+    template <Projection Proj, sort_order Dir = sort_order::asc>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_position() && {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>() + 1;
+        order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
         return std::move(*this);
     }
 
@@ -3704,7 +3884,9 @@ struct select_query_builder {
         if (!from_subquery_.empty()) {
             sql << " FROM " << from_subquery_;
         } else {
-            sql << " FROM " << table_name_for<Table>::value().to_string_view();
+            if constexpr (!std::is_same_v<Table, subquery_source>) {
+                sql << " FROM " << table_name_for<Table>::value().to_string_view();
+            }
         }
         sql << joins_;
 
@@ -3730,11 +3912,18 @@ struct select_query_builder {
         if (!order_by_clauses_.empty()) {
             sql << " ORDER BY ";
             bool f = true;
-            for (auto const& clause : order_by_clauses_) {
+            for (auto const& item : order_by_clauses_) {
                 if (!f) {
                     sql << ", ";
                 }
-                sql << clause;
+                if (std::holds_alternative<std::string>(item)) {
+                    sql << std::get<std::string>(item);
+                } else {
+                    auto const& e = std::get<alias_order_entry>(item);
+                    auto it = aliases_.find(e.proj_index);
+                    sql << (it != aliases_.end() ? it->second : e.fallback_expr);
+                    sql << (e.dir == sort_order::asc ? " ASC" : " DESC");
+                }
                 f = false;
             }
         }
@@ -3776,25 +3965,14 @@ struct select_query_builder {
     // Private helper: builds a comma-separated GROUP BY column name string.
     template <ColumnDescriptor... GroupCols>
     static std::string build_group_by_string() {
-        std::ostringstream ss;
-        bool first = true;
-        (
-            [&](std::string_view name) {
-                if (!first) {
-                    ss << ", ";
-                }
-                ss << name;
-                first = false;
-            }(column_traits<GroupCols>::column_name()),
-            ...);
-        return ss.str();
+        return detail::build_group_by_cols_string<GroupCols...>();
     }
 
     template <typename... Sets>
     static std::string build_grouping_sets_string() {
         std::ostringstream ss;
         bool first = true;
-        ((ss << (first ? "" : ", ") << grouping_set_sql<Sets>::value(), first = false), ...);
+        ((ss << (first ? "" : ", ") << detail::grouping_set_sql<Sets>::value(), first = false), ...);
         return ss.str();
     }
 
@@ -3803,7 +3981,7 @@ struct select_query_builder {
     bool with_rollup_ = false;
     group_by_mode group_by_mode_ = group_by_mode::standard;
     std::optional<where_condition> having_;
-    std::vector<std::string> order_by_clauses_;
+    std::vector<order_by_item> order_by_clauses_;
     std::optional<std::size_t> limit_;
     std::optional<std::size_t> offset_;
     bool distinct_ = false;
@@ -3819,25 +3997,25 @@ struct select_query_builder {
 template <typename... Projs>
 class select_builder {
 public:
-    // Checked: all column projections must belong to Table (single-table query).
-    template <ValidTable Table>
-    [[nodiscard]] select_query_builder<Table, Projs...> from() const {
-        static_assert(((AggregateProjection<Projs> || column_belongs_to_table_v<Projs, Table>) && ...),
-                      "All column projections must belong to the table passed to from<Table>(). "
-                      "For JOIN queries spanning multiple tables, use .from_joined<Table>() instead.");
-        return {};
+    // Checked: all column projections must belong to Table.
+    // For JOIN queries use from<joined<Table>>() to skip the check.
+    template <typename TableSpec>
+    [[nodiscard]] auto from() const {
+        if constexpr (is_joined_v<TableSpec>) {
+            return select_query_builder<typename TableSpec::table_type, Projs...>{};
+        } else {
+            static_assert(ValidTable<TableSpec>);
+            static_assert(((AggregateProjection<Projs> || column_belongs_to_table_v<Projs, TableSpec>) && ...),
+                          "All column projections must belong to the table passed to from<Table>(). "
+                          "For JOIN queries spanning multiple tables, use from<joined<Table>>() instead.");
+            return select_query_builder<TableSpec, Projs...>{};
+        }
     }
 
-    // Unchecked: for JOIN queries spanning multiple tables.
-    template <typename Table>
-    [[nodiscard]] select_query_builder<Table, Projs...> from_joined() const {
-        return {};
-    }
-
-    // from_subquery — derived table: SELECT ... FROM (subquery) AS alias
-    template <typename Table, AnySelectQuery Query>
-    [[nodiscard]] select_query_builder<Table, Projs...> from_subquery(Query const& subquery, std::string alias) const {
-        select_query_builder<Table, Projs...> builder;
+    // from(subquery, "alias") — derived table: SELECT ... FROM (subquery) AS alias
+    template <AnySelectQuery Query>
+    [[nodiscard]] select_query_builder<subquery_source, Projs...> from(Query const& subquery, std::string alias) const {
+        select_query_builder<subquery_source, Projs...> builder;
         builder.from_subquery_ = "(" + subquery.build_sql() + ") AS " + std::move(alias);
         return builder;
     }

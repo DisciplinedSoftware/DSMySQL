@@ -16,14 +16,14 @@ using namespace std::string_literals;
 namespace {
 
 struct product {
-    COLUMN_FIELD(id,              uint32_t)
-    COLUMN_FIELD(category_id,     std::optional<uint32_t>)
-    COLUMN_FIELD(sku,             varchar_field<32>)
-    COLUMN_FIELD(type,            varchar_field<64>)
-    COLUMN_FIELD(name,            std::optional<varchar_field<255>>)
-    COLUMN_FIELD(tag,             std::optional<varchar_field<255>>)
-    COLUMN_FIELD(unit,            std::optional<varchar_field<32>>)
-    COLUMN_FIELD(created_at,      sql_datetime)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(category_id, std::optional<uint32_t>)
+    COLUMN_FIELD(sku, varchar_field<32>)
+    COLUMN_FIELD(type, varchar_field<64>)
+    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(tag, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(unit, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(created_at, sql_datetime)
     COLUMN_FIELD(last_updated_at, sql_datetime)
 };
 
@@ -481,7 +481,7 @@ suite<"DQL MySQL Metadata Queries"> dql_mysql_metadata_suite = [] {
 
 namespace {
 struct category {
-    COLUMN_FIELD(id,    uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(label, varchar_field<64>)
 };
 }  // namespace
@@ -490,7 +490,7 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
     "inner_join - generates INNER JOIN ON clause"_test = [] {
         // product.category_id FK → category.id
         auto const sql = select<product::sku, category::label>()
-                             .from_joined<product>()
+                             .from<joined<product>>()
                              .inner_join<category, product::category_id, category::id>()
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product INNER JOIN category ON category_id = id"s) << sql;
@@ -498,7 +498,7 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
 
     "left_join - generates LEFT JOIN ON clause"_test = [] {
         auto const sql = select<product::sku, category::label>()
-                             .from_joined<product>()
+                             .from<joined<product>>()
                              .left_join<category, product::category_id, category::id>()
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product LEFT JOIN category ON category_id = id"s) << sql;
@@ -506,7 +506,7 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
 
     "right_join - generates RIGHT JOIN ON clause"_test = [] {
         auto const sql = select<product::sku, category::label>()
-                             .from_joined<product>()
+                             .from<joined<product>>()
                              .right_join<category, product::category_id, category::id>()
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product RIGHT JOIN category ON category_id = id"s) << sql;
@@ -514,7 +514,7 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
 
     "inner_join with WHERE and ORDER BY - generates full query"_test = [] {
         auto const sql = select<product::sku, category::label>()
-                             .from_joined<product>()
+                             .from<joined<product>>()
                              .inner_join<category, product::category_id, category::id>()
                              .where(is_not_null<product::category_id>())
                              .order_by<product::sku>()
@@ -529,7 +529,7 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
     "inner_join with col<T,I> descriptors - generates qualified ON condition"_test = [] {
         // col<product, 1> = category_id field, col<category, 0> = id field
         auto const sql = select<col<product, 2>, col<category, 1>>()
-                             .from_joined<product>()
+                             .from<joined<product>>()
                              .inner_join<category, col<product, 1>, col<category, 0>>()
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product INNER JOIN category ON product.category_id = category.id"s)
@@ -554,12 +554,12 @@ static_assert(std::is_same_v<decltype(select<count_all>().from<product>())::resu
 // Custom table types used to verify cross-table type isolation with tagged fields.
 namespace {
 struct table_a {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, std::string)
 };
 
 struct table_b {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, std::string)
 };
 }  // namespace
@@ -568,12 +568,10 @@ struct table_b {
 static_assert(!std::is_same_v<table_a::id, table_b::id>);
 
 // Columns belong to their own table.
-static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_a>,
-              "table_a::id must belong to table_a");
+static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_a>, "table_a::id must belong to table_a");
 static_assert(ds_mysql::detail::column_belongs_to_table_v<table_a::name, table_a>,
               "table_a::name must belong to table_a");
-static_assert(ds_mysql::detail::column_belongs_to_table_v<table_b::id, table_b>,
-              "table_b::id must belong to table_b");
+static_assert(ds_mysql::detail::column_belongs_to_table_v<table_b::id, table_b>, "table_b::id must belong to table_b");
 
 // Cross-table isolation: tagged columns do NOT belong to the other table.
 static_assert(!ds_mysql::detail::column_belongs_to_table_v<table_a::id, table_b>,
