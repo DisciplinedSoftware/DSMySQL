@@ -164,6 +164,25 @@ db.execute(drop_table<product>());
 db.execute(create_database<my_db>().if_not_exists());
 ```
 
+#### CREATE TABLE attributes (fluent API)
+
+```cpp
+auto sql = create_table<product>()
+               .if_not_exists()
+               .engine(Engine::InnoDB)
+               .auto_increment(1)
+               .default_charset(Charset::utf8mb4)
+               .row_format(RowFormat::Dynamic)
+               .comment("product catalog")
+               .build_sql();
+
+auto ctas = create_table<product_archive>()
+                .as(select<product::id, product::name>().from<product>())
+                .engine("MyCustomEngine")
+                .default_charset("koi8r")
+                .build_sql();
+```
+
 ### DML (INSERT, UPDATE, DELETE)
 
 ```cpp

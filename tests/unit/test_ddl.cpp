@@ -359,6 +359,35 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE tag IS NOT NULL;\n"s) << sql;
     };
 
+    "create_table.as(select) with fluent table attributes"_test = [] {
+        auto const sql = create_table<new_table>()
+                             .as(select<test_table::id, test_table::name>().from<test_table>())
+                             .engine(Engine::InnoDB)
+                             .auto_increment(1)
+                             .default_charset(Charset::utf8mb4)
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE new_table ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 AS SELECT id, name "
+               "FROM test_table;\n"s)
+            << sql;
+    };
+
+    "create_table with string overload attributes"_test = [] {
+        auto const sql = create_table<test_table>()
+                             .engine("MyCustomEngine")
+                             .default_charset("koi8r")
+                             .row_format("DYNAMIC")
+                             .collate("koi8r_general_ci")
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENGINE=MyCustomEngine DEFAULT CHARSET=koi8r ROW_FORMAT=DYNAMIC COLLATE=koi8r_general_ci;\n"s)
+            << sql;
+    };
+
     "drop_table.then.create_table.as(select) - chains DROP and CREATE AS SELECT"_test = [] {
         auto const sql = drop_table<new_table>()
                              .if_exists()
