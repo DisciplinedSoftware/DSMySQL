@@ -78,7 +78,7 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/kitware.list
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build g++-15 \
+          sudo apt-get install -y cmake ninja-build g++-15 gcc-15 \
             libmysqlclient-dev pkg-config
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -93,7 +93,7 @@ jobs:
           CC: gcc-15
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset release -j4
 
       - name: Unit tests
         run: ctest --preset release -R tests_unit_ds_mysql --output-on-failure
@@ -115,8 +115,9 @@ jobs:
             | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
           echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
             | sudo tee /etc/apt/sources.list.d/kitware.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake libmysqlclient-dev pkg-config g++-15
+          sudo apt-get install -y cmake libmysqlclient-dev pkg-config g++-15 gcc-15
         env:
           DEBIAN_FRONTEND: noninteractive
 
