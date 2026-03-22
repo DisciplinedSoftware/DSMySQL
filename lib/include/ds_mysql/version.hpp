@@ -16,7 +16,7 @@ namespace ds_mysql {
 /// This checked-in fallback is used only when no build-system generated
 /// `version_generated.hpp` is present (e.g. raw-header, non-CMake usage).
 struct version {
-    static constexpr std::uint32_t major = 0;
+    static constexpr std::uint32_t major = 1;
     static constexpr std::uint32_t minor = 0;
     static constexpr std::uint32_t patch = 0;
 
@@ -24,7 +24,7 @@ struct version {
     static constexpr std::uint32_t value = major * 10'000u + minor * 100u + patch;
 
     /// Canonical fallback string for non-generated builds.
-    static constexpr std::string_view string = "0.0.0+unknown";
+    static constexpr std::string_view string = "1.0.0";
 };
 
 }  // namespace ds_mysql

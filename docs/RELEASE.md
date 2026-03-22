@@ -10,14 +10,14 @@ which:
 
 1. Validates that the tag matches the `VERSION` declared in `CMakeLists.txt`.
 2. Runs the full unit-test suite (GCC).
-3. Generates `version.hpp` from the template.
+3. Generates `version_generated.hpp` from the template.
 4. Packages the public headers into `ds_mysql-v<version>.tar.gz`.
 5. Creates a GitHub Release and attaches the archive.
 
 The easiest way to perform all pre-tag steps in one shot is the helper script:
 
 ```bash
-./scripts/release/release.sh <new-version>   # e.g.  ./scripts/release/release.sh 1.1.0
+./scripts/release/release.sh <new-version>   # e.g. ./scripts/release/release.sh 1.1.0
 ```
 
 ---
@@ -43,8 +43,14 @@ project(DSMySQL
 )
 ```
 
-The version is the single source of truth.  `version.hpp` is generated from it
-at configure time, so no other file needs editing.
+The version is the single source of truth.
+
+If you use `scripts/release/release.sh`, it also updates fallback constants in
+`lib/include/ds_mysql/version.hpp` so raw-header/non-CMake consumers see the
+new version too.
+
+For a fully manual release, update `lib/include/ds_mysql/version.hpp` major,
+minor, patch, and string values to match `<new-version>`.
 
 ### 3. Update `CHANGELOG.md`
 
@@ -64,7 +70,7 @@ Also update the `[Unreleased]` comparison link at the bottom of the file.
 ### 4. Commit
 
 ```bash
-git add CMakeLists.txt CHANGELOG.md
+git add CMakeLists.txt lib/include/ds_mysql/version.hpp CHANGELOG.md
 git commit -m "chore: release v<new-version>"
 ```
 
@@ -86,9 +92,9 @@ After the workflow succeeds:
 - The GitHub Release page lists the new tag with auto-generated release notes.
 - The `ds_mysql-v<version>.tar.gz` archive is attached and contains every public
   header under a top-level `ds_mysql/` directory, including the generated
-  `version.hpp`.
+  `version_generated.hpp`.
 - Confirm `ds_mysql::version::string` matches the new version by inspecting
-  `version.hpp` inside the archive.
+  `version_generated.hpp` inside the archive.
 
 ---
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# scripts/release/release.sh  —  bump version, update CHANGELOG, commit, and tag.
+# scripts/release/release.sh  —  bump version, sync fallback header,
+#                               update CHANGELOG, commit, and tag.
 #
 # Usage:
 #   ./scripts/release/release.sh <new-version>
@@ -9,10 +10,11 @@
 #   1. Validates the supplied version string.
 #   2. Ensures the working tree is clean and on `main`.
 #   3. Updates the VERSION field in CMakeLists.txt.
-#   4. Opens CHANGELOG.md in $EDITOR so you can fill in the release notes.
-#   5. Commits the two changed files.
-#   6. Creates an annotated tag.
-#   7. Optionally pushes branch + tag to origin.
+#   4. Updates checked-in fallback version constants in version.hpp.
+#   5. Opens CHANGELOG.md in $EDITOR so you can fill in the release notes.
+#   6. Commits the changed files.
+#   7. Creates an annotated tag.
+#   8. Optionally pushes branch + tag to origin.
 
 set -euo pipefail
 
@@ -36,6 +38,7 @@ NEW_VERSION="$1"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CMAKE_FILE="$REPO_ROOT/CMakeLists.txt"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
+VERSION_HEADER="$REPO_ROOT/lib/include/ds_mysql/version.hpp"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Git sanity checks
@@ -89,6 +92,31 @@ UPDATED_VERSION="$(grep -oP '(?<=VERSION )\d+\.\d+\.\d+' "$CMAKE_FILE" | head -1
     || die "CMakeLists.txt update failed — expected $NEW_VERSION, got $UPDATED_VERSION"
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Sync fallback version in checked-in header
+# ──────────────────────────────────────────────────────────────────────────────
+
+IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$NEW_VERSION"
+
+info "Updating fallback version header …"
+sed -Ei "s/(static constexpr std::uint32_t major = )[0-9]+;/\\1${NEW_MAJOR};/" \
+    "$VERSION_HEADER"
+sed -Ei "s/(static constexpr std::uint32_t minor = )[0-9]+;/\\1${NEW_MINOR};/" \
+    "$VERSION_HEADER"
+sed -Ei "s/(static constexpr std::uint32_t patch = )[0-9]+;/\\1${NEW_PATCH};/" \
+    "$VERSION_HEADER"
+sed -Ei "s|(static constexpr std::string_view string = )\"[^\"]+\";|\\1\"${NEW_VERSION}\";|" \
+    "$VERSION_HEADER"
+
+grep -q "static constexpr std::uint32_t major = ${NEW_MAJOR};" "$VERSION_HEADER" \
+    || die "Failed to update major in version.hpp"
+grep -q "static constexpr std::uint32_t minor = ${NEW_MINOR};" "$VERSION_HEADER" \
+    || die "Failed to update minor in version.hpp"
+grep -q "static constexpr std::uint32_t patch = ${NEW_PATCH};" "$VERSION_HEADER" \
+    || die "Failed to update patch in version.hpp"
+grep -q "static constexpr std::string_view string = \"${NEW_VERSION}\";" "$VERSION_HEADER" \
+    || die "Failed to update string in version.hpp"
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Update CHANGELOG.md
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -125,7 +153,7 @@ info "Opening CHANGELOG.md in ${EDITOR} …"
 # ──────────────────────────────────────────────────────────────────────────────
 
 info "Staging changed files …"
-git add "$CMAKE_FILE" "$CHANGELOG"
+git add "$CMAKE_FILE" "$VERSION_HEADER" "$CHANGELOG"
 
 git diff --cached --stat
 

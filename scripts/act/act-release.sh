@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# scripts/release/act-release.sh  —  run release workflow locally with act
+# scripts/act/act-release.sh  —  run release workflow locally with act
 #
 # Usage:
-#   ./scripts/release/act-release.sh
+#   ./scripts/act/act-release.sh
 #
 # What it does:
 #   1. Extracts the current version from CMakeLists.txt.
