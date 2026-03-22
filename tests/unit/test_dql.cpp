@@ -95,6 +95,18 @@ suite<"DQL"> dql_suite = [] {
             << sql;
     };
 
+    "select all product fields with order_by and limit - composes with standard DQL clauses"_test = [] {
+        auto const sql = select<product::id, product::category_id, product::sku, product::type, product::name,
+                                product::tag, product::unit, product::created_at, product::last_updated_at>()
+                             .from<product>()
+                             .order_by<product::id>()
+                             .limit(3)
+                             .build_sql();
+        expect(sql ==
+               "SELECT id, category_id, sku, type, name, tag, unit, created_at, last_updated_at FROM product ORDER BY id ASC LIMIT 3"s)
+            << sql;
+    };
+
     "select<count_all> - generates correct SQL"_test = [] {
         auto const sql = select<count_all>().from<product>().build_sql();
         expect(sql == "SELECT COUNT(*) FROM product"s) << sql;

@@ -199,7 +199,9 @@ db.execute(truncate<product>());
 auto rows = db.query(select<product::id, product::name>().from<product>());
 
 // Select all columns
-auto all = db.query(select_all<product>().from<product>().order_by<product::id>());
+auto all = db.query(select<product::id, product::sku, product::name, product::price>()
+                        .from<product>()
+                        .order_by<product::id>());
 
 // Count
 auto cnt = db.query(count<product>().where(product::price{9.99}));

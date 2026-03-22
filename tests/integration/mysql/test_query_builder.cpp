@@ -317,6 +317,52 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         expect(std::get<1>((*results)[2]) == "MSFT") << "Third code should be MSFT";
     };
 
+    "select of all declared columns returns full row in declared order"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<trade>().if_exists()));
+        }};
+
+        expect(db->execute(create_table<trade>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<trade>()).has_value());
+
+        trade row;
+        row.code_ = "AAPL";
+        row.type_ = "Stock";
+        row.name_ = "Apple Inc.";
+        row.category_ = "Technology";
+        row.currency_ = "USD";
+        expect(db->execute(insert_into<trade>().values(row)).has_value());
+
+        auto const results = db->query(select<trade::id, trade::account_id, trade::code, trade::type, trade::name,
+                              trade::category, trade::currency,
+                              date_format_of<trade::executed_at, "%Y-%m-%d %H:%i:%s">,
+                              date_format_of<trade::recorded_at, "%Y-%m-%d %H:%i:%s">>()
+                           .from<trade>()
+                           .order_by<trade::id>()
+                           .limit(1));
+        expect(fatal(results.has_value()));
+        expect(results->size() == 1u);
+
+        auto const& [id, account_id, code, type, name, category, currency, executed_at, recorded_at] = (*results)[0];
+        expect(id == 1u) << id;
+        expect(!account_id.has_value());
+        expect(code == varchar_field<32>{"AAPL"});
+        expect(type == varchar_field<64>{"Stock"});
+        expect(name.has_value());
+        expect(name.value() == varchar_field<255>{"Apple Inc."});
+        expect(category.has_value());
+        expect(category.value() == varchar_field<255>{"Technology"});
+        expect(currency.has_value());
+        expect(currency.value() == varchar_field<32>{"USD"});
+        expect(!executed_at.empty());
+        expect(!recorded_at.empty());
+    };
+
     "select with equal WHERE clause"_test = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
@@ -851,6 +897,22 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 // ===================================================================
 
 suite<"Connection Error"> connection_error_suite = [] {
+    "connect with explicit parameters succeeds"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_database::connect(
+            config->host(), config->database(), config->credentials(), config->port());
+        expect(fatal(db)) << "Explicit overload should succeed with valid connection parameters";
+
+        auto const rows = db->query(raw_sql{"SELECT 1"});
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        expect((*rows)[0].size() == 1u);
+        expect((*rows)[0][0].has_value());
+        expect((*rows)[0][0].value() == "1"s);
+    };
+
     "connect with wrong credentials fails"_test = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));

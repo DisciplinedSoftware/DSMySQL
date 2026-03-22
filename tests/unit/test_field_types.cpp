@@ -3,7 +3,15 @@
 #include <string_view>
 
 #include "ds_mysql/column_field.hpp"
+#include "ds_mysql/credentials.hpp"
+#include "ds_mysql/database_name.hpp"
+#include "ds_mysql/host_name.hpp"
+#include "ds_mysql/mysql_config.hpp"
+#include "ds_mysql/port_number.hpp"
+#include "ds_mysql/sql_identifiers.hpp"
 #include "ds_mysql/text_field.hpp"
+#include "ds_mysql/user_name.hpp"
+#include "ds_mysql/user_password.hpp"
 #include "ds_mysql/varchar_field.hpp"
 #include "ds_mysql/version.hpp"
 
@@ -216,19 +224,90 @@ suite<"column_field string constructors"> column_field_string_suite = [] {
 
 // value must be derivable from the component fields
 static_assert(ds_mysql::version::value ==
-              ds_mysql::version::major * 10'000u +
-              ds_mysql::version::minor * 100u +
-              ds_mysql::version::patch);
+              ds_mysql::version::major * 10'000u + ds_mysql::version::minor * 100u + ds_mysql::version::patch);
 
 static_assert(!ds_mysql::version::string.empty());
 
 suite<"version"> version_suite = [] {
     "value is consistent with major/minor/patch"_test = [] {
-        expect(version::value ==
-               version::major * 10'000u + version::minor * 100u + version::patch);
+        expect(version::value == version::major * 10'000u + version::minor * 100u + version::patch);
     };
 
     "string is non-empty"_test = [] {
         expect(!version::string.empty());
+    };
+};
+
+// ===================================================================
+// Strong wrapper types and mysql_config
+// ===================================================================
+
+suite<"strong wrapper types"> strong_wrapper_types_suite = [] {
+    "host_name stores string value"_test = [] {
+        host_name const host{"127.0.0.1"};
+        expect(host.to_string() == "127.0.0.1"sv);
+    };
+
+    "database_name stores string value"_test = [] {
+        database_name const database{"trading"};
+        expect(database.to_string() == "trading"sv);
+    };
+
+    "user_name and user_password store their values"_test = [] {
+        user_name const user{"root"};
+        user_password const password{"secret"};
+
+        expect(user.to_string() == "root"sv);
+        expect(password.to_string() == "secret"sv);
+    };
+
+    "auth_credentials exposes user and password accessors"_test = [] {
+        auth_credentials const credentials{user_name{"admin"}, user_password{"pw"}};
+
+        expect(credentials.user().to_string() == "admin"sv);
+        expect(credentials.password().to_string() == "pw"sv);
+    };
+
+    "port_number exposes unsigned integer value"_test = [] {
+        port_number const port{3307};
+        expect(port.to_unsigned_int() == 3307_u);
+    };
+
+    "mysql_config stores all connection parts and default port"_test = [] {
+        mysql_config const explicit_cfg{
+            host_name{"db.internal"},
+            database_name{"market_data"},
+            auth_credentials{user_name{"alice"}, user_password{"hunter2"}},
+            port_number{3308},
+        };
+
+        mysql_config const default_port_cfg{
+            host_name{"localhost"},
+            database_name{"test_db"},
+            auth_credentials{user_name{"bob"}, user_password{"pw"}},
+        };
+
+        expect(explicit_cfg.host().to_string() == "db.internal"sv);
+        expect(explicit_cfg.database().to_string() == "market_data"sv);
+        expect(explicit_cfg.credentials().user().to_string() == "alice"sv);
+        expect(explicit_cfg.credentials().password().to_string() == "hunter2"sv);
+        expect(explicit_cfg.port().to_unsigned_int() == 3308_u);
+        expect(default_port_cfg.port().to_unsigned_int() == default_mysql_port.to_unsigned_int());
+    };
+};
+
+// ===================================================================
+// SQL identifier wrappers
+// ===================================================================
+
+suite<"sql identifier wrappers"> sql_identifier_wrappers_suite = [] {
+    "table_name stores identifier view"_test = [] {
+        table_name const table{"audit_log"};
+        expect(table.to_string_view() == "audit_log"sv);
+    };
+
+    "column_name stores identifier view"_test = [] {
+        column_name const column{"created_at"};
+        expect(column.to_string_view() == "created_at"sv);
     };
 };
