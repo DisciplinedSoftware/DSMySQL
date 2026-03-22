@@ -3502,45 +3502,6 @@ private:
 
 enum class sort_order { asc, desc };
 
-// nulls_last<Col> / nulls_first<Col> — NULL-placement modifiers for order_by
-//
-// MySQL has no NULLS LAST / NULLS FIRST syntax. These wrappers are accepted
-// by order_by<> and expand to the standard two-term workaround:
-//
-//   order_by<nulls_last<Col>>()              — (col IS NULL) ASC, col ASC
-//   order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
-//   order_by<nulls_first<Col>>()             — (col IS NULL) DESC, col ASC
-//
-// NullsWrapper<T> — satisfied by nulls_last<Col> and nulls_first<Col>.
-
-template <ColumnDescriptor Col>
-struct nulls_last {
-    using col_type = Col;
-    static constexpr bool puts_nulls_last = true;
-};
-
-template <ColumnDescriptor Col>
-struct nulls_first {
-    using col_type = Col;
-    static constexpr bool puts_nulls_last = false;
-};
-
-template <typename T>
-concept NullsWrapper = requires {
-    typename T::col_type;
-    { T::puts_nulls_last } -> std::convertible_to<bool>;
-} && ColumnDescriptor<typename T::col_type>;
-
-// qual<Col> — forces table-qualified name ("table.column") in order_by<>.
-//
-// Useful for ORDER BY on columns from joined tables that are not in the
-// SELECT list.  For col<T,I> descriptors this emits the fully-qualified
-// "table.column" name; for ColumnFieldType descriptors it degrades to
-// the bare column name (same as unqualified order_by<Col>()).
-//
-//   order_by<qual<col<category, 1>>>()     — ORDER BY category.label ASC
-//   order_by<qual<category::label>>()      — ORDER BY label ASC (no table info)
-
 template <ColumnDescriptor Col>
 struct qual {
     using col_type = Col;
@@ -3553,6 +3514,54 @@ concept QualifiedCol = requires {
     { T::is_qualified } -> std::convertible_to<bool>;
     requires T::is_qualified;
 } && ColumnDescriptor<typename T::col_type>;
+
+template <typename T>
+struct unwrap_order_col {
+    using type = T;
+};
+
+template <QualifiedCol T>
+struct unwrap_order_col<T> {
+    using type = typename T::col_type;
+};
+
+template <typename T>
+using unwrap_order_col_t = typename unwrap_order_col<T>::type;
+
+template <typename T>
+constexpr bool is_qualified_col_v = false;
+
+template <QualifiedCol T>
+constexpr bool is_qualified_col_v<T> = true;
+
+// nulls_last<Col> / nulls_first<Col> — NULL-placement modifiers for order_by
+//
+// MySQL has no NULLS LAST / NULLS FIRST syntax. These wrappers are accepted
+// by order_by<> and expand to the standard two-term workaround:
+//
+//   order_by<nulls_last<Col>>()              — (col IS NULL) ASC, col ASC
+//   order_by<nulls_last<Col>, sort_order::desc>() — (col IS NULL) ASC, col DESC
+//   order_by<nulls_first<Col>>()             — (col IS NULL) DESC, col ASC
+//
+// NullsWrapper<T> — satisfied by nulls_last<Col> and nulls_first<Col>.
+
+template <typename Col>
+struct nulls_last {
+    using col_type = Col;
+    static constexpr bool puts_nulls_last = true;
+};
+
+template <typename Col>
+struct nulls_first {
+    using col_type = Col;
+    static constexpr bool puts_nulls_last = false;
+};
+
+template <typename T>
+concept NullsWrapper = requires {
+    typename T::col_type;
+    { T::puts_nulls_last } -> std::convertible_to<bool>;
+} && ColumnDescriptor<unwrap_order_col_t<typename T::col_type>>;
 
 // position<Proj> — ORDER BY the 1-based ordinal index of Proj in the SELECT list.
 //
@@ -3913,7 +3922,7 @@ concept AggregateOrderBy = requires {
     typename T::aggregate_order_tag;
     typename T::proj_type;
     { T::direction } -> std::convertible_to<sort_order>;
-} && Projection<typename T::proj_type> && !ColumnDescriptor<typename T::proj_type>;
+} && Projection<typename T::proj_type>;
 
 // ===================================================================
 // projection_traits — specialisations for types that depend on Projection
@@ -4731,12 +4740,15 @@ struct select_query_builder {
     // order_by<qual<col<Table, I>>>()              — table.column ASC  (qualified JOIN column)
     // order_by<position<Proj>>()                   — ORDER BY <ordinal of Proj in SELECT> ASC
     // order_by<col_index<N>>()                     — ORDER BY N ASC (literal 1-based index)
-    // order_by<aggregate<Proj>>()                  — ORDER BY aggregate expression ASC
-    // order_by<aggregate<Proj, desc>>()            — ORDER BY aggregate expression DESC
+    // order_by<Proj>()                             — ORDER BY any projection expression ASC
+    // order_by<Proj, sort_order::desc>()           — ORDER BY any projection expression DESC
+    // order_by<aggregate<Proj>>()                  — ORDER BY projection expression ASC
+    // order_by<aggregate<Proj, desc>>()            — ORDER BY projection expression DESC
     // Can be chained multiple times for multi-column ordering.
     template <typename ColSpec, sort_order Dir = sort_order::asc>
         requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec>)
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec> ||
+                 Projection<ColSpec>)
     [[nodiscard]] select_query_builder order_by() const& {
         auto copy = *this;
         if constexpr (AggregateOrderBy<ColSpec>) {
@@ -4744,8 +4756,15 @@ struct select_query_builder {
             copy.order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
                                              (ColSpec::direction == sort_order::asc ? " ASC" : " DESC"));
         } else if constexpr (NullsWrapper<ColSpec>) {
-            using Col = typename ColSpec::col_type;
-            const std::string col_name(column_traits<Col>::column_name());
+            using ColLike = typename ColSpec::col_type;
+            using Col = unwrap_order_col_t<ColLike>;
+            const std::string col_name = [] {
+                if constexpr (is_qualified_col_v<ColLike>) {
+                    return qualified_col_name<Col>();
+                } else {
+                    return std::string(column_traits<Col>::column_name());
+                }
+            }();
             copy.order_by_clauses_.push_back("(" + col_name +
                                              (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
             copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -4763,6 +4782,9 @@ struct select_query_builder {
                           "order_by<col_index<N>>: N is out of range for this SELECT list");
             copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
                                              (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (Projection<ColSpec>) {
+            copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                              (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -4771,15 +4793,23 @@ struct select_query_builder {
     }
     template <typename ColSpec, sort_order Dir = sort_order::asc>
         requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec>)
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec> ||
+                 Projection<ColSpec>)
     [[nodiscard]] select_query_builder order_by() && {
         if constexpr (AggregateOrderBy<ColSpec>) {
             using Proj = typename ColSpec::proj_type;
             order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
                                         (ColSpec::direction == sort_order::asc ? " ASC" : " DESC"));
         } else if constexpr (NullsWrapper<ColSpec>) {
-            using Col = typename ColSpec::col_type;
-            const std::string col_name(column_traits<Col>::column_name());
+            using ColLike = typename ColSpec::col_type;
+            using Col = unwrap_order_col_t<ColLike>;
+            const std::string col_name = [] {
+                if constexpr (is_qualified_col_v<ColLike>) {
+                    return qualified_col_name<Col>();
+                } else {
+                    return std::string(column_traits<Col>::column_name());
+                }
+            }();
             order_by_clauses_.push_back("(" + col_name +
                                         (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
             order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
@@ -4796,6 +4826,9 @@ struct select_query_builder {
             static_assert(ColSpec::value <= sizeof...(Projs),
                           "order_by<col_index<N>>: N is out of range for this SELECT list");
             order_by_clauses_.push_back(std::to_string(ColSpec::value) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+        } else if constexpr (Projection<ColSpec>) {
+            order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
         } else {
             order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
                                         (Dir == sort_order::asc ? " ASC" : " DESC"));

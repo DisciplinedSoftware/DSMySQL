@@ -530,6 +530,22 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
         expect(sql == "SELECT type, SUM(price_val) FROM product GROUP BY type ORDER BY SUM(price_val) DESC"s) << sql;
     };
 
+    "order_by<aggregate<Col>>() — supports plain column projection wrapper"_test = [] {
+        auto const sql = select<product::id>().from<product>().order_by<aggregate<product::id>>().build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY id ASC"s) << sql;
+    };
+
+    "order_by<Proj>() — supports non-aggregate projections"_test = [] {
+        auto const sql = select<product::id>().from<product>().order_by<upper_of<product::sku>>().build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY UPPER(sku) ASC"s) << sql;
+    };
+
+    "order_by<Proj, desc>() — supports non-aggregate projections DESC"_test = [] {
+        auto const sql =
+            select<product::id>().from<product>().order_by<upper_of<product::sku>, sort_order::desc>().build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY UPPER(sku) DESC"s) << sql;
+    };
+
     // order_by_alias
     "order_by_alias — emits alias when with_alias is set"_test = [] {
         auto const sql = select<product::type, sum<product::price_val>>()
@@ -709,6 +725,31 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
                              .order_by<qual<col<category, 1>>, sort_order::desc>()
                              .build_sql();
         expect(sql == "SELECT sku FROM product INNER JOIN category ON category_id = id ORDER BY category.label DESC"s)
+            << sql;
+    };
+
+    "order_by<nulls_last<qual<col<T,I>>>> — NULL handling supports qualified columns"_test = [] {
+        auto const sql = select<product::sku>()
+                             .from<joined<product>>()
+                             .inner_join<category, product::category_id, category::id>()
+                             .order_by<nulls_last<qual<col<category, 1>>>>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku FROM product INNER JOIN category ON category_id = id ORDER BY (category.label IS NULL) ASC, "
+               "category.label ASC"s)
+            << sql;
+    };
+
+    "order_by<nulls_first<qual<col<T,I>>>, desc> — qualified NULL handling with DESC"_test = [] {
+        auto const sql = select<product::sku>()
+                             .from<joined<product>>()
+                             .inner_join<category, product::category_id, category::id>()
+                             .order_by<nulls_first<qual<col<category, 1>>>, sort_order::desc>()
+                             .build_sql();
+        expect(
+            sql ==
+            "SELECT sku FROM product INNER JOIN category ON category_id = id ORDER BY (category.label IS NULL) DESC, "
+            "category.label DESC"s)
             << sql;
     };
 };
