@@ -503,53 +503,21 @@ suite<"DDL"> ddl_suite = [] {
 // ===================================================================
 
 namespace {
-struct child_table {
-    COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(parent_id, uint32_t)
-};
-
 struct parent_table {
     COLUMN_FIELD(id, uint32_t)
 };
-}  // namespace
 
-// Declare FK: child_table.parent_id → parent_table.id (RESTRICT behaviour)
-template <>
-struct ds_mysql::foreign_key_schema<child_table, 1> {
-    static constexpr std::string_view referenced_table() {
-        return "parent_table";
-    }
-    static constexpr std::string_view referenced_column() {
-        return "id";
-    }
-    static constexpr std::string_view on_delete() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "";
-    }
+struct child_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>)
 };
 
 struct child_table_cascade {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(parent_id, uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>, fk_attr::on_delete_cascade,
+                 fk_attr::on_update_cascade)
 };
-
-template <>
-struct ds_mysql::foreign_key_schema<child_table_cascade, 1> {
-    static constexpr std::string_view referenced_table() {
-        return "parent_table";
-    }
-    static constexpr std::string_view referenced_column() {
-        return "id";
-    }
-    static constexpr std::string_view on_delete() {
-        return "CASCADE";
-    }
-    static constexpr std::string_view on_update() {
-        return "CASCADE";
-    }
-};
+}  // namespace
 
 suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
     "create_table with FK - emits FOREIGN KEY constraint"_test = [] {

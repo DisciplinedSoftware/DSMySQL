@@ -1768,21 +1768,22 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
     // Emit FOREIGN KEY constraints for fields that have them declared.
     (
         [&] {
-            if constexpr (has_foreign_key_v<T, Is>) {
+            using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            if constexpr (requires { field_type::ddl_has_fk; } && field_type::ddl_has_fk) {
                 sql += ",\n    FOREIGN KEY (";
                 sql += field_schema<T, Is>::name();
                 sql += ") REFERENCES ";
-                sql += foreign_key_schema<T, Is>::referenced_table();
+                sql += table_name_for<typename field_type::ddl_fk_ref_table>::value().to_string_view();
                 sql += "(";
-                sql += foreign_key_schema<T, Is>::referenced_column();
+                sql += field_type::ddl_fk_ref_column::column_name();
                 sql += ")";
-                if constexpr (!foreign_key_schema<T, Is>::on_delete().empty()) {
+                if constexpr (!field_type::ddl_fk_on_delete.empty()) {
                     sql += " ON DELETE ";
-                    sql += foreign_key_schema<T, Is>::on_delete();
+                    sql += field_type::ddl_fk_on_delete;
                 }
-                if constexpr (!foreign_key_schema<T, Is>::on_update().empty()) {
+                if constexpr (!field_type::ddl_fk_on_update.empty()) {
                     sql += " ON UPDATE ";
-                    sql += foreign_key_schema<T, Is>::on_update();
+                    sql += field_type::ddl_fk_on_update;
                 }
             }
         }(),

@@ -35,6 +35,41 @@ struct collate {};
 
 }  // namespace column_attr
 
+// ===================================================================
+// fk_attr — typed DDL modifiers for FOREIGN KEY constraints
+//
+// Use as Attrs on column_field / COLUMN_FIELD to declare a FK inline:
+//
+//   COLUMN_FIELD(parent_id, uint32_t,
+//                fk_attr::references<parent_table, parent_table::id>,
+//                fk_attr::on_delete_cascade,
+//                fk_attr::on_update_cascade)
+//
+// references<RefTable, RefColumn>
+//   RefTable   — the C++ struct type of the referenced table.
+//   RefColumn  — the column_field type within RefTable (e.g. parent_table::id).
+//   The SQL table name is derived via table_name_for<RefTable> and the
+//   SQL column name via RefColumn::column_name().
+//
+// on_delete_* / on_update_* — referential actions (default: no clause = RESTRICT).
+// ===================================================================
+namespace fk_attr {
+
+template <typename RefTable, typename RefColumn>
+struct references {};
+
+struct on_delete_restrict {};
+struct on_delete_cascade {};
+struct on_delete_set_null {};
+struct on_delete_no_action {};
+
+struct on_update_restrict {};
+struct on_update_cascade {};
+struct on_update_set_null {};
+struct on_update_no_action {};
+
+}  // namespace fk_attr
+
 // column_field<Name, T> — the only user-facing form.
 // Name is the SQL column name as a string literal; T is the stored value type.
 //   using id = column_field<"id", uint32_t>;
@@ -81,6 +116,82 @@ template <typename First, typename... Rest>
 struct collate_attr_value<First, Rest...> {
     static constexpr std::string_view value = collate_attr_value<Rest...>::value;
 };
+
+// fk_references_attr — detects fk_attr::references<RefTable, RefColumn> in Attrs.
+template <typename... Attrs>
+struct fk_references_attr {
+    static constexpr bool has_value = false;
+    using ref_table = void;
+    using ref_column = void;
+};
+
+template <typename RefTable, typename RefColumn, typename... Rest>
+struct fk_references_attr<fk_attr::references<RefTable, RefColumn>, Rest...> {
+    static constexpr bool has_value = true;
+    using ref_table = RefTable;
+    using ref_column = RefColumn;
+};
+
+template <typename First, typename... Rest>
+struct fk_references_attr<First, Rest...> : fk_references_attr<Rest...> {};
+
+// fk_on_delete_attr — extracts the on_delete referential action string.
+template <typename... Attrs>
+struct fk_on_delete_attr {
+    static constexpr std::string_view value = "";
+};
+
+template <typename... Rest>
+struct fk_on_delete_attr<fk_attr::on_delete_restrict, Rest...> {
+    static constexpr std::string_view value = "RESTRICT";
+};
+
+template <typename... Rest>
+struct fk_on_delete_attr<fk_attr::on_delete_cascade, Rest...> {
+    static constexpr std::string_view value = "CASCADE";
+};
+
+template <typename... Rest>
+struct fk_on_delete_attr<fk_attr::on_delete_set_null, Rest...> {
+    static constexpr std::string_view value = "SET NULL";
+};
+
+template <typename... Rest>
+struct fk_on_delete_attr<fk_attr::on_delete_no_action, Rest...> {
+    static constexpr std::string_view value = "NO ACTION";
+};
+
+template <typename First, typename... Rest>
+struct fk_on_delete_attr<First, Rest...> : fk_on_delete_attr<Rest...> {};
+
+// fk_on_update_attr — extracts the on_update referential action string.
+template <typename... Attrs>
+struct fk_on_update_attr {
+    static constexpr std::string_view value = "";
+};
+
+template <typename... Rest>
+struct fk_on_update_attr<fk_attr::on_update_restrict, Rest...> {
+    static constexpr std::string_view value = "RESTRICT";
+};
+
+template <typename... Rest>
+struct fk_on_update_attr<fk_attr::on_update_cascade, Rest...> {
+    static constexpr std::string_view value = "CASCADE";
+};
+
+template <typename... Rest>
+struct fk_on_update_attr<fk_attr::on_update_set_null, Rest...> {
+    static constexpr std::string_view value = "SET NULL";
+};
+
+template <typename... Rest>
+struct fk_on_update_attr<fk_attr::on_update_no_action, Rest...> {
+    static constexpr std::string_view value = "NO ACTION";
+};
+
+template <typename First, typename... Rest>
+struct fk_on_update_attr<First, Rest...> : fk_on_update_attr<Rest...> {};
 
 template <typename T>
 struct base : column_field_tag {
@@ -532,6 +643,13 @@ struct column_field : column_field_detail::base<T> {
         (std::same_as<Attrs, column_attr::on_update_current_timestamp> || ...);
     static constexpr std::string_view ddl_comment = column_field_detail::comment_attr_value<Attrs...>::value;
     static constexpr std::string_view ddl_collate = column_field_detail::collate_attr_value<Attrs...>::value;
+
+    // Foreign key attributes — populated only when an fk_attr::references<> is present.
+    static constexpr bool ddl_has_fk = column_field_detail::fk_references_attr<Attrs...>::has_value;
+    using ddl_fk_ref_table = typename column_field_detail::fk_references_attr<Attrs...>::ref_table;
+    using ddl_fk_ref_column = typename column_field_detail::fk_references_attr<Attrs...>::ref_column;
+    static constexpr std::string_view ddl_fk_on_delete = column_field_detail::fk_on_delete_attr<Attrs...>::value;
+    static constexpr std::string_view ddl_fk_on_update = column_field_detail::fk_on_update_attr<Attrs...>::value;
 
     template <typename Attr>
     [[nodiscard]] static consteval bool has_attribute() noexcept {

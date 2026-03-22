@@ -271,43 +271,33 @@ std::string field_sql_type_override() {
 }
 
 // ===================================================================
-// Foreign Key Schema
+// has_foreign_key_v — true when the field at Index in table T carries
+// an fk_attr::references<> attribute.
 //
-// Declare a FOREIGN KEY constraint for a specific field of a table by
-// specialising foreign_key_schema<T, Index>:
+// FK constraints are declared directly on the column field using typed
+// fk_attr attributes instead of a separate schema specialization:
 //
-//   template <>
-//   struct foreign_key_schema<market_data, 1> {
-//       // referenced_table() — name of the table being referenced
-//       static constexpr std::string_view referenced_table() { return "symbol"; }
-//       // referenced_column() — column in the referenced table
-//       static constexpr std::string_view referenced_column() { return "id"; }
-//       // on_delete() / on_update() — optional referential actions
-//       static constexpr std::string_view on_delete() { return "CASCADE"; }
-//       static constexpr std::string_view on_update() { return "CASCADE"; }
+//   struct child_table {
+//       COLUMN_FIELD(id, uint32_t)
+//       COLUMN_FIELD(parent_id, uint32_t,
+//                    fk_attr::references<parent_table, parent_table::id>,
+//                    fk_attr::on_delete_cascade,
+//                    fk_attr::on_update_cascade)
 //   };
 //
-// The primary template returns empty strings = no FK constraint.
+// The SQL referenced table name is derived from table_name_for<RefTable>
+// and the column name from RefColumn::column_name() — both resolved at
+// compile time, so typos become build errors.
 // ===================================================================
 
 template <typename T, std::size_t Index>
-struct foreign_key_schema {
-    static constexpr std::string_view referenced_table() {
-        return "";
-    }
-    static constexpr std::string_view referenced_column() {
-        return "";
-    }
-    static constexpr std::string_view on_delete() {
-        return "";
-    }
-    static constexpr std::string_view on_update() {
-        return "";
-    }
-};
-
-template <typename T, std::size_t Index>
-constexpr bool has_foreign_key_v = !foreign_key_schema<T, Index>::referenced_table().empty();
+constexpr bool has_foreign_key_v = [] {
+    using field_type = boost::pfr::tuple_element_t<Index, T>;
+    if constexpr (requires { field_type::ddl_has_fk; })
+        return field_type::ddl_has_fk;
+    else
+        return false;
+}();
 
 // ===================================================================
 // ValidTable — concept for a well-formed table struct
