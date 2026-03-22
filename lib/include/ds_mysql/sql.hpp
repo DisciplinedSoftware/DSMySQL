@@ -1080,6 +1080,124 @@ inline std::string to_sql_encryption(Encryption value) {
     return "N";
 }
 
+namespace table_option_sql {
+
+inline constexpr std::string_view engine_key = "ENGINE";
+inline constexpr std::string_view engine_prefix = "ENGINE=";
+
+inline constexpr std::string_view auto_increment_key = "AUTO_INCREMENT";
+inline constexpr std::string_view auto_increment_prefix = "AUTO_INCREMENT=";
+
+inline constexpr std::string_view avg_row_length_key = "AVG_ROW_LENGTH";
+inline constexpr std::string_view avg_row_length_prefix = "AVG_ROW_LENGTH=";
+
+inline constexpr std::string_view default_charset_key = "DEFAULT CHARSET";
+inline constexpr std::string_view default_charset_prefix = "DEFAULT CHARSET=";
+
+inline constexpr std::string_view collate_key = "COLLATE";
+inline constexpr std::string_view collate_prefix = "COLLATE=";
+
+inline constexpr std::string_view checksum_key = "CHECKSUM";
+inline constexpr std::string_view checksum_prefix = "CHECKSUM=";
+
+inline constexpr std::string_view comment_key = "COMMENT";
+inline constexpr std::string_view comment_prefix = "COMMENT=";
+
+inline constexpr std::string_view compression_key = "COMPRESSION";
+inline constexpr std::string_view compression_prefix = "COMPRESSION=";
+
+inline constexpr std::string_view connection_key = "CONNECTION";
+inline constexpr std::string_view connection_prefix = "CONNECTION=";
+
+inline constexpr std::string_view data_directory_key = "DATA DIRECTORY";
+inline constexpr std::string_view data_directory_prefix = "DATA DIRECTORY=";
+
+inline constexpr std::string_view index_directory_key = "INDEX DIRECTORY";
+inline constexpr std::string_view index_directory_prefix = "INDEX DIRECTORY=";
+
+inline constexpr std::string_view delay_key_write_key = "DELAY_KEY_WRITE";
+inline constexpr std::string_view delay_key_write_prefix = "DELAY_KEY_WRITE=";
+
+inline constexpr std::string_view encryption_key = "ENCRYPTION";
+inline constexpr std::string_view encryption_prefix = "ENCRYPTION=";
+
+inline constexpr std::string_view insert_method_key = "INSERT_METHOD";
+inline constexpr std::string_view insert_method_prefix = "INSERT_METHOD=";
+
+inline constexpr std::string_view key_block_size_key = "KEY_BLOCK_SIZE";
+inline constexpr std::string_view key_block_size_prefix = "KEY_BLOCK_SIZE=";
+
+inline constexpr std::string_view max_rows_key = "MAX_ROWS";
+inline constexpr std::string_view max_rows_prefix = "MAX_ROWS=";
+
+inline constexpr std::string_view min_rows_key = "MIN_ROWS";
+inline constexpr std::string_view min_rows_prefix = "MIN_ROWS=";
+
+inline constexpr std::string_view pack_keys_key = "PACK_KEYS";
+inline constexpr std::string_view pack_keys_prefix = "PACK_KEYS=";
+
+inline constexpr std::string_view password_key = "PASSWORD";
+inline constexpr std::string_view password_prefix = "PASSWORD=";
+
+inline constexpr std::string_view row_format_key = "ROW_FORMAT";
+inline constexpr std::string_view row_format_prefix = "ROW_FORMAT=";
+
+inline constexpr std::string_view stats_auto_recalc_key = "STATS_AUTO_RECALC";
+inline constexpr std::string_view stats_auto_recalc_prefix = "STATS_AUTO_RECALC=";
+
+inline constexpr std::string_view stats_persistent_key = "STATS_PERSISTENT";
+inline constexpr std::string_view stats_persistent_prefix = "STATS_PERSISTENT=";
+
+inline constexpr std::string_view stats_sample_pages_key = "STATS_SAMPLE_PAGES";
+inline constexpr std::string_view stats_sample_pages_prefix = "STATS_SAMPLE_PAGES=";
+
+inline constexpr std::string_view tablespace_key = "TABLESPACE";
+inline constexpr std::string_view tablespace_prefix = "TABLESPACE=";
+
+inline constexpr std::string_view union_key = "UNION";
+
+[[nodiscard]] inline std::string assign(std::string_view prefix, std::string_view value) {
+    std::string out;
+    out.reserve(prefix.size() + value.size());
+    out += prefix;
+    out += value;
+    return out;
+}
+
+[[nodiscard]] inline std::string assign_quoted(std::string_view prefix, std::string_view value) {
+    std::string out;
+    out.reserve(prefix.size() + value.size() + 2);
+    out += prefix;
+    out += quote_sql_string(value);
+    return out;
+}
+
+[[nodiscard]] inline std::string assign_numeric(std::string_view prefix, std::size_t value) {
+    return std::format("{}{}", prefix, value);
+}
+
+[[nodiscard]] inline std::string assign_bool(std::string_view prefix, bool enabled) {
+    std::string out;
+    out.reserve(prefix.size() + 1);
+    out += prefix;
+    out += enabled ? "1" : "0";
+    return out;
+}
+
+[[nodiscard]] inline std::string union_tables_value(std::vector<std::string> const& table_names) {
+    std::string sql = "UNION=(";
+    for (std::size_t i = 0; i < table_names.size(); ++i) {
+        if (i > 0) {
+            sql += ",";
+        }
+        sql += table_names[i];
+    }
+    sql += ")";
+    return sql;
+}
+
+}  // namespace table_option_sql
+
 struct create_table_option {
     void set(std::string key, std::string value_sql) {
         auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
@@ -1107,17 +1225,20 @@ struct create_table_option {
     }
 
     create_table_option& engine(std::string_view value) {
-        set("ENGINE", std::string{"ENGINE="} + std::string{value});
+        set(std::string{table_option_sql::engine_key},
+            table_option_sql::assign(table_option_sql::engine_prefix, value));
         return *this;
     }
 
     create_table_option& auto_increment(std::size_t value) {
-        set("AUTO_INCREMENT", std::format("AUTO_INCREMENT={}", value));
+        set(std::string{table_option_sql::auto_increment_key},
+            table_option_sql::assign_numeric(table_option_sql::auto_increment_prefix, value));
         return *this;
     }
 
     create_table_option& avg_row_length(std::size_t value) {
-        set("AVG_ROW_LENGTH", std::format("AVG_ROW_LENGTH={}", value));
+        set(std::string{table_option_sql::avg_row_length_key},
+            table_option_sql::assign_numeric(table_option_sql::avg_row_length_prefix, value));
         return *this;
     }
 
@@ -1126,27 +1247,32 @@ struct create_table_option {
     }
 
     create_table_option& default_charset(std::string_view value) {
-        set("DEFAULT CHARSET", std::string{"DEFAULT CHARSET="} + std::string{value});
+        set(std::string{table_option_sql::default_charset_key},
+            table_option_sql::assign(table_option_sql::default_charset_prefix, value));
         return *this;
     }
 
     create_table_option& collate(std::string_view value) {
-        set("COLLATE", std::string{"COLLATE="} + std::string{value});
+        set(std::string{table_option_sql::collate_key},
+            table_option_sql::assign(table_option_sql::collate_prefix, value));
         return *this;
     }
 
     create_table_option& checksum(bool enabled) {
-        set("CHECKSUM", std::string{"CHECKSUM="} + (enabled ? "1" : "0"));
+        set(std::string{table_option_sql::checksum_key},
+            table_option_sql::assign_bool(table_option_sql::checksum_prefix, enabled));
         return *this;
     }
 
     create_table_option& checksum(std::size_t value) {
-        set("CHECKSUM", std::format("CHECKSUM={}", value));
+        set(std::string{table_option_sql::checksum_key},
+            table_option_sql::assign_numeric(table_option_sql::checksum_prefix, value));
         return *this;
     }
 
     create_table_option& comment(std::string_view value) {
-        set("COMMENT", std::string{"COMMENT="} + quote_sql_string(value));
+        set(std::string{table_option_sql::comment_key},
+            table_option_sql::assign_quoted(table_option_sql::comment_prefix, value));
         return *this;
     }
 
@@ -1155,32 +1281,38 @@ struct create_table_option {
     }
 
     create_table_option& compression(std::string_view value) {
-        set("COMPRESSION", std::string{"COMPRESSION="} + quote_sql_string(value));
+        set(std::string{table_option_sql::compression_key},
+            table_option_sql::assign_quoted(table_option_sql::compression_prefix, value));
         return *this;
     }
 
     create_table_option& connection(std::string_view value) {
-        set("CONNECTION", std::string{"CONNECTION="} + quote_sql_string(value));
+        set(std::string{table_option_sql::connection_key},
+            table_option_sql::assign_quoted(table_option_sql::connection_prefix, value));
         return *this;
     }
 
     create_table_option& data_directory(std::string_view value) {
-        set("DATA DIRECTORY", std::string{"DATA DIRECTORY="} + quote_sql_string(value));
+        set(std::string{table_option_sql::data_directory_key},
+            table_option_sql::assign_quoted(table_option_sql::data_directory_prefix, value));
         return *this;
     }
 
     create_table_option& index_directory(std::string_view value) {
-        set("INDEX DIRECTORY", std::string{"INDEX DIRECTORY="} + quote_sql_string(value));
+        set(std::string{table_option_sql::index_directory_key},
+            table_option_sql::assign_quoted(table_option_sql::index_directory_prefix, value));
         return *this;
     }
 
     create_table_option& delay_key_write(bool enabled) {
-        set("DELAY_KEY_WRITE", std::string{"DELAY_KEY_WRITE="} + (enabled ? "1" : "0"));
+        set(std::string{table_option_sql::delay_key_write_key},
+            table_option_sql::assign_bool(table_option_sql::delay_key_write_prefix, enabled));
         return *this;
     }
 
     create_table_option& delay_key_write(std::size_t value) {
-        set("DELAY_KEY_WRITE", std::format("DELAY_KEY_WRITE={}", value));
+        set(std::string{table_option_sql::delay_key_write_key},
+            table_option_sql::assign_numeric(table_option_sql::delay_key_write_prefix, value));
         return *this;
     }
 
@@ -1189,7 +1321,8 @@ struct create_table_option {
     }
 
     create_table_option& encryption(std::string_view value) {
-        set("ENCRYPTION", std::string{"ENCRYPTION="} + quote_sql_string(value));
+        set(std::string{table_option_sql::encryption_key},
+            table_option_sql::assign_quoted(table_option_sql::encryption_prefix, value));
         return *this;
     }
 
@@ -1198,22 +1331,26 @@ struct create_table_option {
     }
 
     create_table_option& insert_method(std::string_view value) {
-        set("INSERT_METHOD", std::string{"INSERT_METHOD="} + std::string{value});
+        set(std::string{table_option_sql::insert_method_key},
+            table_option_sql::assign(table_option_sql::insert_method_prefix, value));
         return *this;
     }
 
     create_table_option& key_block_size(std::size_t value) {
-        set("KEY_BLOCK_SIZE", std::format("KEY_BLOCK_SIZE={}", value));
+        set(std::string{table_option_sql::key_block_size_key},
+            table_option_sql::assign_numeric(table_option_sql::key_block_size_prefix, value));
         return *this;
     }
 
     create_table_option& max_rows(std::size_t value) {
-        set("MAX_ROWS", std::format("MAX_ROWS={}", value));
+        set(std::string{table_option_sql::max_rows_key},
+            table_option_sql::assign_numeric(table_option_sql::max_rows_prefix, value));
         return *this;
     }
 
     create_table_option& min_rows(std::size_t value) {
-        set("MIN_ROWS", std::format("MIN_ROWS={}", value));
+        set(std::string{table_option_sql::min_rows_key},
+            table_option_sql::assign_numeric(table_option_sql::min_rows_prefix, value));
         return *this;
     }
 
@@ -1222,12 +1359,14 @@ struct create_table_option {
     }
 
     create_table_option& pack_keys(std::string_view value) {
-        set("PACK_KEYS", std::string{"PACK_KEYS="} + std::string{value});
+        set(std::string{table_option_sql::pack_keys_key},
+            table_option_sql::assign(table_option_sql::pack_keys_prefix, value));
         return *this;
     }
 
     create_table_option& password(std::string_view value) {
-        set("PASSWORD", std::string{"PASSWORD="} + quote_sql_string(value));
+        set(std::string{table_option_sql::password_key},
+            table_option_sql::assign_quoted(table_option_sql::password_prefix, value));
         return *this;
     }
 
@@ -1236,7 +1375,8 @@ struct create_table_option {
     }
 
     create_table_option& row_format(std::string_view value) {
-        set("ROW_FORMAT", std::string{"ROW_FORMAT="} + std::string{value});
+        set(std::string{table_option_sql::row_format_key},
+            table_option_sql::assign(table_option_sql::row_format_prefix, value));
         return *this;
     }
 
@@ -1245,7 +1385,8 @@ struct create_table_option {
     }
 
     create_table_option& stats_auto_recalc(std::string_view value) {
-        set("STATS_AUTO_RECALC", std::string{"STATS_AUTO_RECALC="} + std::string{value});
+        set(std::string{table_option_sql::stats_auto_recalc_key},
+            table_option_sql::assign(table_option_sql::stats_auto_recalc_prefix, value));
         return *this;
     }
 
@@ -1254,30 +1395,25 @@ struct create_table_option {
     }
 
     create_table_option& stats_persistent(std::string_view value) {
-        set("STATS_PERSISTENT", std::string{"STATS_PERSISTENT="} + std::string{value});
+        set(std::string{table_option_sql::stats_persistent_key},
+            table_option_sql::assign(table_option_sql::stats_persistent_prefix, value));
         return *this;
     }
 
     create_table_option& stats_sample_pages(std::size_t value) {
-        set("STATS_SAMPLE_PAGES", std::format("STATS_SAMPLE_PAGES={}", value));
+        set(std::string{table_option_sql::stats_sample_pages_key},
+            table_option_sql::assign_numeric(table_option_sql::stats_sample_pages_prefix, value));
         return *this;
     }
 
     create_table_option& tablespace(std::string_view value) {
-        set("TABLESPACE", std::string{"TABLESPACE="} + std::string{value});
+        set(std::string{table_option_sql::tablespace_key},
+            table_option_sql::assign(table_option_sql::tablespace_prefix, value));
         return *this;
     }
 
     create_table_option& union_tables(std::vector<std::string> table_names) {
-        std::string sql = "UNION=(";
-        for (std::size_t i = 0; i < table_names.size(); ++i) {
-            if (i > 0) {
-                sql += ",";
-            }
-            sql += table_names[i];
-        }
-        sql += ")";
-        set("UNION", std::move(sql));
+        set(std::string{table_option_sql::union_key}, table_option_sql::union_tables_value(table_names));
         return *this;
     }
 
@@ -1292,15 +1428,18 @@ public:
     }
 
     Derived& engine(std::string_view value) {
-        return set("ENGINE", std::string{"ENGINE="} + std::string{value});
+        return set(std::string{table_option_sql::engine_key},
+                   table_option_sql::assign(table_option_sql::engine_prefix, value));
     }
 
     Derived& auto_increment(std::size_t value) {
-        return set("AUTO_INCREMENT", std::format("AUTO_INCREMENT={}", value));
+        return set(std::string{table_option_sql::auto_increment_key},
+                   table_option_sql::assign_numeric(table_option_sql::auto_increment_prefix, value));
     }
 
     Derived& avg_row_length(std::size_t value) {
-        return set("AVG_ROW_LENGTH", std::format("AVG_ROW_LENGTH={}", value));
+        return set(std::string{table_option_sql::avg_row_length_key},
+                   table_option_sql::assign_numeric(table_option_sql::avg_row_length_prefix, value));
     }
 
     Derived& default_charset(Charset value) {
@@ -1308,23 +1447,28 @@ public:
     }
 
     Derived& default_charset(std::string_view value) {
-        return set("DEFAULT CHARSET", std::string{"DEFAULT CHARSET="} + std::string{value});
+        return set(std::string{table_option_sql::default_charset_key},
+                   table_option_sql::assign(table_option_sql::default_charset_prefix, value));
     }
 
     Derived& collate(std::string_view value) {
-        return set("COLLATE", std::string{"COLLATE="} + std::string{value});
+        return set(std::string{table_option_sql::collate_key},
+                   table_option_sql::assign(table_option_sql::collate_prefix, value));
     }
 
     Derived& checksum(bool enabled) {
-        return set("CHECKSUM", std::string{"CHECKSUM="} + (enabled ? "1" : "0"));
+        return set(std::string{table_option_sql::checksum_key},
+                   table_option_sql::assign_bool(table_option_sql::checksum_prefix, enabled));
     }
 
     Derived& checksum(std::size_t value) {
-        return set("CHECKSUM", std::format("CHECKSUM={}", value));
+        return set(std::string{table_option_sql::checksum_key},
+                   table_option_sql::assign_numeric(table_option_sql::checksum_prefix, value));
     }
 
     Derived& comment(std::string_view value) {
-        return set("COMMENT", std::string{"COMMENT="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::comment_key},
+                   table_option_sql::assign_quoted(table_option_sql::comment_prefix, value));
     }
 
     Derived& compression(Compression value) {
@@ -1332,27 +1476,33 @@ public:
     }
 
     Derived& compression(std::string_view value) {
-        return set("COMPRESSION", std::string{"COMPRESSION="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::compression_key},
+                   table_option_sql::assign_quoted(table_option_sql::compression_prefix, value));
     }
 
     Derived& connection(std::string_view value) {
-        return set("CONNECTION", std::string{"CONNECTION="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::connection_key},
+                   table_option_sql::assign_quoted(table_option_sql::connection_prefix, value));
     }
 
     Derived& data_directory(std::string_view value) {
-        return set("DATA DIRECTORY", std::string{"DATA DIRECTORY="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::data_directory_key},
+                   table_option_sql::assign_quoted(table_option_sql::data_directory_prefix, value));
     }
 
     Derived& index_directory(std::string_view value) {
-        return set("INDEX DIRECTORY", std::string{"INDEX DIRECTORY="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::index_directory_key},
+                   table_option_sql::assign_quoted(table_option_sql::index_directory_prefix, value));
     }
 
     Derived& delay_key_write(bool enabled) {
-        return set("DELAY_KEY_WRITE", std::string{"DELAY_KEY_WRITE="} + (enabled ? "1" : "0"));
+        return set(std::string{table_option_sql::delay_key_write_key},
+                   table_option_sql::assign_bool(table_option_sql::delay_key_write_prefix, enabled));
     }
 
     Derived& delay_key_write(std::size_t value) {
-        return set("DELAY_KEY_WRITE", std::format("DELAY_KEY_WRITE={}", value));
+        return set(std::string{table_option_sql::delay_key_write_key},
+                   table_option_sql::assign_numeric(table_option_sql::delay_key_write_prefix, value));
     }
 
     Derived& encryption(Encryption value) {
@@ -1360,7 +1510,8 @@ public:
     }
 
     Derived& encryption(std::string_view value) {
-        return set("ENCRYPTION", std::string{"ENCRYPTION="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::encryption_key},
+                   table_option_sql::assign_quoted(table_option_sql::encryption_prefix, value));
     }
 
     Derived& insert_method(InsertMethod value) {
@@ -1368,19 +1519,23 @@ public:
     }
 
     Derived& insert_method(std::string_view value) {
-        return set("INSERT_METHOD", std::string{"INSERT_METHOD="} + std::string{value});
+        return set(std::string{table_option_sql::insert_method_key},
+                   table_option_sql::assign(table_option_sql::insert_method_prefix, value));
     }
 
     Derived& key_block_size(std::size_t value) {
-        return set("KEY_BLOCK_SIZE", std::format("KEY_BLOCK_SIZE={}", value));
+        return set(std::string{table_option_sql::key_block_size_key},
+                   table_option_sql::assign_numeric(table_option_sql::key_block_size_prefix, value));
     }
 
     Derived& max_rows(std::size_t value) {
-        return set("MAX_ROWS", std::format("MAX_ROWS={}", value));
+        return set(std::string{table_option_sql::max_rows_key},
+                   table_option_sql::assign_numeric(table_option_sql::max_rows_prefix, value));
     }
 
     Derived& min_rows(std::size_t value) {
-        return set("MIN_ROWS", std::format("MIN_ROWS={}", value));
+        return set(std::string{table_option_sql::min_rows_key},
+                   table_option_sql::assign_numeric(table_option_sql::min_rows_prefix, value));
     }
 
     Derived& pack_keys(PackKeys value) {
@@ -1388,11 +1543,13 @@ public:
     }
 
     Derived& pack_keys(std::string_view value) {
-        return set("PACK_KEYS", std::string{"PACK_KEYS="} + std::string{value});
+        return set(std::string{table_option_sql::pack_keys_key},
+                   table_option_sql::assign(table_option_sql::pack_keys_prefix, value));
     }
 
     Derived& password(std::string_view value) {
-        return set("PASSWORD", std::string{"PASSWORD="} + quote_sql_string(value));
+        return set(std::string{table_option_sql::password_key},
+                   table_option_sql::assign_quoted(table_option_sql::password_prefix, value));
     }
 
     Derived& row_format(RowFormat value) {
@@ -1400,7 +1557,8 @@ public:
     }
 
     Derived& row_format(std::string_view value) {
-        return set("ROW_FORMAT", std::string{"ROW_FORMAT="} + std::string{value});
+        return set(std::string{table_option_sql::row_format_key},
+                   table_option_sql::assign(table_option_sql::row_format_prefix, value));
     }
 
     Derived& stats_auto_recalc(StatsPolicy value) {
@@ -1408,7 +1566,8 @@ public:
     }
 
     Derived& stats_auto_recalc(std::string_view value) {
-        return set("STATS_AUTO_RECALC", std::string{"STATS_AUTO_RECALC="} + std::string{value});
+        return set(std::string{table_option_sql::stats_auto_recalc_key},
+                   table_option_sql::assign(table_option_sql::stats_auto_recalc_prefix, value));
     }
 
     Derived& stats_persistent(StatsPolicy value) {
@@ -1416,27 +1575,22 @@ public:
     }
 
     Derived& stats_persistent(std::string_view value) {
-        return set("STATS_PERSISTENT", std::string{"STATS_PERSISTENT="} + std::string{value});
+        return set(std::string{table_option_sql::stats_persistent_key},
+                   table_option_sql::assign(table_option_sql::stats_persistent_prefix, value));
     }
 
     Derived& stats_sample_pages(std::size_t value) {
-        return set("STATS_SAMPLE_PAGES", std::format("STATS_SAMPLE_PAGES={}", value));
+        return set(std::string{table_option_sql::stats_sample_pages_key},
+                   table_option_sql::assign_numeric(table_option_sql::stats_sample_pages_prefix, value));
     }
 
     Derived& tablespace(std::string_view value) {
-        return set("TABLESPACE", std::string{"TABLESPACE="} + std::string{value});
+        return set(std::string{table_option_sql::tablespace_key},
+                   table_option_sql::assign(table_option_sql::tablespace_prefix, value));
     }
 
     Derived& union_tables(std::vector<std::string> table_names) {
-        std::string sql = "UNION=(";
-        for (std::size_t i = 0; i < table_names.size(); ++i) {
-            if (i > 0) {
-                sql += ",";
-            }
-            sql += table_names[i];
-        }
-        sql += ")";
-        return set("UNION", std::move(sql));
+        return set(std::string{table_option_sql::union_key}, table_option_sql::union_tables_value(table_names));
     }
 
 protected:
@@ -1459,6 +1613,24 @@ struct table_attributes {
     }
 };
 
+namespace database_option_sql {
+
+inline constexpr std::string_view default_character_set_key = "DEFAULT CHARACTER SET";
+inline constexpr std::string_view default_character_set_prefix = "DEFAULT CHARACTER SET ";
+
+inline constexpr std::string_view default_collate_key = "DEFAULT COLLATE";
+inline constexpr std::string_view default_collate_prefix = "DEFAULT COLLATE ";
+
+[[nodiscard]] inline std::string assign(std::string_view prefix, std::string_view value) {
+    std::string out;
+    out.reserve(prefix.size() + value.size());
+    out += prefix;
+    out += value;
+    return out;
+}
+
+}  // namespace database_option_sql
+
 struct create_database_option {
     [[nodiscard]] std::string to_sql() const {
         std::string out;
@@ -1474,12 +1646,14 @@ struct create_database_option {
     }
 
     create_database_option& default_charset(std::string_view value) {
-        set("DEFAULT CHARACTER SET", std::string{"DEFAULT CHARACTER SET "} + std::string{value});
+        set(std::string{database_option_sql::default_character_set_key},
+            database_option_sql::assign(database_option_sql::default_character_set_prefix, value));
         return *this;
     }
 
     create_database_option& default_collate(std::string_view value) {
-        set("DEFAULT COLLATE", std::string{"DEFAULT COLLATE "} + std::string{value});
+        set(std::string{database_option_sql::default_collate_key},
+            database_option_sql::assign(database_option_sql::default_collate_prefix, value));
         return *this;
     }
 
@@ -1496,7 +1670,6 @@ private:
             options.emplace_back(std::move(key), std::move(value_sql));
         }
     }
-
 };
 
 template <typename Derived>
@@ -1517,8 +1690,7 @@ public:
     }
 
 protected:
-    explicit create_database_attributes_mixin(create_database_option options = {})
-        : options_(std::move(options)) {
+    explicit create_database_attributes_mixin(create_database_option options = {}) : options_(std::move(options)) {
     }
 
     create_database_option options_;
@@ -2254,8 +2426,8 @@ public:
 
     explicit create_database_if_not_exists_builder(std::string prior = {},
                                                    create_database_option options = database_attributes<T>::get())
-        : create_database_attributes_mixin<create_database_if_not_exists_builder<T>>(std::move(options))
-        , prior_sql_(std::move(prior)) {
+        : create_database_attributes_mixin<create_database_if_not_exists_builder<T>>(std::move(options)),
+          prior_sql_(std::move(prior)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2288,8 +2460,8 @@ public:
 
     explicit create_database_builder(std::string prior = {},
                                      create_database_option options = database_attributes<T>::get())
-        : create_database_attributes_mixin<create_database_builder<T>>(std::move(options))
-        , prior_sql_(std::move(prior)) {
+        : create_database_attributes_mixin<create_database_builder<T>>(std::move(options)),
+          prior_sql_(std::move(prior)) {
     }
 
     [[nodiscard]] create_database_if_not_exists_builder<T> if_not_exists() const {
@@ -2326,8 +2498,9 @@ public:
 
     explicit create_database_named_if_not_exists_builder(database_name name, std::string prior = {},
                                                          create_database_option options = {})
-        : create_database_attributes_mixin<create_database_named_if_not_exists_builder>(std::move(options))
-        , prior_sql_(std::move(prior)), name_(std::move(name)) {
+        : create_database_attributes_mixin<create_database_named_if_not_exists_builder>(std::move(options)),
+          prior_sql_(std::move(prior)),
+          name_(std::move(name)) {
     }
 
     [[nodiscard]] ddl_continuation then() const {
@@ -2352,8 +2525,9 @@ public:
 
     explicit create_database_named_builder(database_name name, std::string prior = {},
                                            create_database_option options = {})
-        : create_database_attributes_mixin<create_database_named_builder>(std::move(options))
-        , prior_sql_(std::move(prior)), name_(std::move(name)) {
+        : create_database_attributes_mixin<create_database_named_builder>(std::move(options)),
+          prior_sql_(std::move(prior)),
+          name_(std::move(name)) {
     }
 
     [[nodiscard]] create_database_named_if_not_exists_builder if_not_exists() const {
