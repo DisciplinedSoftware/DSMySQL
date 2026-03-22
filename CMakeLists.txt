@@ -46,6 +46,7 @@ elseif(MSVC)
         /W4       # High warning level
         /WX       # Warnings as errors
         /permissive-  # Strict standards conformance
+        /Zc:preprocessor # Enable standards-conforming preprocessor (__VA_OPT__)
     )
 endif()
 

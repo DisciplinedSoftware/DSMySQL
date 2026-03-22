@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mysql/mysql.h>
+#include <mysql.h>
 
 #include <algorithm>
 #include <cassert>
@@ -12,10 +12,10 @@
 #include <string_view>
 #include <vector>
 
+#include "ds_mysql/config.hpp"
 #include "ds_mysql/credentials.hpp"
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/host_name.hpp"
-#include "ds_mysql/config.hpp"
 #include "ds_mysql/port_number.hpp"
 #include "ds_mysql/sql.hpp"
 
