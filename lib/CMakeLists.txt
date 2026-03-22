@@ -16,8 +16,8 @@ option(DSMYSQL_ENABLE_INSTALL "Enable install targets" ${PROJECT_IS_TOP_LEVEL})
 
 target_include_directories(ds_mysql
     INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     "$<BUILD_INTERFACE:${MYSQL_INCLUDE_DIRS}>"
 )

@@ -150,10 +150,10 @@ find_package(ds_mysql CONFIG REQUIRED)
 target_link_libraries(my_target PRIVATE ds_mysql::ds_mysql)
 ```
 
-If you are not using CMake, prefer the release archive (`ds_mysql-v<version>.tar.gz`):
-it already contains generated `ds_mysql/version.hpp`. Cloning the raw repository
-and copying headers directly will not provide `version.hpp` unless you run CMake
-configure first.
+If you are not using CMake, you can consume headers directly from either the
+release archive or a git checkout: `ds_mysql/version.hpp` is checked in as a
+fallback. In CMake builds, a generated `version.hpp` (from `version.hpp.in`) is
+preferred so `project(VERSION ...)` remains the authoritative source.
 
 ## Key API
 
