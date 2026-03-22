@@ -4790,6 +4790,13 @@ struct alias_order_entry {
 
 using order_by_item = std::variant<std::string, alias_order_entry>;
 
+enum class select_lock_mode {
+    none,
+    for_update,
+    for_share,
+    lock_in_share_mode,
+};
+
 // ===================================================================
 // select_query_builder — unified builder for all SELECT clauses
 // ===================================================================
@@ -5072,6 +5079,36 @@ struct select_query_builder {
         return std::move(*this);
     }
 
+    [[nodiscard]] select_query_builder for_update() const& {
+        auto copy = *this;
+        copy.lock_mode_ = select_lock_mode::for_update;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder for_update() && {
+        lock_mode_ = select_lock_mode::for_update;
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder for_share() const& {
+        auto copy = *this;
+        copy.lock_mode_ = select_lock_mode::for_share;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder for_share() && {
+        lock_mode_ = select_lock_mode::for_share;
+        return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder lock_in_share_mode() const& {
+        auto copy = *this;
+        copy.lock_mode_ = select_lock_mode::lock_in_share_mode;
+        return copy;
+    }
+    [[nodiscard]] select_query_builder lock_in_share_mode() && {
+        lock_mode_ = select_lock_mode::lock_in_share_mode;
+        return std::move(*this);
+    }
+
     // ---- JOIN clauses ----
     //
     // Use col<Table, Index> descriptors for the join columns to produce
@@ -5266,6 +5303,13 @@ struct select_query_builder {
             sql += " OFFSET ";
             sql += std::to_string(*offset_);
         }
+        if (lock_mode_ == select_lock_mode::for_update) {
+            sql += " FOR UPDATE";
+        } else if (lock_mode_ == select_lock_mode::for_share) {
+            sql += " FOR SHARE";
+        } else if (lock_mode_ == select_lock_mode::lock_in_share_mode) {
+            sql += " LOCK IN SHARE MODE";
+        }
         return sql;
     }
 
@@ -5318,6 +5362,7 @@ struct select_query_builder {
     std::vector<order_by_item> order_by_clauses_;
     std::optional<std::size_t> limit_;
     std::optional<std::size_t> offset_;
+    select_lock_mode lock_mode_ = select_lock_mode::none;
     bool distinct_ = false;
     std::string joins_;
     std::map<std::size_t, std::string> aliases_;
@@ -5380,6 +5425,19 @@ private:
     std::string sql_;
 };
 
+class statement_query {
+public:
+    explicit statement_query(std::string sql) : sql_(std::move(sql)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
 }  // namespace detail
 
 // ===================================================================
@@ -5416,6 +5474,22 @@ template <TypedSelectQuery Q1, TypedSelectQuery Q2>
 [[nodiscard]] detail::union_query<typename Q1::result_row_type> except_(Q1 const& q1, Q2 const& q2) {
     return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") EXCEPT (" + q2.build_sql() +
                                                              ")"};
+}
+
+[[nodiscard]] inline detail::statement_query start_transaction() {
+    return detail::statement_query{"START TRANSACTION"};
+}
+
+[[nodiscard]] inline detail::statement_query begin_transaction() {
+    return detail::statement_query{"BEGIN"};
+}
+
+[[nodiscard]] inline detail::statement_query commit_transaction() {
+    return detail::statement_query{"COMMIT"};
+}
+
+[[nodiscard]] inline detail::statement_query rollback_transaction() {
+    return detail::statement_query{"ROLLBACK"};
 }
 
 /**

@@ -102,8 +102,9 @@ suite<"DQL"> dql_suite = [] {
                              .order_by<product::id>()
                              .limit(3)
                              .build_sql();
-        expect(sql ==
-               "SELECT id, category_id, sku, type, name, tag, unit, created_at, last_updated_at FROM product ORDER BY id ASC LIMIT 3"s)
+        expect(
+            sql ==
+            "SELECT id, category_id, sku, type, name, tag, unit, created_at, last_updated_at FROM product ORDER BY id ASC LIMIT 3"s)
             << sql;
     };
 
@@ -328,6 +329,26 @@ suite<"DQL Extended Clauses"> dql_extended_clauses_suite = [] {
             sql ==
             "SELECT type, COUNT(*) FROM product WHERE unit IS NOT NULL GROUP BY type HAVING COUNT(*) > 2 ORDER BY type ASC LIMIT 10 OFFSET 20"s)
             << sql;
+    };
+
+    "for_update - appends FOR UPDATE lock clause"_test = [] {
+        auto const sql = select<product::id>().from<product>().where(equal<product::id>(1u)).for_update().build_sql();
+        expect(sql == "SELECT id FROM product WHERE id = 1 FOR UPDATE"s) << sql;
+    };
+
+    "for_share - appends FOR SHARE lock clause"_test = [] {
+        auto const sql = select<product::id>().from<product>().order_by<product::id>().for_share().build_sql();
+        expect(sql == "SELECT id FROM product ORDER BY id ASC FOR SHARE"s) << sql;
+    };
+
+    "lock_in_share_mode - appends LOCK IN SHARE MODE lock clause"_test = [] {
+        auto const sql = select<product::id>().from<product>().limit(5).lock_in_share_mode().build_sql();
+        expect(sql == "SELECT id FROM product LIMIT 5 LOCK IN SHARE MODE"s) << sql;
+    };
+
+    "lock clause precedence - last lock method wins"_test = [] {
+        auto const sql = select<product::id>().from<product>().for_update().for_share().build_sql();
+        expect(sql == "SELECT id FROM product FOR SHARE"s) << sql;
     };
 
     "union_ - combines two queries with UNION"_test = [] {

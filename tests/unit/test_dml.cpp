@@ -16,14 +16,14 @@ using namespace std::string_literals;
 
 namespace {
 struct asset {
-    COLUMN_FIELD(id,                uint32_t)
-    COLUMN_FIELD(exchange_id,       std::optional<uint32_t>)
-    COLUMN_FIELD(ticker,            varchar_field<32>)
-    COLUMN_FIELD(instrument,        varchar_field<64>)
-    COLUMN_FIELD(name,              std::optional<varchar_field<255>>)
-    COLUMN_FIELD(sector,            std::optional<varchar_field<255>>)
-    COLUMN_FIELD(currency,          std::optional<varchar_field<32>>)
-    COLUMN_FIELD(created_date,      sql_datetime)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(exchange_id, std::optional<uint32_t>)
+    COLUMN_FIELD(ticker, varchar_field<32>)
+    COLUMN_FIELD(instrument, varchar_field<64>)
+    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(sector, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(created_date, sql_datetime)
     COLUMN_FIELD(last_updated_date, sql_datetime)
 };
 }  // namespace
@@ -40,6 +40,26 @@ suite<"DML"> dml_suite = [] {
     "describe - generates correct SQL"_test = [] {
         auto const sql = describe<asset>().build_sql();
         expect(sql == "DESCRIBE asset"s) << sql;
+    };
+
+    "start_transaction - generates correct SQL"_test = [] {
+        auto const sql = start_transaction().build_sql();
+        expect(sql == "START TRANSACTION"s) << sql;
+    };
+
+    "begin_transaction - generates correct SQL"_test = [] {
+        auto const sql = begin_transaction().build_sql();
+        expect(sql == "BEGIN"s) << sql;
+    };
+
+    "commit_transaction - generates correct SQL"_test = [] {
+        auto const sql = commit_transaction().build_sql();
+        expect(sql == "COMMIT"s) << sql;
+    };
+
+    "rollback_transaction - generates correct SQL"_test = [] {
+        auto const sql = rollback_transaction().build_sql();
+        expect(sql == "ROLLBACK"s) << sql;
     };
 
     // -------------------------------------------------------------------
@@ -311,8 +331,10 @@ suite<"DML"> dml_suite = [] {
         row.exchange_id_ = 1u;
         row.ticker_ = "AAPL";
         row.instrument_ = "Stock";
-        auto const sql =
-            insert_into<asset>().values(row).on_duplicate_key_update(asset::ticker{"AAPL"}, asset::instrument{"Stock"}).build_sql();
+        auto const sql = insert_into<asset>()
+                             .values(row)
+                             .on_duplicate_key_update(asset::ticker{"AAPL"}, asset::instrument{"Stock"})
+                             .build_sql();
         expect(sql ==
                "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, "
                "last_updated_date) "
