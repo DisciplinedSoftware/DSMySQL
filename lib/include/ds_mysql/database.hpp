@@ -15,7 +15,7 @@
 #include "ds_mysql/credentials.hpp"
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/host_name.hpp"
-#include "ds_mysql/mysql_config.hpp"
+#include "ds_mysql/config.hpp"
 #include "ds_mysql/port_number.hpp"
 #include "ds_mysql/sql.hpp"
 

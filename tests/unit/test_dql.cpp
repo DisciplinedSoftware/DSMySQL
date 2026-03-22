@@ -2,7 +2,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include "ds_mysql/mysql_metadata.hpp"
+#include "ds_mysql/metadata.hpp"
 #include "ds_mysql/sql.hpp"
 
 using namespace boost::ut;

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ds_mysql/mysql_database.hpp"
+#include "ds_mysql/database.hpp"
 #include "ut_expected_expect.hpp"
 
 using namespace boost::ut;

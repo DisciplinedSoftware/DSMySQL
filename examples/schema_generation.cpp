@@ -74,8 +74,13 @@ struct ds_mysql::field_schema<order_row, 3> {
 // ===================================================================
 
 struct example_db : ds_mysql::database_schema {
-    using tables = std::tuple<user, order_row>;
+    using type = std::tuple<user, order_row>;
 };
+
+// template <>
+// struct ds_mysql::database_tables<example_db> {
+//     using type = std::tuple<user, order_row>;
+// };
 
 template <>
 struct ds_mysql::database_name_for<example_db> {
