@@ -161,11 +161,8 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = update<asset>()
-                             .set(asset::ticker{"MSFT"})
-                             .order_by<asset::id, sort_order::desc>()
-                             .limit(1)
-                             .build_sql();
+        auto const sql =
+            update<asset>().set(asset::ticker{"MSFT"}).order_by<asset::id, sort_order::desc>().limit(1).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' ORDER BY id DESC LIMIT 1"s) << sql;
     };
 
@@ -206,11 +203,8 @@ suite<"DML"> dml_suite = [] {
     };
 
     "delete from - where + order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>()
-                             .where(is_not_null<asset::sector>())
-                             .order_by<asset::id>()
-                             .limit(10)
-                             .build_sql();
+        auto const sql =
+            delete_from<asset>().where(is_not_null<asset::sector>()).order_by<asset::id>().limit(10).build_sql();
         expect(sql == "DELETE FROM asset WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 10"s) << sql;
     };
 

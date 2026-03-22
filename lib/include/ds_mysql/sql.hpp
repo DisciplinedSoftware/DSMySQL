@@ -3905,12 +3905,10 @@ struct window_frame_clause {
     }
 };
 
-using rows_unbounded_preceding_to_current_row =
-    window_frame_clause<"ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW">;
+using rows_unbounded_preceding_to_current_row = window_frame_clause<"ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW">;
 using rows_unbounded_preceding_to_unbounded_following =
     window_frame_clause<"ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING">;
-using rows_current_row_to_unbounded_following =
-    window_frame_clause<"ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING">;
+using rows_current_row_to_unbounded_following = window_frame_clause<"ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING">;
 
 template <typename T>
 concept WindowFrameSpec = requires {
@@ -4514,8 +4512,8 @@ struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
     static std::string sql_expr() {
         return "ROW_NUMBER() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
-               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
-               sql_window_frame_clause<Frame>() + ")";
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
     }
 };
 
@@ -4534,8 +4532,8 @@ struct projection_traits<dense_rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
     static std::string sql_expr() {
         return "DENSE_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
-               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
-               sql_window_frame_clause<Frame>() + ")";
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
     }
 };
 

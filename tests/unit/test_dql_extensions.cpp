@@ -387,15 +387,14 @@ suite<"DQL Scalar Functions"> dql_scalar_functions_suite = [] {
     };
 
     "date/time aliases — generate expected SQL"_test = [] {
-        auto const sql =
-            select<date_of<event_log::created_at>, time_of<event_log::created_at>, year_of<event_log::created_at>,
-                   month_of<event_log::created_at>, day_of<event_log::created_at>,
-                   datediff<event_log::created_at, event_log::created_at>,
-                   date_add<event_log::created_at, 2, sql_date_part::week>,
-                   date_sub<event_log::created_at, 3, sql_date_part::day>,
-                   timestampdiff<sql_date_part::minute, event_log::created_at, event_log::created_at>>()
-                .from<event_log>()
-                .build_sql();
+        auto const sql = select<date_of<event_log::created_at>, time_of<event_log::created_at>,
+                                year_of<event_log::created_at>, month_of<event_log::created_at>,
+                                day_of<event_log::created_at>, datediff<event_log::created_at, event_log::created_at>,
+                                date_add<event_log::created_at, 2, sql_date_part::week>,
+                                date_sub<event_log::created_at, 3, sql_date_part::day>,
+                                timestampdiff<sql_date_part::minute, event_log::created_at, event_log::created_at>>()
+                             .from<event_log>()
+                             .build_sql();
         expect(sql ==
                "SELECT DATE(created_at), TIME(created_at), YEAR(created_at), MONTH(created_at), DAY(created_at), "
                "DATEDIFF(created_at, created_at), DATE_ADD(created_at, INTERVAL 2 WEEK), "
@@ -541,11 +540,12 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
 
     "window frame clauses — append frame SQL in OVER()"_test = [] {
         auto const sql =
-            select<row_number_over<product::type, product::id, sort_order::asc, rows_unbounded_preceding_to_current_row>,
-                   window_func<sum<product::price_val>, product::type, product::id, sort_order::asc,
-                               rows_current_row_to_unbounded_following>,
-                   lag_over<product::price_val, product::type, product::id, 1, sort_order::asc,
-                            rows_unbounded_preceding_to_unbounded_following>>()
+            select<
+                row_number_over<product::type, product::id, sort_order::asc, rows_unbounded_preceding_to_current_row>,
+                window_func<sum<product::price_val>, product::type, product::id, sort_order::asc,
+                            rows_current_row_to_unbounded_following>,
+                lag_over<product::price_val, product::type, product::id, 1, sort_order::asc,
+                         rows_unbounded_preceding_to_unbounded_following>>()
                 .from<product>()
                 .build_sql();
         expect(sql ==
