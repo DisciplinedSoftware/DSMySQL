@@ -50,6 +50,7 @@ sed -i "s/- 3306\/tcp/- ${MYSQL_PORT}:3306/" "$TMP_WORKFLOW"
 
 run_job() {
   local job="$1"
+  shift
   echo
   echo "=== Running ${job} ==="
   act push \
