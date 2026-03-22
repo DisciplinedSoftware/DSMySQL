@@ -5,7 +5,7 @@
 # CMakeLists.txt project(VERSION ...) remains the single source of truth.
 configure_file(
     include/ds_mysql/version.hpp.in
-    include/ds_mysql/version.hpp
+    include/ds_mysql/version_generated.hpp
     @ONLY
 )
 
@@ -48,7 +48,7 @@ if(DSMYSQL_ENABLE_INSTALL AND NOT CMAKE_SKIP_INSTALL_RULES)
     )
 
     install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/ds_mysql/version.hpp
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/ds_mysql/version_generated.hpp
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ds_mysql
     )
 

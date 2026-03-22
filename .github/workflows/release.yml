@@ -110,10 +110,10 @@ jobs:
           VERSION="${{ needs.validate-version.outputs.version }}"
           ARCHIVE="ds_mysql-v${VERSION}.tar.gz"
 
-          # Merge source headers with the generated version.hpp
+          # Merge source headers with generated version override header.
           mkdir -p _dist/ds_mysql
           cp -r lib/include/ds_mysql/. _dist/ds_mysql/
-          cp _ver_build/lib/include/ds_mysql/version.hpp _dist/ds_mysql/version.hpp
+          cp _ver_build/lib/include/ds_mysql/version_generated.hpp _dist/ds_mysql/version_generated.hpp
           rm -f _dist/ds_mysql/version.hpp.in
 
           tar -czf "$ARCHIVE" -C _dist ds_mysql

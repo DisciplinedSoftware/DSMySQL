@@ -3,23 +3,30 @@
 #include <cstdint>
 #include <string_view>
 
+#if __has_include("ds_mysql/version_generated.hpp")
+
+#include "ds_mysql/version_generated.hpp"
+
+#else
+
 namespace ds_mysql {
 
 /// Compile-time version information for DSMySQL.
 ///
-/// This checked-in header is a fallback for non-CMake consumption.
-/// In CMake builds, `version.hpp.in` is configured into the build tree and
-/// should be preferred so `project(VERSION ...)` stays authoritative.
+/// This checked-in fallback is used only when no build-system generated
+/// `version_generated.hpp` is present (e.g. raw-header, non-CMake usage).
 struct version {
-    static constexpr std::uint32_t major  = 1;
+    static constexpr std::uint32_t major  = 0;
     static constexpr std::uint32_t minor  = 0;
     static constexpr std::uint32_t patch  = 0;
 
     /// Packed integer: major * 10000 + minor * 100 + patch.
     static constexpr std::uint32_t value  = major * 10'000u + minor * 100u + patch;
 
-    /// Canonical "major.minor.patch" string.
-    static constexpr std::string_view string = "1.0.0";
+    /// Canonical fallback string for non-generated builds.
+    static constexpr std::string_view string = "0.0.0+unknown";
 };
 
 }  // namespace ds_mysql
+
+#endif

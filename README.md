@@ -152,8 +152,9 @@ target_link_libraries(my_target PRIVATE ds_mysql::ds_mysql)
 
 If you are not using CMake, you can consume headers directly from either the
 release archive or a git checkout: `ds_mysql/version.hpp` is checked in as a
-fallback. In CMake builds, a generated `version.hpp` (from `version.hpp.in`) is
-preferred so `project(VERSION ...)` remains the authoritative source.
+stable wrapper/fallback. In CMake builds, a generated
+`ds_mysql/version_generated.hpp` (from `version.hpp.in`) is used so
+`project(VERSION ...)` remains authoritative without rewriting tracked headers.
 
 ## Key API
 
