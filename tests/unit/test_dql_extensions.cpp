@@ -360,6 +360,48 @@ suite<"DQL Scalar Functions"> dql_scalar_functions_suite = [] {
         auto const sql = select<mysql_date_format_of<event_log::created_at, "%Y-%m">>().from<event_log>().build_sql();
         expect(sql == "SELECT DATE_FORMAT(created_at, '%Y-%m') FROM event_log"s) << sql;
     };
+
+    "date/time extraction helpers — generate expected SQL"_test = [] {
+        auto const sql =
+            select<date_of<event_log::created_at>, time_of<event_log::created_at>, year_of<event_log::created_at>,
+                   month_of<event_log::created_at>, day_of<event_log::created_at>>()
+                .from<event_log>()
+                .build_sql();
+        expect(sql ==
+               "SELECT DATE(created_at), TIME(created_at), YEAR(created_at), MONTH(created_at), DAY(created_at) "
+               "FROM event_log"s)
+            << sql;
+    };
+
+    "datediff/date_add/date_sub/timestampdiff — generate expected SQL"_test = [] {
+        auto const sql = select<datediff_of<event_log::created_at, event_log::created_at>,
+                                date_add_of<event_log::created_at, 7, sql_date_part::day>,
+                                date_sub_of<event_log::created_at, 1, sql_date_part::month>,
+                                timestampdiff_of<sql_date_part::hour, event_log::created_at, event_log::created_at>>()
+                             .from<event_log>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT DATEDIFF(created_at, created_at), DATE_ADD(created_at, INTERVAL 7 DAY), "
+               "DATE_SUB(created_at, INTERVAL 1 MONTH), TIMESTAMPDIFF(HOUR, created_at, created_at) FROM event_log"s)
+            << sql;
+    };
+
+    "date/time aliases — generate expected SQL"_test = [] {
+        auto const sql =
+            select<date_of<event_log::created_at>, time_of<event_log::created_at>, year_of<event_log::created_at>,
+                   month_of<event_log::created_at>, day_of<event_log::created_at>,
+                   datediff<event_log::created_at, event_log::created_at>,
+                   date_add<event_log::created_at, 2, sql_date_part::week>,
+                   date_sub<event_log::created_at, 3, sql_date_part::day>,
+                   timestampdiff<sql_date_part::minute, event_log::created_at, event_log::created_at>>()
+                .from<event_log>()
+                .build_sql();
+        expect(sql ==
+               "SELECT DATE(created_at), TIME(created_at), YEAR(created_at), MONTH(created_at), DAY(created_at), "
+               "DATEDIFF(created_at, created_at), DATE_ADD(created_at, INTERVAL 2 WEEK), "
+               "DATE_SUB(created_at, INTERVAL 3 DAY), TIMESTAMPDIFF(MINUTE, created_at, created_at) FROM event_log"s)
+            << sql;
+    };
 };
 
 // ===================================================================
@@ -494,6 +536,23 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
                "SELECT RANK() OVER (PARTITION BY type ORDER BY id ASC), DENSE_RANK() OVER (PARTITION BY type ORDER BY "
                "id ASC), LAG(price_val, 1) OVER (PARTITION BY type ORDER BY id ASC), LEAD(price_val, 2) OVER "
                "(PARTITION BY type ORDER BY id DESC) FROM product"s)
+            << sql;
+    };
+
+    "window frame clauses — append frame SQL in OVER()"_test = [] {
+        auto const sql =
+            select<row_number_over<product::type, product::id, sort_order::asc, rows_unbounded_preceding_to_current_row>,
+                   window_func<sum<product::price_val>, product::type, product::id, sort_order::asc,
+                               rows_current_row_to_unbounded_following>,
+                   lag_over<product::price_val, product::type, product::id, 1, sort_order::asc,
+                            rows_unbounded_preceding_to_unbounded_following>>()
+                .from<product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT ROW_NUMBER() OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND "
+               "CURRENT ROW), SUM(price_val) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN CURRENT ROW AND "
+               "UNBOUNDED FOLLOWING), LAG(price_val, 1) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN "
+               "UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM product"s)
             << sql;
     };
 };

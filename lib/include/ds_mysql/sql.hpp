@@ -3583,6 +3583,33 @@ struct date_format_of {};
 template <sql_date_part Part, typename P>
 struct extract_of {};
 
+template <typename P>
+struct date_of {};
+
+template <typename P>
+struct time_of {};
+
+template <typename P>
+struct year_of {};
+
+template <typename P>
+struct month_of {};
+
+template <typename P>
+struct day_of {};
+
+template <typename A, typename B>
+struct datediff_of {};
+
+template <typename P, int Amount, sql_date_part Part>
+struct date_add_of {};
+
+template <typename P, int Amount, sql_date_part Part>
+struct date_sub_of {};
+
+template <sql_date_part Part, typename A, typename B>
+struct timestampdiff_of {};
+
 template <typename P, sql_cast_type Type>
 struct cast_as {};
 
@@ -3640,6 +3667,18 @@ using date_format = date_format_of<P, Format>;
 
 template <sql_date_part Part, typename P>
 using extract = extract_of<Part, P>;
+
+template <typename A, typename B>
+using datediff = datediff_of<A, B>;
+
+template <typename P, int Amount, sql_date_part Part>
+using date_add = date_add_of<P, Amount, Part>;
+
+template <typename P, int Amount, sql_date_part Part>
+using date_sub = date_sub_of<P, Amount, Part>;
+
+template <sql_date_part Part, typename A, typename B>
+using timestampdiff = timestampdiff_of<Part, A, B>;
 
 template <typename P, sql_cast_type Type>
 using cast = cast_as<P, Type>;
@@ -3859,6 +3898,25 @@ struct field {
     using field_order_tag = void;
 };
 
+template <fixed_string Clause>
+struct window_frame_clause {
+    static constexpr std::string_view sql_clause() {
+        return Clause;
+    }
+};
+
+using rows_unbounded_preceding_to_current_row =
+    window_frame_clause<"ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW">;
+using rows_unbounded_preceding_to_unbounded_following =
+    window_frame_clause<"ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING">;
+using rows_current_row_to_unbounded_following =
+    window_frame_clause<"ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING">;
+
+template <typename T>
+concept WindowFrameSpec = requires {
+    { T::sql_clause() } -> std::convertible_to<std::string_view>;
+};
+
 // ===================================================================
 // Window function projections
 //
@@ -3871,24 +3929,28 @@ struct field {
 // projection_traits specialisations are defined after the Projection concept.
 // ===================================================================
 
-template <typename Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+template <typename Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
 struct window_func {};
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
 struct row_number_over {};
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
 struct rank_over {};
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc>
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
 struct dense_rank_over {};
 
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
-          sort_order Dir = sort_order::asc>
+          sort_order Dir = sort_order::asc, typename Frame = void>
 struct lag_over {};
 
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
-          sort_order Dir = sort_order::asc>
+          sort_order Dir = sort_order::asc, typename Frame = void>
 struct lead_over {};
 
 // projection_traits<P> — uniform interface over column descriptors and aggregates.
@@ -4028,6 +4090,16 @@ template <sql_date_part Part>
         return "MINUTE";
     } else {
         return "SECOND";
+    }
+}
+
+template <typename Frame>
+[[nodiscard]] std::string sql_window_frame_clause() {
+    if constexpr (std::same_as<Frame, void>) {
+        return "";
+    } else {
+        static_assert(WindowFrameSpec<Frame>, "Frame must satisfy WindowFrameSpec");
+        return " " + std::string(Frame::sql_clause());
     }
 }
 
@@ -4331,6 +4403,83 @@ struct projection_traits<extract_of<Part, P>> {
     }
 };
 
+template <Projection P>
+struct projection_traits<date_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "DATE(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<time_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "TIME(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<year_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "YEAR(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<month_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "MONTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<day_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "DAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<datediff_of<A, B>> {
+    using value_type = int64_t;
+    static std::string sql_expr() {
+        return "DATEDIFF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, int Amount, sql_date_part Part>
+struct projection_traits<date_add_of<P, Amount, Part>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "DATE_ADD(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(Amount) +
+               " " + std::string(sql_date_part_name<Part>()) + ")";
+    }
+};
+
+template <Projection P, int Amount, sql_date_part Part>
+struct projection_traits<date_sub_of<P, Amount, Part>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "DATE_SUB(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(Amount) +
+               " " + std::string(sql_date_part_name<Part>()) + ")";
+    }
+};
+
+template <sql_date_part Part, Projection A, Projection B>
+struct projection_traits<timestampdiff_of<Part, A, B>> {
+    using value_type = int64_t;
+    static std::string sql_expr() {
+        return "TIMESTAMPDIFF(" + std::string(sql_date_part_name<Part>()) + ", " +
+               std::string(projection_traits<A>::sql_expr()) + ", " + std::string(projection_traits<B>::sql_expr()) +
+               ")";
+    }
+};
+
 template <Projection P, sql_cast_type Type>
 struct projection_traits<cast_as<P, Type>> {
     using value_type = typename sql_cast_type_traits<Type>::value_type;
@@ -4349,64 +4498,68 @@ struct projection_traits<convert_as<P, Type>> {
     }
 };
 
-template <Projection Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
-struct projection_traits<window_func<Agg, PartitionCol, OrderCol, Dir>> {
+template <Projection Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<window_func<Agg, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename projection_traits<Agg>::value_type;
     static std::string sql_expr() {
         return std::string(projection_traits<Agg>::sql_expr()) + " OVER (PARTITION BY " +
                std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
-               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
-struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir>> {
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
     static std::string sql_expr() {
         return "ROW_NUMBER() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
-               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
-               (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
-struct projection_traits<rank_over<PartitionCol, OrderCol, Dir>> {
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
     static std::string sql_expr() {
         return "RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
-               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
-template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir>
-struct projection_traits<dense_rank_over<PartitionCol, OrderCol, Dir>> {
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<dense_rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
     static std::string sql_expr() {
         return "DENSE_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
-               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
-               (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset,
-          sort_order Dir>
-struct projection_traits<lag_over<Col, PartitionCol, OrderCol, Offset, Dir>> {
+          sort_order Dir, typename Frame>
+struct projection_traits<lag_over<Col, PartitionCol, OrderCol, Offset, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
     static std::string sql_expr() {
         return "LAG(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
-               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset,
-          sort_order Dir>
-struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir>> {
+          sort_order Dir, typename Frame>
+struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
     static std::string sql_expr() {
         return "LEAD(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
-               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC)" : " DESC)");
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
     }
 };
 
