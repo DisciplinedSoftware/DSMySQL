@@ -4803,17 +4803,6 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    // order_by_raw("expression DESC") — raw SQL ORDER BY expression
-    [[nodiscard]] select_query_builder order_by_raw(std::string expr) const& {
-        auto copy = *this;
-        copy.order_by_clauses_.push_back(std::move(expr));
-        return copy;
-    }
-    [[nodiscard]] select_query_builder order_by_raw(std::string expr) && {
-        order_by_clauses_.push_back(std::move(expr));
-        return std::move(*this);
-    }
-
     // order_by(case_when_builder, dir) — ORDER BY CASE WHEN ... END
     // Accepts a case_when_builder directly; calls .build_sql() at call time.
     template <typename ValueType>

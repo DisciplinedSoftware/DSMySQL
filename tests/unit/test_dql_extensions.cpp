@@ -530,21 +530,6 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
         expect(sql == "SELECT type, SUM(price_val) FROM product GROUP BY type ORDER BY SUM(price_val) DESC"s) << sql;
     };
 
-    "order_by_raw(\"total DESC\") — raw ORDER BY expression"_test = [] {
-        auto const sql = select<product::type, count_all>()
-                             .from<product>()
-                             .group_by<product::type>()
-                             .order_by_raw("COUNT(*) DESC")
-                             .build_sql();
-        expect(sql == "SELECT type, COUNT(*) FROM product GROUP BY type ORDER BY COUNT(*) DESC"s) << sql;
-    };
-
-    "order_by_raw chained after column order_by"_test = [] {
-        auto const sql =
-            select<product::id>().from<product>().order_by<product::type>().order_by_raw("price_val DESC").build_sql();
-        expect(sql == "SELECT id FROM product ORDER BY type ASC, price_val DESC"s) << sql;
-    };
-
     // order_by_alias
     "order_by_alias — emits alias when with_alias is set"_test = [] {
         auto const sql = select<product::type, sum<product::price_val>>()
