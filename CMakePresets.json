@@ -14,7 +14,8 @@
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SKIP_DOCKER_MANAGEMENT": "OFF"
       }
     },
     {
@@ -25,7 +26,8 @@
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SKIP_DOCKER_MANAGEMENT": "OFF"
       }
     },
     {
@@ -36,7 +38,8 @@
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SKIP_DOCKER_MANAGEMENT": "OFF"
       }
     },
     {
@@ -48,7 +51,20 @@
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "ENABLE_COVERAGE": "ON"
+        "ENABLE_COVERAGE": "ON",
+        "SKIP_DOCKER_MANAGEMENT": "OFF"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI (externally-managed DB)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-ci",
+      "cacheVariables": {
+        "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SKIP_DOCKER_MANAGEMENT": "ON"
       }
     }
   ],
@@ -68,6 +84,10 @@
     {
       "name": "coverage",
       "configurePreset": "coverage"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
     }
   ],
   "testPresets": [
@@ -110,6 +130,18 @@
     {
       "name": "coverage",
       "configurePreset": "coverage",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "label": "fixture"
+        }
+      }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
       "output": {
         "outputOnFailure": true
       },
