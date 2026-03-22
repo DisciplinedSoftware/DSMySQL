@@ -3254,7 +3254,7 @@ struct count_distinct {};
 template <ColumnDescriptor Col>
 struct group_concat {};
 
-// rand_val — RAND() projection for ORDER BY clauses (e.g. order_by<aggregate<rand_val>>())
+// rand_val — RAND() projection for ORDER BY clauses (e.g. order_by<rand_val>())
 struct rand_val {};
 
 // ===================================================================
@@ -3600,22 +3600,6 @@ struct field {
     using field_order_tag = void;
 };
 
-// aggregate<Proj, Dir> — ORDER BY an aggregate expression with explicit direction.
-//
-// Unified wrapper to order by aggregates via order_by<>().
-// Follows the same pattern as position<>, qual<>, etc.
-//
-//   order_by<aggregate<count_all>>()                   — ORDER BY COUNT(*) ASC
-//   order_by<aggregate<sum<col>, sort_order::desc>>() — ORDER BY SUM(col) DESC
-//
-// AggregateOrderBy concept is defined after the Projection concept (forward dependency).
-template <typename Proj, sort_order Dir = sort_order::asc>
-struct aggregate {
-    using proj_type = Proj;
-    static constexpr sort_order direction = Dir;
-    using aggregate_order_tag = void;  // marker for AggregateOrderBy
-};
-
 // ===================================================================
 // Window function projections
 //
@@ -3915,14 +3899,6 @@ concept FieldOrderBy = requires {
     typename T::field_order_tag;
     typename T::col_type;
 } && ColumnDescriptor<typename T::col_type>;
-
-// AggregateOrderBy — satisfied by aggregate<Proj, Dir> where Proj is a Projection.
-template <typename T>
-concept AggregateOrderBy = requires {
-    typename T::aggregate_order_tag;
-    typename T::proj_type;
-    { T::direction } -> std::convertible_to<sort_order>;
-} && Projection<typename T::proj_type>;
 
 // ===================================================================
 // projection_traits — specialisations for types that depend on Projection
@@ -4742,20 +4718,13 @@ struct select_query_builder {
     // order_by<col_index<N>>()                     — ORDER BY N ASC (literal 1-based index)
     // order_by<Proj>()                             — ORDER BY any projection expression ASC
     // order_by<Proj, sort_order::desc>()           — ORDER BY any projection expression DESC
-    // order_by<aggregate<Proj>>()                  — ORDER BY projection expression ASC
-    // order_by<aggregate<Proj, desc>>()            — ORDER BY projection expression DESC
     // Can be chained multiple times for multi-column ordering.
     template <typename ColSpec, sort_order Dir = sort_order::asc>
         requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec> ||
-                 Projection<ColSpec>)
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || Projection<ColSpec>)
     [[nodiscard]] select_query_builder order_by() const& {
         auto copy = *this;
-        if constexpr (AggregateOrderBy<ColSpec>) {
-            using Proj = typename ColSpec::proj_type;
-            copy.order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
-                                             (ColSpec::direction == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (NullsWrapper<ColSpec>) {
+        if constexpr (NullsWrapper<ColSpec>) {
             using ColLike = typename ColSpec::col_type;
             using Col = unwrap_order_col_t<ColLike>;
             const std::string col_name = [] {
@@ -4793,14 +4762,9 @@ struct select_query_builder {
     }
     template <typename ColSpec, sort_order Dir = sort_order::asc>
         requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || AggregateOrderBy<ColSpec> ||
-                 Projection<ColSpec>)
+                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || Projection<ColSpec>)
     [[nodiscard]] select_query_builder order_by() && {
-        if constexpr (AggregateOrderBy<ColSpec>) {
-            using Proj = typename ColSpec::proj_type;
-            order_by_clauses_.push_back(std::string(projection_traits<Proj>::sql_expr()) +
-                                        (ColSpec::direction == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (NullsWrapper<ColSpec>) {
+        if constexpr (NullsWrapper<ColSpec>) {
             using ColLike = typename ColSpec::col_type;
             using Col = unwrap_order_col_t<ColLike>;
             const std::string col_name = [] {
