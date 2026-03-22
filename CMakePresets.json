@@ -10,7 +10,7 @@
       "name": "default",
       "displayName": "Default (Release)",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Release",
@@ -22,7 +22,7 @@
       "name": "debug",
       "displayName": "Debug",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Debug",
@@ -34,7 +34,7 @@
       "name": "release",
       "displayName": "Release",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Release",
@@ -46,7 +46,7 @@
       "name": "coverage",
       "displayName": "Coverage",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-coverage",
+      "binaryDir": "${sourceDir}/build/coverage",
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Debug",
@@ -59,7 +59,7 @@
       "name": "ci",
       "displayName": "CI (externally-managed DB)",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build-ci",
+      "binaryDir": "${sourceDir}/build/ci",
       "cacheVariables": {
         "CMAKE_POLICY_DEFAULT_CMP0175": "OLD",
         "CMAKE_BUILD_TYPE": "Release",

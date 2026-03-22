@@ -5,7 +5,7 @@
 ```bash
 # Configure and build (release)
 cmake --preset release
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 
 # Run all tests
 ctest --preset release
@@ -18,13 +18,20 @@ ctest --preset release -R tests_integration_ds_mysql
 
 # Debug build
 cmake --preset debug
-cmake --build build -j$(nproc)
+cmake --build build/debug -j$(nproc)
 
 # Coverage build
 cmake --preset coverage
-cmake --build build-coverage -j$(nproc)
+cmake --build build/coverage -j$(nproc)
 ctest --preset coverage
 ```
+
+## Scripts Layout
+
+- `scripts/ci/act-ci.sh` — run `tests-gcc` job locally with `act`
+- `scripts/ci/act-ci-full.sh` — run Linux CI jobs locally in sequence with `act`
+- `scripts/release/release.sh` — bump version, update changelog, commit, and tag
+- `scripts/release/act-release.sh` — dry-run release workflow locally with `act`
 
 ## Project Layout
 

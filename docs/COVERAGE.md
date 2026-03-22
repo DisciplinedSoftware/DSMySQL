@@ -12,23 +12,23 @@ sudo apt-get install gcov lcov
 
 ```bash
 cmake --preset coverage
-cmake --build build-coverage -j$(nproc)
+cmake --build build/coverage -j$(nproc)
 ctest --preset coverage
 ```
 
 ### Manual Configuration
 
 ```bash
-cmake -DENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug -B build-coverage
-cmake --build build-coverage -j$(nproc)
-ctest --test-dir build-coverage
+cmake -DENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug -B build/coverage
+cmake --build build/coverage -j$(nproc)
+ctest --test-dir build/coverage
 ```
 
 ## Generate HTML Report
 
 ```bash
-./scripts/generate_coverage.sh build-coverage
-# Opens: build-coverage/html/index.html
+./scripts/generate_coverage.sh build/coverage
+# Opens: build/coverage/html/index.html
 ```
 
 ## How It Works
@@ -40,4 +40,4 @@ ctest --test-dir build-coverage
 ## Performance Note
 
 Coverage instrumentation adds 10–30% overhead at compile and run time.
-Use the separate `build-coverage/` directory to avoid affecting normal builds.
+Use the separate `build/coverage/` directory to avoid affecting normal builds.

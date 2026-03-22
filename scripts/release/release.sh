@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# scripts/release.sh  —  bump version, update CHANGELOG, commit, and tag.
+# scripts/release/release.sh  —  bump version, update CHANGELOG, commit, and tag.
 #
 # Usage:
-#   ./scripts/release.sh <new-version>
-#   ./scripts/release.sh 1.2.0
+#   ./scripts/release/release.sh <new-version>
+#   ./scripts/release/release.sh 1.2.0
 #
 # What it does:
 #   1. Validates the supplied version string.
@@ -33,7 +33,7 @@ NEW_VERSION="$1"
 [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
     || die "Version must be in MAJOR.MINOR.PATCH format, got '$NEW_VERSION'"
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CMAKE_FILE="$REPO_ROOT/CMakeLists.txt"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
 

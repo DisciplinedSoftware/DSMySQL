@@ -12,7 +12,7 @@
 
 ```bash
 cmake --preset release
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 ctest --preset release
 ```
 
@@ -30,8 +30,8 @@ DSMySQL/
 ## Configure + Build Manually
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15
-cmake --build build -j$(nproc)
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15
+cmake --build build/release -j$(nproc)
 ```
 
 ## Build Options
@@ -55,7 +55,7 @@ ctest --preset release
 
 # Skip integration tests
 cmake --preset release -DBUILD_INTEGRATION_TESTS=OFF
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 ctest --preset release
 ```
 
@@ -63,8 +63,8 @@ ctest --preset release
 
 ```bash
 cmake --preset coverage
-cmake --build build-coverage -j$(nproc)
+cmake --build build/coverage -j$(nproc)
 ctest --preset coverage
-./scripts/generate_coverage.sh build-coverage
-# Report: build-coverage/html/index.html
+./scripts/generate_coverage.sh build/coverage
+# Report: build/coverage/html/index.html
 ```

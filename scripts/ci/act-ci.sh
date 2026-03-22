@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# scripts/act-ci.sh  —  run CI tests-gcc locally with act using a free MySQL host port.
+# scripts/ci/act-ci.sh  —  run CI tests-gcc locally with act using a free MySQL host port.
 #
 # Usage:
-#   bash ./scripts/act-ci.sh
-#   bash ./scripts/act-ci.sh --pull=false
+#   bash ./scripts/ci/act-ci.sh
+#   bash ./scripts/ci/act-ci.sh --pull=false
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 find_free_port() {

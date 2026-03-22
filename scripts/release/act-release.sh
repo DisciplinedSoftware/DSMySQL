@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# scripts/act-release.sh  —  run release workflow locally with act
+# scripts/release/act-release.sh  —  run release workflow locally with act
 #
 # Usage:
-#   ./scripts/act-release.sh
+#   ./scripts/release/act-release.sh
 #
 # What it does:
 #   1. Extracts the current version from CMakeLists.txt.
@@ -22,7 +22,7 @@ info() { echo "  →  $*"; }
 # Extract version from CMakeLists.txt
 # ──────────────────────────────────────────────────────────────────────────────
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CMAKE_FILE="$REPO_ROOT/CMakeLists.txt"
 
 cd "$REPO_ROOT"

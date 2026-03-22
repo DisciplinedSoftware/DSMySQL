@@ -92,10 +92,10 @@ Available helpers:
 
 ```bash
 # Build (release)
-cmake --preset release && cmake --build build -j$(nproc)
+cmake --preset release && cmake --build build/release -j$(nproc)
 
 # Build (debug)
-cmake --preset debug && cmake --build build -j$(nproc)
+cmake --preset debug && cmake --build build/debug -j$(nproc)
 
 # Run all tests
 ctest --preset release

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/act-ci-full.sh  —  run all Linux CI jobs locally with act, sequentially.
+# scripts/ci/act-ci-full.sh  —  run all Linux CI jobs locally with act, sequentially.
 #
 # Jobs run in order:
 #   1) tests-gcc
@@ -7,12 +7,12 @@
 #   3) package-consumer-smoke
 #
 # Usage:
-#   bash ./scripts/act-ci-full.sh
-#   bash ./scripts/act-ci-full.sh --pull=false
+#   bash ./scripts/ci/act-ci-full.sh
+#   bash ./scripts/ci/act-ci-full.sh --pull=false
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 find_free_port() {

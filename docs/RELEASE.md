@@ -17,7 +17,7 @@ which:
 The easiest way to perform all pre-tag steps in one shot is the helper script:
 
 ```bash
-./scripts/release.sh <new-version>   # e.g.  ./scripts/release.sh 1.1.0
+./scripts/release/release.sh <new-version>   # e.g.  ./scripts/release/release.sh 1.1.0
 ```
 
 ---

@@ -11,7 +11,7 @@ DSMySQL uses Docker containers to provide a real MySQL 8.0 instance for integrat
 
 ```bash
 cmake --preset release
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 ctest --preset release
 ```
 
@@ -39,10 +39,10 @@ The `.env` file is auto-created from `.env.example` during CMake configure if mi
 
 ```bash
 # Start container only
-cmake --build build --target docker_integration_up
+cmake --build build/release --target docker_integration_up
 
 # Stop container
-cmake --build build --target docker_integration_down
+cmake --build build/release --target docker_integration_down
 ```
 
 ## CI / Externally-Provided Database
@@ -82,5 +82,5 @@ DS_MYSQL_TEST_PORT=3308
 ```bash
 docker logs ds_mysql_test
 docker stop ds_mysql_test && docker rm ds_mysql_test
-cmake --build build --target docker_integration_up
+cmake --build build/release --target docker_integration_up
 ```

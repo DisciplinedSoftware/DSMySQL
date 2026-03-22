@@ -94,7 +94,7 @@ git clone https://github.com/DisciplinedSoftware/DSMySQL.git
 cd DSMySQL
 
 cmake --preset release
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 ctest --preset release
 ```
 
@@ -112,13 +112,22 @@ ctest --preset release
 ```bash
 # Unit tests only, skip integration tests
 cmake --preset release -DBUILD_INTEGRATION_TESTS=OFF
-cmake --build build -j$(nproc)
+cmake --build build/release -j$(nproc)
 ctest --preset release
 
 # Debug build
 cmake --preset debug
-cmake --build build -j$(nproc)
+cmake --build build/debug -j$(nproc)
 ```
+
+## Scripts Layout
+
+Project automation scripts are grouped by purpose:
+
+- `scripts/ci/act-ci.sh` — run `tests-gcc` job locally with `act`
+- `scripts/ci/act-ci-full.sh` — run Linux CI jobs locally in sequence with `act`
+- `scripts/release/release.sh` — bump version, update changelog, commit, and tag
+- `scripts/release/act-release.sh` — dry-run release workflow locally with `act`
 
 ## Using as a Dependency
 
@@ -141,8 +150,8 @@ Optional install/package flow:
 
 ```bash
 cmake --preset release -DDSMYSQL_ENABLE_INSTALL=ON
-cmake --build build -j$(nproc)
-cmake --install build --prefix /usr/local
+cmake --build build/release -j$(nproc)
+cmake --install build/release --prefix /usr/local
 ```
 
 ```cmake
@@ -260,9 +269,9 @@ Integration tests connect to a real MySQL 8.0 instance managed via Docker Compos
 ctest --preset release
 
 # Manual container management
-cmake --build build --target docker_integration_up
+cmake --build build/release --target docker_integration_up
 ctest --preset release -R tests_integration_ds_mysql
-cmake --build build --target docker_integration_down
+cmake --build build/release --target docker_integration_down
 ```
 
 See [docs/INTEGRATION_TESTS.md](docs/INTEGRATION_TESTS.md) for full details.
