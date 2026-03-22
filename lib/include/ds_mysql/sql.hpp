@@ -115,6 +115,8 @@ enum class Encryption {
     N,
 };
 
+enum class sort_order { asc, desc };
+
 template <typename... Cols>
 struct grouping_set {};
 
@@ -2173,6 +2175,24 @@ public:
         return copy;
     }
 
+    [[nodiscard]] alter_table_builder add_constraint(std::string constraint_sql) const {
+        auto copy = *this;
+        copy.actions_.push_back("ADD CONSTRAINT " + std::move(constraint_sql));
+        return copy;
+    }
+
+    [[nodiscard]] alter_table_builder drop_constraint(std::string constraint_name) const {
+        auto copy = *this;
+        copy.actions_.push_back("DROP CONSTRAINT " + std::move(constraint_name));
+        return copy;
+    }
+
+    [[nodiscard]] alter_table_builder drop_foreign_key(std::string constraint_name) const {
+        auto copy = *this;
+        copy.actions_.push_back("DROP FOREIGN KEY " + std::move(constraint_name));
+        return copy;
+    }
+
     [[nodiscard]] ddl_continuation then() const {
         return ddl_continuation{build_sql()};
     }
@@ -3191,28 +3211,60 @@ template <typename... Cols>
 template <typename T, typename... Cols>
 class update_set_where_builder {
 public:
-    update_set_where_builder(std::tuple<Cols...> assignments, where_condition where)
+    update_set_where_builder(std::tuple<Cols...> assignments, std::optional<where_condition> where)
         : assignments_(std::move(assignments)), where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
         auto set_sql = build_assignment_sql_from_tuple(assignments_);
-        auto where_sql = where_.build_sql();
         std::string s;
-        s.reserve(7 + table_name.size() + 5 + set_sql.size() + 7 + where_sql.size());
+        s.reserve(7 + table_name.size() + 5 + set_sql.size() + 48);
         s += "UPDATE ";
         s += table_name;
         s += " SET ";
         s += set_sql;
-        s += " WHERE ";
-        s += std::move(where_sql);
+        if (where_.has_value()) {
+            s += " WHERE ";
+            s += where_->build_sql();
+        }
+        if (!order_by_clauses_.empty()) {
+            s += " ORDER BY ";
+            bool first = true;
+            for (auto const& clause : order_by_clauses_) {
+                if (!first) {
+                    s += ", ";
+                }
+                s += clause;
+                first = false;
+            }
+        }
+        if (limit_.has_value()) {
+            s += " LIMIT ";
+            s += std::to_string(*limit_);
+        }
         return s;
+    }
+
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] update_set_where_builder order_by() const {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
+                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+
+    [[nodiscard]] update_set_where_builder limit(std::size_t n) const {
+        auto copy = *this;
+        copy.limit_ = n;
+        return copy;
     }
 
 private:
     std::tuple<Cols...> assignments_;
-    where_condition where_;
+    std::optional<where_condition> where_;
+    std::vector<std::string> order_by_clauses_;
+    std::optional<std::size_t> limit_;
 };
 
 template <typename T, typename... Cols>
@@ -3223,6 +3275,15 @@ public:
 
     [[nodiscard]] update_set_where_builder<T, Cols...> where(where_condition condition) const {
         return {assignments_, std::move(condition)};
+    }
+
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] update_set_where_builder<T, Cols...> order_by() const {
+        return update_set_where_builder<T, Cols...>{assignments_, std::nullopt}.template order_by<Col, Dir>();
+    }
+
+    [[nodiscard]] update_set_where_builder<T, Cols...> limit(std::size_t n) const {
+        return update_set_where_builder<T, Cols...>{assignments_, std::nullopt}.limit(n);
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -3257,23 +3318,55 @@ public:
 template <typename T>
 class delete_from_where_builder {
 public:
-    explicit delete_from_where_builder(where_condition where) : where_(std::move(where)) {
+    explicit delete_from_where_builder(std::optional<where_condition> where) : where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
-        auto where_sql = where_.build_sql();
         std::string s;
-        s.reserve(12 + table_name.size() + 7 + where_sql.size());
+        s.reserve(12 + table_name.size() + 32);
         s += "DELETE FROM ";
         s += table_name;
-        s += " WHERE ";
-        s += std::move(where_sql);
+        if (where_.has_value()) {
+            s += " WHERE ";
+            s += where_->build_sql();
+        }
+        if (!order_by_clauses_.empty()) {
+            s += " ORDER BY ";
+            bool first = true;
+            for (auto const& clause : order_by_clauses_) {
+                if (!first) {
+                    s += ", ";
+                }
+                s += clause;
+                first = false;
+            }
+        }
+        if (limit_.has_value()) {
+            s += " LIMIT ";
+            s += std::to_string(*limit_);
+        }
         return s;
     }
 
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] delete_from_where_builder order_by() const {
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
+                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        return copy;
+    }
+
+    [[nodiscard]] delete_from_where_builder limit(std::size_t n) const {
+        auto copy = *this;
+        copy.limit_ = n;
+        return copy;
+    }
+
 private:
-    where_condition where_;
+    std::optional<where_condition> where_;
+    std::vector<std::string> order_by_clauses_;
+    std::optional<std::size_t> limit_;
 };
 
 template <typename T>
@@ -3283,13 +3376,17 @@ public:
         return delete_from_where_builder<T>{std::move(condition)};
     }
 
+    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
+    [[nodiscard]] delete_from_where_builder<T> order_by() const {
+        return delete_from_where_builder<T>{std::nullopt}.template order_by<Col, Dir>();
+    }
+
+    [[nodiscard]] delete_from_where_builder<T> limit(std::size_t n) const {
+        return delete_from_where_builder<T>{std::nullopt}.limit(n);
+    }
+
     [[nodiscard]] std::string build_sql() const {
-        const auto table_name = table_name_for<T>::value().to_string_view();
-        std::string s;
-        s.reserve(12 + table_name.size());
-        s += "DELETE FROM ";
-        s += table_name;
-        return s;
+        return delete_from_where_builder<T>{std::nullopt}.build_sql();
     }
 };
 
@@ -3663,8 +3760,6 @@ private:
 // ===================================================================
 // sort_order — column ordering direction for ORDER BY clauses
 // ===================================================================
-
-enum class sort_order { asc, desc };
 
 template <ColumnDescriptor Col>
 struct qual {
@@ -5490,6 +5585,22 @@ template <TypedSelectQuery Q1, TypedSelectQuery Q2>
 
 [[nodiscard]] inline detail::statement_query rollback_transaction() {
     return detail::statement_query{"ROLLBACK"};
+}
+
+template <typename Query>
+    requires requires(Query const& q) {
+        { q.build_sql() } -> std::convertible_to<std::string>;
+    }
+[[nodiscard]] inline detail::statement_query explain(Query const& query) {
+    return detail::statement_query{"EXPLAIN " + query.build_sql()};
+}
+
+template <typename Query>
+    requires requires(Query const& q) {
+        { q.build_sql() } -> std::convertible_to<std::string>;
+    }
+[[nodiscard]] inline detail::statement_query explain_analyze(Query const& query) {
+    return detail::statement_query{"EXPLAIN ANALYZE " + query.build_sql()};
 }
 
 /**

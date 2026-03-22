@@ -62,6 +62,16 @@ suite<"DML"> dml_suite = [] {
         expect(sql == "ROLLBACK"s) << sql;
     };
 
+    "explain(select) - prefixes EXPLAIN"_test = [] {
+        auto const sql = explain(select<asset::id>().from<asset>().where(equal<asset::id>(1u))).build_sql();
+        expect(sql == "EXPLAIN SELECT id FROM asset WHERE id = 1"s) << sql;
+    };
+
+    "explain_analyze(select) - prefixes EXPLAIN ANALYZE"_test = [] {
+        auto const sql = explain_analyze(select<asset::id>().from<asset>().limit(5)).build_sql();
+        expect(sql == "EXPLAIN ANALYZE SELECT id FROM asset LIMIT 5"s) << sql;
+    };
+
     // -------------------------------------------------------------------
     // insert_into<T>
     // -------------------------------------------------------------------
@@ -150,6 +160,25 @@ suite<"DML"> dml_suite = [] {
         expect(sql == "UPDATE asset SET name = 'Apple Inc' WHERE (ticker = 'AAPL' AND exchange_id = 2)"s) << sql;
     };
 
+    "update - order_by + limit - generates correct SQL"_test = [] {
+        auto const sql = update<asset>()
+                             .set(asset::ticker{"MSFT"})
+                             .order_by<asset::id, sort_order::desc>()
+                             .limit(1)
+                             .build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'MSFT' ORDER BY id DESC LIMIT 1"s) << sql;
+    };
+
+    "update - where + order_by + limit - generates correct SQL"_test = [] {
+        auto const sql = update<asset>()
+                             .set(asset::ticker{"MSFT"})
+                             .where(is_not_null<asset::sector>())
+                             .order_by<asset::id>()
+                             .limit(3)
+                             .build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 3"s) << sql;
+    };
+
     // -------------------------------------------------------------------
     // delete_from<T>
     // -------------------------------------------------------------------
@@ -169,6 +198,20 @@ suite<"DML"> dml_suite = [] {
                              .where(and_(equal<asset::ticker>(asset::ticker{"AAPL"}), equal<asset::exchange_id>(2u)))
                              .build_sql();
         expect(sql == "DELETE FROM asset WHERE (ticker = 'AAPL' AND exchange_id = 2)"s) << sql;
+    };
+
+    "delete from - order_by + limit - generates correct SQL"_test = [] {
+        auto const sql = delete_from<asset>().order_by<asset::id, sort_order::desc>().limit(2).build_sql();
+        expect(sql == "DELETE FROM asset ORDER BY id DESC LIMIT 2"s) << sql;
+    };
+
+    "delete from - where + order_by + limit - generates correct SQL"_test = [] {
+        auto const sql = delete_from<asset>()
+                             .where(is_not_null<asset::sector>())
+                             .order_by<asset::id>()
+                             .limit(10)
+                             .build_sql();
+        expect(sql == "DELETE FROM asset WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 10"s) << sql;
     };
 
     // -------------------------------------------------------------------

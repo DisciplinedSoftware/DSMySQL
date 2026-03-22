@@ -765,6 +765,18 @@ suite<"DDL Extensions"> ddl_extensions_suite = [] {
                "NULL, RENAME COLUMN name TO display_name, DROP COLUMN name, RENAME TO renamed_table;\n"s)
             << sql;
     };
+
+    "alter_table constraint helpers - add/drop constraint and drop fk"_test = [] {
+        auto const sql = alter_table<test_table>()
+                             .add_constraint("fk_test_table_related FOREIGN KEY (id) REFERENCES related_table(id)")
+                             .drop_constraint("chk_test_table_name")
+                             .drop_foreign_key("fk_test_table_related")
+                             .build_sql();
+        expect(sql ==
+               "ALTER TABLE test_table ADD CONSTRAINT fk_test_table_related FOREIGN KEY (id) REFERENCES "
+               "related_table(id), DROP CONSTRAINT chk_test_table_name, DROP FOREIGN KEY fk_test_table_related;\n"s)
+            << sql;
+    };
 };
 
 static_assert(SqlStatement<ddl_detail::create_database_builder<test_db>>,
