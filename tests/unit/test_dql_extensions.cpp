@@ -686,21 +686,21 @@ suite<"DQL ORDER BY Extensions"> dql_order_by_extensions_suite = [] {
         expect(sql == "SELECT id FROM product ORDER BY CASE WHEN type = 'widget' THEN 0 ELSE 1 END DESC"s) << sql;
     };
 
-    // order_by_field<Col> — case 4 (FIELD custom ordering)
-    "order_by_field<Col> — ORDER BY FIELD(col, ...) ASC"_test = [] {
+    // order_by<field<Col>>(...) — case 4 (FIELD custom ordering)
+    "order_by<field<Col>>(...) — ORDER BY FIELD(col, ...) ASC"_test = [] {
         auto const sql = select<product::id>()
                              .from<product>()
-                             .order_by_field<product::type>(
+                             .order_by<field<product::type>>(
                                  {product::type{"electronics"}, product::type{"clothing"}, product::type{"food"}})
                              .build_sql();
         expect(sql == "SELECT id FROM product ORDER BY FIELD(type, 'electronics', 'clothing', 'food') ASC"s) << sql;
     };
 
-    "order_by_field<Col> desc — ORDER BY FIELD(col, ...) DESC"_test = [] {
+    "order_by<field<Col>>(...) desc — ORDER BY FIELD(col, ...) DESC"_test = [] {
         auto const sql = select<product::id>()
                              .from<product>()
-                             .order_by_field<product::type>({product::type{"electronics"}, product::type{"clothing"}},
-                                                            sort_order::desc)
+                             .order_by<field<product::type>>({product::type{"electronics"}, product::type{"clothing"}},
+                                                             sort_order::desc)
                              .build_sql();
         expect(sql == "SELECT id FROM product ORDER BY FIELD(type, 'electronics', 'clothing') DESC"s) << sql;
     };

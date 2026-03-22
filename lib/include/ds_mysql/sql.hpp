@@ -3579,6 +3579,18 @@ struct col_index {
     static_assert(N >= 1, "col_index: column index must be >= 1 (1-based)");
 };
 
+// field<Col> — ORDER BY FIELD(col, v1, v2, ...) with runtime value list.
+//
+// Used with order_by<field<Col>>(values, dir):
+//
+//   order_by<field<product::type>>({"electronics", "clothing"})
+//   order_by<field<product::type>>({"electronics", "clothing"}, sort_order::desc)
+template <ColumnDescriptor Col>
+struct field {
+    using col_type = Col;
+    using field_order_tag = void;
+};
+
 // aggregate<Proj, Dir> — ORDER BY an aggregate expression with explicit direction.
 //
 // Unified wrapper to order by aggregates via order_by<>().
@@ -3887,6 +3899,13 @@ concept ColIndexWrapper = requires {
     typename T::col_index_tag;
     { T::value } -> std::same_as<const std::size_t&>;
 };
+
+// FieldOrderBy — satisfied by field<Col> where Col is a ColumnDescriptor.
+template <typename T>
+concept FieldOrderBy = requires {
+    typename T::field_order_tag;
+    typename T::col_type;
+} && ColumnDescriptor<typename T::col_type>;
 
 // AggregateOrderBy — satisfied by aggregate<Proj, Dir> where Proj is a Projection.
 template <typename T>
@@ -4811,14 +4830,16 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    // order_by_field<Col>(values, dir) — ORDER BY FIELD(col, v1, v2, ...) [ASC|DESC]
+    // order_by<field<Col>>(values, dir) — ORDER BY FIELD(col, v1, v2, ...) [ASC|DESC]
     // Emits MySQL FIELD() for custom value-based ordering.
-    // Example: .order_by_field<product::type>({"electronics", "clothing", "food"})
+    // Example: .order_by<field<product::type>>({"electronics", "clothing", "food"})
     //          → ORDER BY FIELD(type, 'electronics', 'clothing', 'food') ASC
-    template <ColumnDescriptor Col, SqlValue ValueType>
-    [[nodiscard]] select_query_builder order_by_field(std::initializer_list<ValueType> values,
-                                                      sort_order dir = sort_order::asc) const& {
+    template <typename ColSpec, SqlValue ValueType>
+        requires FieldOrderBy<ColSpec>
+    [[nodiscard]] select_query_builder order_by(std::initializer_list<ValueType> values,
+                                                sort_order dir = sort_order::asc) const& {
         auto copy = *this;
+        using Col = typename ColSpec::col_type;
         std::string expr = "FIELD(" + std::string(column_traits<Col>::column_name());
         for (auto const& v : values) {
             expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
@@ -4827,9 +4848,11 @@ struct select_query_builder {
         copy.order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
         return copy;
     }
-    template <ColumnDescriptor Col, SqlValue ValueType>
-    [[nodiscard]] select_query_builder order_by_field(std::initializer_list<ValueType> values,
-                                                      sort_order dir = sort_order::asc) && {
+    template <typename ColSpec, SqlValue ValueType>
+        requires FieldOrderBy<ColSpec>
+    [[nodiscard]] select_query_builder order_by(std::initializer_list<ValueType> values,
+                                                sort_order dir = sort_order::asc) && {
+        using Col = typename ColSpec::col_type;
         std::string expr = "FIELD(" + std::string(column_traits<Col>::column_name());
         for (auto const& v : values) {
             expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
