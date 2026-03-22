@@ -83,9 +83,7 @@ struct audit_log {
     COLUMN_FIELD(event_type, varchar_field<64>)
     COLUMN_FIELD(user_id, uint32_t, column_attr::comment<"User who triggered the event">)
     COLUMN_FIELD(description, varchar_field<255>)
-    COLUMN_FIELD(created_at,
-                 std::chrono::system_clock::time_point,
-                 column_attr::default_current_timestamp,
+    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_current_timestamp,
                  column_attr::on_update_current_timestamp)
 };
 }  // namespace
@@ -688,10 +686,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET utf8mb4;\n"s) << sql;
     };
 
-    "create_database.if_not_exists with fluent charset and collate - chains both attributes"_test = [] {
+    "create_database.if_not_exists with fluent charset and default_collate - chains both attributes"_test = [] {
         auto const sql = create_database<test_db>()
                              .default_charset(Charset::utf8mb4)
-                             .collate("utf8mb4_unicode_ci")
+                             .default_collate("utf8mb4_unicode_ci")
                              .if_not_exists()
                              .build_sql();
         expect(sql ==
@@ -705,10 +703,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET koi8r;\n"s) << sql;
     };
 
-    "create_database(database_name) with fluent attributes - runtime name with charset and collate"_test = [] {
+    "create_database(database_name) with fluent attributes - runtime name with charset and default_collate"_test = [] {
         auto const sql = create_database(database_name{"my_db"})
                              .default_charset(Charset::utf8mb4)
-                             .collate("utf8mb4_bin")
+                             .default_collate("utf8mb4_bin")
                              .build_sql();
         expect(sql == "CREATE DATABASE my_db DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_bin;\n"s) << sql;
     };
