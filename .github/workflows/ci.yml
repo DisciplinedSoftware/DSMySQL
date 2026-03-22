@@ -27,7 +27,7 @@ jobs:
           MYSQL_USER: ds_mysql_test_user
           MYSQL_PASSWORD: ds_mysql_test_password
         ports:
-          - 3306:3306
+          - 3306/tcp
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 --protocol=tcp"
           --health-interval=5s
@@ -37,10 +37,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Export mapped MySQL service port
+        run: echo "DS_MYSQL_TEST_PORT=${{ job.services.mysql.ports['3306'] }}" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y software-properties-common ca-certificates gpg wget mysql-client
+          sudo apt-get install -y --no-install-recommends software-properties-common ca-certificates gpg wget
           # Kitware APT repo for CMake 3.31+
           wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
             | gpg --dearmor \
@@ -49,7 +52,7 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/kitware.list
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build g++-15 \
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++-15 \
             libmysqlclient-dev pkg-config
 
       - name: Configure
@@ -63,10 +66,6 @@ jobs:
 
       - name: Unit tests
         run: ctest --preset release -R tests_unit_ds_mysql
-
-      - name: Initialize database
-        run: |
-          mysql -h 127.0.0.1 -P 3306 -u root -proot
 
       - name: Integration tests
         run: ctest --preset release -R tests_integration_ds_mysql
@@ -173,14 +172,52 @@ jobs:
           choco install cmake ninja --no-progress -y
         shell: pwsh
 
+      - name: Ensure MySQL is installed
+        shell: pwsh
+        run: |
+          $mysqlCmd = Get-Command mysql -ErrorAction SilentlyContinue
+          if (-not $mysqlCmd) {
+            choco install mysql --no-progress -y
+          }
+
       - name: Detect MySQL root
         shell: pwsh
         run: |
-          $dirs = Get-ChildItem "C:\Program Files\MySQL" -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like "MySQL Server *" } |
-            Sort-Object Name -Descending
-          if (-not $dirs) { throw "MySQL installation not found" }
-          $root = $dirs[0].FullName
+          $candidateRoots = @()
+
+          if (Test-Path "C:\Program Files\MySQL") {
+            $candidateRoots += (Get-ChildItem "C:\Program Files\MySQL" -Directory -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -like "MySQL Server *" } |
+              Sort-Object Name -Descending |
+              ForEach-Object { $_.FullName })
+          }
+
+          $candidateRoots += (Get-ChildItem "C:\ProgramData\chocolatey\lib" -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like "mysql*" } |
+            ForEach-Object {
+              $toolsDir = Join-Path $_.FullName "tools"
+              if (Test-Path $toolsDir) {
+                Get-ChildItem $toolsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+              }
+            })
+
+          $candidateRoots = $candidateRoots | Select-Object -Unique
+
+          $root = $null
+          foreach ($candidate in $candidateRoots) {
+            $includeFile = Join-Path $candidate "include\mysql.h"
+            $libFile = Join-Path $candidate "lib\libmysql.lib"
+            if ((Test-Path $includeFile) -and (Test-Path $libFile)) {
+              $root = $candidate
+              break
+            }
+          }
+
+          if (-not $root) {
+            throw "MySQL installation not found with include/mysql.h and lib/libmysql.lib"
+          }
+
+          Write-Host "Detected MYSQL_ROOT_DIR: $root"
           echo "MYSQL_ROOT_DIR=$root" >> $env:GITHUB_ENV
           echo "$root\lib" >> $env:GITHUB_PATH
 
