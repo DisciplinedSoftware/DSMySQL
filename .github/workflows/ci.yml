@@ -52,7 +52,7 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/kitware.list
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends cmake ninja-build g++-15 \
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++-15 gcc-15 \
             libmysqlclient-dev pkg-config
 
       - name: Configure
@@ -62,7 +62,7 @@ jobs:
           CC: gcc-15
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset release -j4
 
       - name: Unit tests
         run: ctest --preset release -R tests_unit_ds_mysql
@@ -86,6 +86,12 @@ jobs:
             | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
           echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
             | sudo tee /etc/apt/sources.list.d/kitware.list
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/llvm-archive-keyring.gpg > /dev/null
+          UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] https://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-20 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
           sudo apt-get update -q
           sudo apt-get install -y cmake ninja-build clang-20 \
             libmysqlclient-dev pkg-config
@@ -97,7 +103,7 @@ jobs:
           CC: clang-20
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset release -j4
 
       - name: Unit tests
         run: ctest --preset release -R tests_unit_ds_mysql
@@ -119,7 +125,7 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/kitware.list
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build g++-15 libmysqlclient-dev pkg-config libboost-dev
+          sudo apt-get install -y cmake ninja-build g++-15 gcc-15 libmysqlclient-dev pkg-config libboost-dev
 
       - name: Configure (install enabled)
         run: |
@@ -135,8 +141,8 @@ jobs:
 
       - name: Build and install
         run: |
-          cmake --build build -j4
-          cmake --install build --prefix "$RUNNER_TEMP/dsmysql-install"
+          cmake --build --preset release -j4
+          cmake --install build/release --prefix "$RUNNER_TEMP/dsmysql-install"
 
       - name: External consumer smoke test
         run: |
