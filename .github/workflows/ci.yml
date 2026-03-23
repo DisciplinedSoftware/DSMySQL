@@ -267,45 +267,91 @@ jobs:
       - name: Start MySQL server
         shell: pwsh
         run: |
-          $dataDir = Join-Path $env:RUNNER_TEMP "mysql-data"
-          $logFile = Join-Path $env:RUNNER_TEMP "mysql-server.log"
-          $mysqlExe = Join-Path $env:MYSQL_BIN_DIR "mysql.exe"
-          $mysqlAdminExe = Join-Path $env:MYSQL_BIN_DIR "mysqladmin.exe"
-          $mysqldExe = Join-Path $env:MYSQL_BIN_DIR "mysqld.exe"
+          function Find-Tool([string]$toolName) {
+            $candidates = @(
+              (Join-Path $env:MYSQL_BIN_DIR $toolName),
+              (Join-Path $env:MYSQL_ROOT_DIR $toolName),
+              (Join-Path $env:MYSQL_ROOT_DIR "bin\$toolName")
+            )
 
-          if (-not (Test-Path $mysqldExe)) {
-            throw "mysqld.exe not found at $mysqldExe"
+            foreach ($candidate in $candidates) {
+              if ($candidate -and (Test-Path $candidate)) {
+                return $candidate
+              }
+            }
+
+            $match = Get-ChildItem -Path $env:MYSQL_ROOT_DIR -Filter $toolName -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($match) {
+              return $match.FullName
+            }
+
+            throw "$toolName not found under MYSQL_ROOT_DIR=$env:MYSQL_ROOT_DIR"
           }
+
+          $dataDir = Join-Path $env:RUNNER_TEMP ("mysql-data-" + [guid]::NewGuid().ToString("N"))
+          $logFile = Join-Path $env:RUNNER_TEMP "mysql-server.log"
+          $mysqlExe = Find-Tool "mysql.exe"
+          $mysqlAdminExe = Find-Tool "mysqladmin.exe"
+          $mysqldExe = Find-Tool "mysqld.exe"
+
+          Write-Host "Using mysql.exe: $mysqlExe"
+          Write-Host "Using mysqladmin.exe: $mysqlAdminExe"
+          Write-Host "Using mysqld.exe: $mysqldExe"
 
           New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
-          & $mysqldExe --initialize-insecure --datadir="$dataDir"
+          & $mysqldExe --initialize-insecure --basedir="$env:MYSQL_ROOT_DIR" --datadir="$dataDir" --console
           if ($LASTEXITCODE -ne 0) {
             throw "mysqld --initialize-insecure failed with exit code $LASTEXITCODE"
           }
 
-          $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
-            "--datadir=$dataDir",
-            "--port=$env:DS_MYSQL_TEST_PORT",
-            "--bind-address=$env:DS_MYSQL_TEST_HOST",
-            "--console"
-          ) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+          $requestedPort = [int]$env:DS_MYSQL_TEST_PORT
+          $portsToTry = @($requestedPort, 3307, 3308, 33306) | Select-Object -Unique
+          $chosenPort = $null
+          $process = $null
 
-          "MYSQL_SERVER_PID=$($process.Id)" >> $env:GITHUB_ENV
+          foreach ($port in $portsToTry) {
+            Write-Host "Trying MySQL port $port"
 
-          for ($attempt = 0; $attempt -lt 60; $attempt++) {
-            & $mysqlAdminExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root ping --silent
-            if ($LASTEXITCODE -eq 0) {
+            $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
+              "--basedir=$env:MYSQL_ROOT_DIR",
+              "--datadir=$dataDir",
+              "--port=$port",
+              "--bind-address=$env:DS_MYSQL_TEST_HOST",
+              "--console"
+            ) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 45; $attempt++) {
+              & $mysqlAdminExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$port --user=root ping --silent
+              if ($LASTEXITCODE -eq 0) {
+                $ready = $true
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+
+            if ($ready) {
+              $chosenPort = $port
               break
             }
-            Start-Sleep -Seconds 2
+
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
           }
 
-          & $mysqlAdminExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root ping --silent
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content $logFile
-            throw "MySQL server did not become ready"
+          if (-not $chosenPort) {
+            if (Test-Path $logFile) {
+              Get-Content $logFile
+            }
+            throw "MySQL server did not become ready on any candidate port"
           }
+
+          Write-Host "MySQL is ready on port $chosenPort"
+          "MYSQL_SERVER_PID=$($process.Id)" >> $env:GITHUB_ENV
+          "DS_MYSQL_TEST_PORT=$chosenPort" >> $env:GITHUB_ENV
 
           $sql = @(
             "CREATE DATABASE IF NOT EXISTS $env:DS_MYSQL_TEST_DATABASE;"
@@ -314,7 +360,7 @@ jobs:
             "FLUSH PRIVILEGES;"
           ) -join ' '
 
-          & $mysqlExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root --execute="$sql"
+          & $mysqlExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$chosenPort --user=root --execute="$sql"
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to initialize MySQL test database"
           }
