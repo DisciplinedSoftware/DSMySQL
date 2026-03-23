@@ -75,13 +75,22 @@ struct renamed_table {
 struct temporal_table {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
-    COLUMN_FIELD(updated_at, timestamp_type)
+    COLUMN_FIELD(updated_at, timestamp_type<>)
 };
 
 struct time_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(start_time, time_type)
-    COLUMN_FIELD(end_time, std::optional<time_type>)
+    COLUMN_FIELD(start_time, time_type<>)
+    COLUMN_FIELD(end_time, std::optional<time_type<>>)
+};
+
+struct fsp_temporal_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(created_at, datetime_type<6>)
+    COLUMN_FIELD(updated_at, timestamp_type<3>)
+    COLUMN_FIELD(duration, time_type<4>)
+    COLUMN_FIELD(opt_created_at, std::optional<datetime_type<3>>)
+    COLUMN_FIELD(opt_duration, std::optional<time_type<6>>)
 };
 
 struct symbol_with_indexes {
@@ -224,6 +233,38 @@ suite<"DDL"> ddl_suite = [] {
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
                "    start_time TIME NOT NULL,\n"
                "    end_time TIME\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "sql_type_for - templated temporal types embed FSP in the type string"_test = [] {
+        expect(sql_type_for<datetime_type<0>>() == "DATETIME"s);
+        expect(sql_type_for<datetime_type<3>>() == "DATETIME(3)"s);
+        expect(sql_type_for<datetime_type<6>>() == "DATETIME(6)"s);
+
+        expect(sql_type_for<timestamp_type<0>>() == "TIMESTAMP"s);
+        expect(sql_type_for<timestamp_type<1>>() == "TIMESTAMP(1)"s);
+        expect(sql_type_for<timestamp_type<6>>() == "TIMESTAMP(6)"s);
+
+        expect(sql_type_for<time_type<0>>() == "TIME"s);
+        expect(sql_type_for<time_type<3>>() == "TIME(3)"s);
+        expect(sql_type_for<time_type<6>>() == "TIME(6)"s);
+
+        // std::optional wrappers preserve the FSP
+        expect(sql_type_for<std::optional<datetime_type<6>>>() == "DATETIME(6)"s);
+        expect(sql_type_for<std::optional<time_type<4>>>() == "TIME(4)"s);
+    };
+
+    "create_table with templated temporal FSP columns - emits types with precision"_test = [] {
+        auto const sql = create_table<fsp_temporal_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE fsp_temporal_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    created_at DATETIME(6) NOT NULL,\n"
+               "    updated_at TIMESTAMP(3) NOT NULL,\n"
+               "    duration TIME(4) NOT NULL,\n"
+               "    opt_created_at DATETIME(3),\n"
+               "    opt_duration TIME(6)\n"
                ");\n"s)
             << sql;
     };

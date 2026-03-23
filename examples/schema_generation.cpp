@@ -25,7 +25,7 @@ struct user {
     COLUMN_FIELD(username, ds_mysql::varchar_field<64>)
     COLUMN_FIELD(email, ds_mysql::varchar_field<255>)
     COLUMN_FIELD(is_active, bool)
-    COLUMN_FIELD(created_at, ds_mysql::datetime_type)
+    COLUMN_FIELD(created_at, ds_mysql::datetime_type<>)
 };
 
 // ===================================================================
@@ -43,7 +43,7 @@ struct order_row {
     COLUMN_FIELD(status, ds_mysql::varchar_field<32>)
 
     struct order_created_at_tag {};
-    using created_at = ds_mysql::tagged_column_field<order_created_at_tag, ds_mysql::datetime_type>;
+    using created_at = ds_mysql::tagged_column_field<order_created_at_tag, ds_mysql::datetime_type<>>;
     created_at created_at_;
 };
 

@@ -415,64 +415,64 @@ struct base<std::optional<varchar_field<N>>> : column_field_tag {
     }
 };
 
-template <>
-struct base<datetime_type> : column_field_tag {
-    using value_type = datetime_type;
+template <uint32_t Fsp>
+struct base<detail::basic_datetime_type<Fsp>> : column_field_tag {
+    using value_type = detail::basic_datetime_type<Fsp>;
 
-    datetime_type value{};
+    detail::basic_datetime_type<Fsp> value{};
 
     constexpr base() = default;
     base(sql_now_t) noexcept : value(sql_now_t{}) {
     }
     base(std::chrono::system_clock::time_point tp) noexcept : value(tp) {
     }
-    base(datetime_type v) noexcept : value(v) {
+    base(detail::basic_datetime_type<Fsp> v) noexcept : value(v) {
     }
 
     base& operator=(sql_now_t) noexcept {
-        value = datetime_type{sql_now_t{}};
+        value = detail::basic_datetime_type<Fsp>{sql_now_t{}};
         return *this;
     }
     base& operator=(std::chrono::system_clock::time_point tp) noexcept {
-        value = datetime_type{tp};
+        value = detail::basic_datetime_type<Fsp>{tp};
         return *this;
     }
-    base& operator=(datetime_type v) noexcept {
+    base& operator=(detail::basic_datetime_type<Fsp> v) noexcept {
         value = v;
         return *this;
     }
 
-    [[nodiscard]] constexpr datetime_type const& get() const noexcept {
+    [[nodiscard]] constexpr detail::basic_datetime_type<Fsp> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr datetime_type& get() noexcept {
+    [[nodiscard]] constexpr detail::basic_datetime_type<Fsp>& get() noexcept {
         return value;
     }
 
-    constexpr operator datetime_type const&() const noexcept {
+    constexpr operator detail::basic_datetime_type<Fsp> const&() const noexcept {
         return value;
     }
-    constexpr operator datetime_type&() noexcept {
+    constexpr operator detail::basic_datetime_type<Fsp>&() noexcept {
         return value;
     }
 };
 
-template <>
-struct base<std::optional<datetime_type>> : column_field_tag {
-    using value_type = std::optional<datetime_type>;
+template <uint32_t Fsp>
+struct base<std::optional<detail::basic_datetime_type<Fsp>>> : column_field_tag {
+    using value_type = std::optional<detail::basic_datetime_type<Fsp>>;
 
-    std::optional<datetime_type> value{};
+    std::optional<detail::basic_datetime_type<Fsp>> value{};
 
     constexpr base() = default;
     constexpr base(std::nullopt_t) noexcept : value(std::nullopt) {
     }
-    base(sql_now_t) noexcept : value(datetime_type{sql_now_t{}}) {
+    base(sql_now_t) noexcept : value(detail::basic_datetime_type<Fsp>{sql_now_t{}}) {
     }
-    base(std::chrono::system_clock::time_point tp) noexcept : value(datetime_type{tp}) {
+    base(std::chrono::system_clock::time_point tp) noexcept : value(detail::basic_datetime_type<Fsp>{tp}) {
     }
-    base(datetime_type v) noexcept : value(std::move(v)) {
+    base(detail::basic_datetime_type<Fsp> v) noexcept : value(std::move(v)) {
     }
-    base(std::optional<datetime_type> v) noexcept : value(std::move(v)) {
+    base(std::optional<detail::basic_datetime_type<Fsp>> v) noexcept : value(std::move(v)) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
@@ -480,95 +480,95 @@ struct base<std::optional<datetime_type>> : column_field_tag {
         return *this;
     }
     constexpr base& operator=(sql_now_t) noexcept {
-        value = datetime_type{sql_now_t{}};
+        value = detail::basic_datetime_type<Fsp>{sql_now_t{}};
         return *this;
     }
     constexpr base& operator=(std::chrono::system_clock::time_point tp) noexcept {
-        value = datetime_type{tp};
+        value = detail::basic_datetime_type<Fsp>{tp};
         return *this;
     }
-    constexpr base& operator=(datetime_type v) noexcept {
+    constexpr base& operator=(detail::basic_datetime_type<Fsp> v) noexcept {
         value = std::move(v);
         return *this;
     }
-    constexpr base& operator=(std::optional<datetime_type> v) noexcept {
+    constexpr base& operator=(std::optional<detail::basic_datetime_type<Fsp>> v) noexcept {
         value = std::move(v);
         return *this;
     }
 
-    [[nodiscard]] constexpr std::optional<datetime_type> const& get() const noexcept {
+    [[nodiscard]] constexpr std::optional<detail::basic_datetime_type<Fsp>> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr std::optional<datetime_type>& get() noexcept {
+    [[nodiscard]] constexpr std::optional<detail::basic_datetime_type<Fsp>>& get() noexcept {
         return value;
     }
 
-    constexpr operator std::optional<datetime_type> const&() const noexcept {
+    constexpr operator std::optional<detail::basic_datetime_type<Fsp>> const&() const noexcept {
         return value;
     }
-    constexpr operator std::optional<datetime_type>&() noexcept {
+    constexpr operator std::optional<detail::basic_datetime_type<Fsp>>&() noexcept {
         return value;
     }
 };
 
-template <>
-struct base<timestamp_type> : column_field_tag {
-    using value_type = timestamp_type;
+template <uint32_t Fsp>
+struct base<detail::basic_timestamp_type<Fsp>> : column_field_tag {
+    using value_type = detail::basic_timestamp_type<Fsp>;
 
-    timestamp_type value{};
+    detail::basic_timestamp_type<Fsp> value{};
 
     constexpr base() = default;
     base(sql_now_t) noexcept : value(sql_now_t{}) {
     }
     base(std::chrono::system_clock::time_point tp) noexcept : value(tp) {
     }
-    base(timestamp_type v) noexcept : value(v) {
+    base(detail::basic_timestamp_type<Fsp> v) noexcept : value(v) {
     }
 
     base& operator=(sql_now_t) noexcept {
-        value = timestamp_type{sql_now_t{}};
+        value = detail::basic_timestamp_type<Fsp>{sql_now_t{}};
         return *this;
     }
     base& operator=(std::chrono::system_clock::time_point tp) noexcept {
-        value = timestamp_type{tp};
+        value = detail::basic_timestamp_type<Fsp>{tp};
         return *this;
     }
-    base& operator=(timestamp_type v) noexcept {
+    base& operator=(detail::basic_timestamp_type<Fsp> v) noexcept {
         value = v;
         return *this;
     }
 
-    [[nodiscard]] constexpr timestamp_type const& get() const noexcept {
+    [[nodiscard]] constexpr detail::basic_timestamp_type<Fsp> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr timestamp_type& get() noexcept {
+    [[nodiscard]] constexpr detail::basic_timestamp_type<Fsp>& get() noexcept {
         return value;
     }
 
-    constexpr operator timestamp_type const&() const noexcept {
+    constexpr operator detail::basic_timestamp_type<Fsp> const&() const noexcept {
         return value;
     }
-    constexpr operator timestamp_type&() noexcept {
+    constexpr operator detail::basic_timestamp_type<Fsp>&() noexcept {
         return value;
     }
 };
 
-template <>
-struct base<std::optional<timestamp_type>> : column_field_tag {
-    using value_type = std::optional<timestamp_type>;
+template <uint32_t Fsp>
+struct base<std::optional<detail::basic_timestamp_type<Fsp>>> : column_field_tag {
+    using value_type = std::optional<detail::basic_timestamp_type<Fsp>>;
 
-    std::optional<timestamp_type> value{};
+    std::optional<detail::basic_timestamp_type<Fsp>> value{};
 
     constexpr base() = default;
     constexpr base(std::nullopt_t) noexcept : value(std::nullopt) {
     }
-    base(sql_now_t) noexcept : value(timestamp_type{sql_now_t{}}) {
+    base(sql_now_t) noexcept : value(detail::basic_timestamp_type<Fsp>{sql_now_t{}}) {
     }
-    base(std::chrono::system_clock::time_point tp) noexcept : value(timestamp_type{tp}) {
+    base(std::chrono::system_clock::time_point tp) noexcept : value(detail::basic_timestamp_type<Fsp>{tp}) {
     }
-    base(timestamp_type v) noexcept : value(std::move(v)) {
+    base(detail::basic_timestamp_type<Fsp> v) noexcept : value(std::move(v)) {
     }
-    base(std::optional<timestamp_type> v) noexcept : value(std::move(v)) {
+    base(std::optional<detail::basic_timestamp_type<Fsp>> v) noexcept : value(std::move(v)) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
@@ -576,33 +576,33 @@ struct base<std::optional<timestamp_type>> : column_field_tag {
         return *this;
     }
     constexpr base& operator=(sql_now_t) noexcept {
-        value = timestamp_type{sql_now_t{}};
+        value = detail::basic_timestamp_type<Fsp>{sql_now_t{}};
         return *this;
     }
     constexpr base& operator=(std::chrono::system_clock::time_point tp) noexcept {
-        value = timestamp_type{tp};
+        value = detail::basic_timestamp_type<Fsp>{tp};
         return *this;
     }
-    constexpr base& operator=(timestamp_type v) noexcept {
+    constexpr base& operator=(detail::basic_timestamp_type<Fsp> v) noexcept {
         value = std::move(v);
         return *this;
     }
-    constexpr base& operator=(std::optional<timestamp_type> v) noexcept {
+    constexpr base& operator=(std::optional<detail::basic_timestamp_type<Fsp>> v) noexcept {
         value = std::move(v);
         return *this;
     }
 
-    [[nodiscard]] constexpr std::optional<timestamp_type> const& get() const noexcept {
+    [[nodiscard]] constexpr std::optional<detail::basic_timestamp_type<Fsp>> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr std::optional<timestamp_type>& get() noexcept {
+    [[nodiscard]] constexpr std::optional<detail::basic_timestamp_type<Fsp>>& get() noexcept {
         return value;
     }
 
-    constexpr operator std::optional<timestamp_type> const&() const noexcept {
+    constexpr operator std::optional<detail::basic_timestamp_type<Fsp>> const&() const noexcept {
         return value;
     }
-    constexpr operator std::optional<timestamp_type>&() noexcept {
+    constexpr operator std::optional<detail::basic_timestamp_type<Fsp>>&() noexcept {
         return value;
     }
 };

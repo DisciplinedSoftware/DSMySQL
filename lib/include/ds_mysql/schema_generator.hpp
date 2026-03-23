@@ -87,20 +87,32 @@ struct sql_type_name {
                 }
             } else if constexpr (std::same_as<base_type, std::chrono::system_clock::time_point>) {
                 return "DATETIME";
-            } else if constexpr (std::same_as<base_type, datetime_type>) {
-                return "DATETIME";
-            } else if constexpr (std::same_as<base_type, timestamp_type>) {
-                return "TIMESTAMP";
-            } else if constexpr (std::same_as<base_type, time_type>) {
-                return "TIME";
+            } else if constexpr (is_datetime_type_v<base_type>) {
+                if constexpr (base_type::column_fsp == 0) {
+                    return "DATETIME";
+                } else {
+                    return "DATETIME(" + std::to_string(base_type::column_fsp) + ")";
+                }
+            } else if constexpr (is_timestamp_type_v<base_type>) {
+                if constexpr (base_type::column_fsp == 0) {
+                    return "TIMESTAMP";
+                } else {
+                    return "TIMESTAMP(" + std::to_string(base_type::column_fsp) + ")";
+                }
+            } else if constexpr (is_time_type_v<base_type>) {
+                if constexpr (base_type::column_fsp == 0) {
+                    return "TIME";
+                } else {
+                    return "TIME(" + std::to_string(base_type::column_fsp) + ")";
+                }
             } else {
                 static_assert(false,
                               "Unsupported type for SQL mapping. Supported: uint32_t, int32_t, uint64_t, "
                               "int64_t, float, double, float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
                               "bool, varchar_field<N>, text_field (TEXT), "
                               "mediumtext_field (MEDIUMTEXT, MySQL), longtext_field (LONGTEXT, MySQL), "
-                              "std::chrono::system_clock::time_point, datetime_type, timestamp_type, time_type, "
-                              "and their std::optional variants");
+                              "std::chrono::system_clock::time_point, datetime_type<Fsp>, timestamp_type<Fsp>, "
+                              "time_type<Fsp>, and their std::optional variants");
             }
         }  // end else (not ColumnFieldType)
     }

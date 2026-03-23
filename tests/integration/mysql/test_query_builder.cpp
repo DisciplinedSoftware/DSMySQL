@@ -20,15 +20,15 @@ namespace ds_mysql {
 namespace {
 
 struct trade {
-    COLUMN_FIELD(id,          uint32_t)
-    COLUMN_FIELD(account_id,  std::optional<uint32_t>)
-    COLUMN_FIELD(code,        varchar_field<32>)
-    COLUMN_FIELD(type,        varchar_field<64>)
-    COLUMN_FIELD(name,        std::optional<varchar_field<255>>)
-    COLUMN_FIELD(category,    std::optional<varchar_field<255>>)
-    COLUMN_FIELD(currency,    std::optional<varchar_field<32>>)
-    COLUMN_FIELD(executed_at, datetime_type)
-    COLUMN_FIELD(recorded_at, datetime_type)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(account_id, std::optional<uint32_t>)
+    COLUMN_FIELD(code, varchar_field<32>)
+    COLUMN_FIELD(type, varchar_field<64>)
+    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(category, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(executed_at, datetime_type<>)
+    COLUMN_FIELD(recorded_at, datetime_type<>)
 };
 
 [[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
@@ -85,7 +85,7 @@ struct trade_db : ds_mysql::database_schema {
 // The DB table is created (via raw SQL) with 9 columns in the mismatch tests, so
 // validate_table / validate_database will detect the count discrepancy.
 struct trade_few_columns {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(code, varchar_field<32>)
 };
 
@@ -96,7 +96,7 @@ struct trade_few_columns_db : ds_mysql::database_schema {
 
 // A second table used for multi-table validate_database tests.
 struct account {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, varchar_field<64>)
 };
 
@@ -106,10 +106,10 @@ struct multi_table_db : ds_mysql::database_schema {
 };
 
 struct temporal_precision_trade {
-    COLUMN_FIELD(id,          uint32_t)
-    COLUMN_FIELD(code,        varchar_field<32>)
-    COLUMN_FIELD(executed_at, datetime_type)
-    COLUMN_FIELD(recorded_at, timestamp_type)
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(code, varchar_field<32>)
+    COLUMN_FIELD(executed_at, datetime_type<>)
+    COLUMN_FIELD(recorded_at, timestamp_type<>)
 };
 
 }  // namespace
@@ -265,8 +265,8 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         temporal_precision_trade row;
         row.code_ = "PREC";
         auto const tp = system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{987654};
-        row.executed_at_ = datetime_type{tp, 3};
-        row.recorded_at_ = timestamp_type{tp, 2};
+        row.executed_at_ = datetime_type<>{tp, 3};
+        row.recorded_at_ = timestamp_type<>{tp, 2};
 
         expect(db->execute(insert_into<temporal_precision_trade>().values(row)).has_value());
 
@@ -338,13 +338,13 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         row.currency_ = "USD";
         expect(db->execute(insert_into<trade>().values(row)).has_value());
 
-        auto const results = db->query(select<trade::id, trade::account_id, trade::code, trade::type, trade::name,
-                              trade::category, trade::currency,
-                              date_format_of<trade::executed_at, "%Y-%m-%d %H:%i:%s">,
-                              date_format_of<trade::recorded_at, "%Y-%m-%d %H:%i:%s">>()
-                           .from<trade>()
-                           .order_by<trade::id>()
-                           .limit(1));
+        auto const results =
+            db->query(select<trade::id, trade::account_id, trade::code, trade::type, trade::name, trade::category,
+                             trade::currency, date_format_of<trade::executed_at, "%Y-%m-%d %H:%i:%s">,
+                             date_format_of<trade::recorded_at, "%Y-%m-%d %H:%i:%s">>()
+                          .from<trade>()
+                          .order_by<trade::id>()
+                          .limit(1));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u);
 
@@ -901,8 +901,8 @@ suite<"Connection Error"> connection_error_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(
-            config->host(), config->database(), config->credentials(), config->port());
+        auto const db =
+            mysql_database::connect(config->host(), config->database(), config->credentials(), config->port());
         expect(fatal(db)) << "Explicit overload should succeed with valid connection parameters";
 
         auto const rows = db->query(raw_sql{"SELECT 1"});
@@ -1003,7 +1003,7 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
 
 namespace {
 struct bool_table {
-    COLUMN_FIELD(id,        uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(is_active, bool)
 };
 }  // namespace
@@ -1037,17 +1037,17 @@ suite<"Boolean Column Coverage"> boolean_column_suite = [] {
 namespace {
 // C++ struct matching the layout of the tables created in validate_field tests.
 struct mismatch_table {
-    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(right_name, varchar_field<32>)
 };
 
 struct type_mismatch_struct {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(code, varchar_field<32>)  // expects VARCHAR(32)
 };
 
 struct nullability_mismatch_struct {
-    COLUMN_FIELD(id,   uint32_t)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(code, varchar_field<32>)  // expects NOT NULL
 };
 }  // namespace

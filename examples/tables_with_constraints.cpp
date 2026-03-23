@@ -28,8 +28,8 @@ struct symbol {
     COLUMN_FIELD(name, std::optional<ds_mysql::varchar_field<255>>)
     COLUMN_FIELD(sector, std::optional<ds_mysql::varchar_field<255>>)
     COLUMN_FIELD(currency, std::optional<ds_mysql::varchar_field<32>>)
-    COLUMN_FIELD(created_date, ds_mysql::datetime_type)
-    COLUMN_FIELD(last_updated_date, ds_mysql::datetime_type)
+    COLUMN_FIELD(created_date, ds_mysql::datetime_type<>)
+    COLUMN_FIELD(last_updated_date, ds_mysql::datetime_type<>)
 };
 
 // ===================================================================

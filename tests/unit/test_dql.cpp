@@ -23,8 +23,8 @@ struct product {
     COLUMN_FIELD(name, std::optional<varchar_field<255>>)
     COLUMN_FIELD(tag, std::optional<varchar_field<255>>)
     COLUMN_FIELD(unit, std::optional<varchar_field<32>>)
-    COLUMN_FIELD(created_at, datetime_type)
-    COLUMN_FIELD(last_updated_at, datetime_type)
+    COLUMN_FIELD(created_at, datetime_type<>)
+    COLUMN_FIELD(last_updated_at, datetime_type<>)
 };
 
 }  // namespace
