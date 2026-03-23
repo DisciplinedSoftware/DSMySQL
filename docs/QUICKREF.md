@@ -49,7 +49,7 @@ DSMySQL/
 | Header | Purpose |
 | ------ | ------- |
 | `ds_mysql.hpp` | **Umbrella header** — include this to get everything |
-| `ds_mysql/database.hpp` | MySQL connection & queries |
+| `ds_mysql/mysql_connection.hpp` | MySQL connection & queries |
 | `ds_mysql/sql_ddl.hpp` | DDL query builder (CREATE / DROP / ALTER / ...) |
 | `ds_mysql/sql_dml.hpp` | DML query builder (INSERT / UPDATE / DELETE / DESCRIBE / ...) |
 | `ds_mysql/sql_dql.hpp` | DQL query builder (SELECT / projections / expressions / ...) |

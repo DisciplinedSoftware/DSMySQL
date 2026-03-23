@@ -3,7 +3,7 @@
 // Convenience header — include everything needed to work with DSMySQL.
 //
 // Transitively provides:
-//   database.hpp        — database connection, query execution, result sets
+//   mysql_connection.hpp — database connection, query execution, result sets
 //   sql_ddl.hpp         — DDL query builder (CREATE / DROP / ALTER / ...)
 //   sql_dml.hpp         — DML query builder (INSERT / UPDATE / DELETE / DESCRIBE / ...)
 //   sql_dql.hpp         — DQL query builder (SELECT / projections / expressions / ...)
@@ -13,8 +13,8 @@
 // sql_temporal, sql_varchar, sql_text, config, credentials, …) are
 // pulled in transitively by the headers above.
 
-#include "ds_mysql/database.hpp"
 #include "ds_mysql/metadata.hpp"
+#include "ds_mysql/mysql_connection.hpp"
 #include "ds_mysql/sql_ddl.hpp"
 #include "ds_mysql/sql_dml.hpp"
 #include "ds_mysql/sql_dql.hpp"

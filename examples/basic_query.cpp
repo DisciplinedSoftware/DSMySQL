@@ -57,7 +57,7 @@ struct product {
 
 int main() {
     // --- Connect ---
-    auto db_result = ds_mysql::mysql_database::connect(ds_mysql::mysql_config{
+    auto db_result = ds_mysql::mysql_connection::connect(ds_mysql::mysql_config{
         ds_mysql::host_name{host},
         ds_mysql::database_name{database},
         ds_mysql::auth_credentials{ds_mysql::user_name{user}, ds_mysql::user_password{password}},

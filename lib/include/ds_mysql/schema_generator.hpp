@@ -373,7 +373,7 @@ concept ValidTable = !ColumnFieldType<T> && all_table_tags_nested<T>();
 // ===================================================================
 // database_tables<DB> — register the table types for a database.
 //
-// Enables validate_database<DB>() on mysql_database.
+// Enables validate_database<DB>() on mysql_connection.
 //
 // Option 1 — nested type alias in the database struct (auto-detected):
 //

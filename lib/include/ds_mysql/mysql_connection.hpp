@@ -414,6 +414,4 @@ private:
     std::unique_ptr<MYSQL, decltype(&mysql_close)> connection_;
 };
 
-using mysql_database = mysql_connection;
-
 }  // namespace ds_mysql

@@ -67,7 +67,7 @@ struct product {
 // preventing accidental cross-table column mixing.
 
 // 2. Connect and query
-auto db = mysql_database::connect(mysql_config{
+auto db = mysql_connection::connect(mysql_config{
     host_name{"127.0.0.1"},
     database_name{"my_db"},
     auth_credentials{user_name{"root"}, user_password{"secret"}},
@@ -180,7 +180,7 @@ stable wrapper/fallback. In CMake builds, a generated
 
 ```cpp
 // Explicit parameters
-auto db = mysql_database::connect(
+auto db = mysql_connection::connect(
     host_name{"127.0.0.1"},
     database_name{"my_db"},
     auth_credentials{user_name{"root"}, user_password{"secret"}},
@@ -191,7 +191,7 @@ auto db = mysql_database::connect(
 mysql_config cfg{host_name{"127.0.0.1"}, database_name{"my_db"},
                  auth_credentials{user_name{"root"}, user_password{""}},
                  port_number{3306}};
-auto db = mysql_database::connect(cfg).value();
+auto db = mysql_connection::connect(cfg).value();
 ```
 
 ### DDL (CREATE, DROP)

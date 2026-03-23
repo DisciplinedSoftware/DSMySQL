@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ds_mysql/database.hpp"
+#include "ds_mysql/mysql_connection.hpp"
 #include "ut_expected_expect.hpp"
 
 using namespace boost::ut;
@@ -145,7 +145,7 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value())) << "Missing MySQL environment variables";
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -163,7 +163,7 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -177,7 +177,7 @@ suite<"DDL Integration"> ddl_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -201,7 +201,7 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -227,7 +227,7 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -253,7 +253,7 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<temporal_precision_trade>().if_exists()));
@@ -293,7 +293,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -321,7 +321,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -367,7 +367,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -392,7 +392,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -423,7 +423,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -458,7 +458,7 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -490,7 +490,7 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -523,7 +523,7 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -557,7 +557,7 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -581,7 +581,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -606,7 +606,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -632,7 +632,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -659,7 +659,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -685,7 +685,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -711,7 +711,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -747,7 +747,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -764,7 +764,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -780,7 +780,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade_few_columns>().if_exists()));
@@ -803,7 +803,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -820,7 +820,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -836,7 +836,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade_few_columns>().if_exists()));
@@ -858,7 +858,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -877,7 +877,7 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -902,7 +902,7 @@ suite<"Connection Error"> connection_error_suite = [] {
         expect(fatal(config.has_value()));
 
         auto const db =
-            mysql_database::connect(config->host(), config->database(), config->credentials(), config->port());
+            mysql_connection::connect(config->host(), config->database(), config->credentials(), config->port());
         expect(fatal(db)) << "Explicit overload should succeed with valid connection parameters";
 
         auto const rows = db->query(sql_raw{"SELECT 1"});
@@ -918,7 +918,7 @@ suite<"Connection Error"> connection_error_suite = [] {
         expect(fatal(config.has_value()));
 
         // Use the same host/port as valid config but wrong credentials.
-        auto const bad_db = mysql_database::connect(
+        auto const bad_db = mysql_connection::connect(
             config->host(), config->database(),
             auth_credentials{user_name{"nonexistent_user___"}, user_password{"wrong_pass___"}}, config->port());
         expect(!bad_db.has_value()) << "Should fail with wrong credentials";
@@ -935,7 +935,7 @@ suite<"Execute Failure"> execute_failure_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -962,7 +962,7 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
@@ -980,7 +980,7 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->query(sql_raw{"DROP TABLE IF EXISTS raw_ddl_test"}));
@@ -1013,7 +1013,7 @@ suite<"Boolean Column Coverage"> boolean_column_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<bool_table>().if_exists()));
@@ -1078,7 +1078,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->query(sql_raw{"DROP TABLE IF EXISTS mismatch_name_tbl"}));
@@ -1107,7 +1107,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->query(sql_raw{"DROP TABLE IF EXISTS type_mismatch_tbl"}));
@@ -1136,7 +1136,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->query(sql_raw{"DROP TABLE IF EXISTS nullable_mismatch_tbl"}));
@@ -1163,7 +1163,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
 };
 
 // ===================================================================
-// Typed query column count mismatch — covers mysql_database::query() guard
+// Typed query column count mismatch — covers mysql_connection::query() guard
 // ===================================================================
 
 namespace {
@@ -1181,7 +1181,7 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
-        auto const db = mysql_database::connect(*config);
+        auto const db = mysql_connection::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
             (void)(db->execute(drop_table<trade>().if_exists()));
