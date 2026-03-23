@@ -303,7 +303,8 @@ jobs:
           }
 
           $dataDir = Join-Path $env:RUNNER_TEMP ("mysql-data-" + [guid]::NewGuid().ToString("N"))
-          $logFile = Join-Path $env:RUNNER_TEMP "mysql-server.log"
+          $stdoutLogFile = Join-Path $env:RUNNER_TEMP "mysql-server.stdout.log"
+          $stderrLogFile = Join-Path $env:RUNNER_TEMP "mysql-server.stderr.log"
           $mysqlExe = Find-Tool "mysql.exe"
           $mysqlAdminExe = Find-Tool "mysqladmin.exe"
           $mysqldExe = Find-Tool "mysqld.exe"
@@ -332,7 +333,7 @@ jobs:
               "--port=$port",
               "--bind-address=$env:DS_MYSQL_TEST_HOST",
               "--console"
-            ) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+            ) -RedirectStandardOutput $stdoutLogFile -RedirectStandardError $stderrLogFile -PassThru
 
             $ready = $false
             for ($attempt = 0; $attempt -lt 45; $attempt++) {
@@ -355,8 +356,13 @@ jobs:
           }
 
           if (-not $chosenPort) {
-            if (Test-Path $logFile) {
-              Get-Content $logFile
+            if (Test-Path $stdoutLogFile) {
+              Write-Host "--- mysqld stdout ---"
+              Get-Content $stdoutLogFile
+            }
+            if (Test-Path $stderrLogFile) {
+              Write-Host "--- mysqld stderr ---"
+              Get-Content $stderrLogFile
             }
             throw "MySQL server did not become ready on any candidate port"
           }
