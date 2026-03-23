@@ -218,8 +218,15 @@ jobs:
         shell: pwsh
         run: |
           $mysqlCmd = Get-Command mysql -ErrorAction SilentlyContinue
-          if (-not $mysqlCmd) {
+          $mysqldCmd = Get-Command mysqld -ErrorAction SilentlyContinue
+          if (-not $mysqlCmd -or -not $mysqldCmd) {
             choco install mysql --no-progress -y
+          }
+
+          $mysqlCmd = Get-Command mysql -ErrorAction SilentlyContinue
+          $mysqldCmd = Get-Command mysqld -ErrorAction SilentlyContinue
+          if (-not $mysqlCmd -or -not $mysqldCmd) {
+            throw "MySQL client/server binaries not available on PATH after installation"
           }
 
       - name: Detect MySQL root
@@ -268,6 +275,12 @@ jobs:
         shell: pwsh
         run: |
           function Find-Tool([string]$toolName) {
+            $toolBase = [System.IO.Path]::GetFileNameWithoutExtension($toolName)
+            $fromPath = Get-Command $toolBase -ErrorAction SilentlyContinue
+            if ($fromPath -and (Test-Path $fromPath.Source)) {
+              return $fromPath.Source
+            }
+
             $candidates = @(
               (Join-Path $env:MYSQL_BIN_DIR $toolName),
               (Join-Path $env:MYSQL_ROOT_DIR $toolName),
@@ -301,7 +314,7 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
-          & $mysqldExe --initialize-insecure --basedir="$env:MYSQL_ROOT_DIR" --datadir="$dataDir" --console
+          & $mysqldExe --initialize-insecure --datadir="$dataDir" --console
           if ($LASTEXITCODE -ne 0) {
             throw "mysqld --initialize-insecure failed with exit code $LASTEXITCODE"
           }
@@ -315,7 +328,6 @@ jobs:
             Write-Host "Trying MySQL port $port"
 
             $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
-              "--basedir=$env:MYSQL_ROOT_DIR",
               "--datadir=$dataDir",
               "--port=$port",
               "--bind-address=$env:DS_MYSQL_TEST_HOST",
