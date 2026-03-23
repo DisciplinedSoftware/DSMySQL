@@ -36,7 +36,7 @@ struct numeric_format_table {
 
 struct formatted_numeric_column_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(value0, float_type<>)
+    COLUMN_FIELD(value0, float_type)
     COLUMN_FIELD(value1, float_type<12, 4>)
     COLUMN_FIELD(value2a, double_type<12>)
     COLUMN_FIELD(value2, double_type<12, 4>)
@@ -75,12 +75,12 @@ struct renamed_table {
 struct temporal_table {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
-    COLUMN_FIELD(updated_at, timestamp_type<>)
+    COLUMN_FIELD(updated_at, timestamp_type)
 };
 
 struct time_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(start_time, time_type<>)
+    COLUMN_FIELD(start_time, time_type)
     COLUMN_FIELD(end_time, std::optional<time_type<>>)
 };
 

@@ -776,7 +776,22 @@ public:
  * per-table type uniqueness and satisfying the compile-time membership
  * check in from<Table>().
  */
-#define COLUMN_FIELD(tag, type, ...)                                                         \
-    struct tag##_tag {};                                                                     \
-    using tag = ::ds_mysql::tagged_column_field<tag##_tag, type __VA_OPT__(, ) __VA_ARGS__>; \
-    tag tag##_;
+#define DS_MYSQL_COLUMN_FIELD_IS_EMPTY(...) DS_MYSQL_COLUMN_FIELD_IS_EMPTY_I(__VA_OPT__(0, ) 1)
+#define DS_MYSQL_COLUMN_FIELD_IS_EMPTY_I(x, ...) x
+
+#define DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE(type, ...) \
+    DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_I(DS_MYSQL_COLUMN_FIELD_IS_EMPTY(__VA_ARGS__), type, __VA_ARGS__)
+
+#define DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_I(is_empty, type, ...) \
+    DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_II(is_empty, type, __VA_ARGS__)
+
+#define DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_II(is_empty, type, ...) \
+    DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_##is_empty(type, __VA_ARGS__)
+
+#define DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_1(type, ...) decltype(type{})
+#define DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE_0(type, ...) type, __VA_ARGS__
+
+#define COLUMN_FIELD(tag, type, ...)                                                                              \
+    struct tag##_tag {};                                                                                          \
+    using tag = ::ds_mysql::tagged_column_field<tag##_tag, DS_MYSQL_COLUMN_FIELD_RESOLVED_TYPE(type, __VA_ARGS__)>; \
+    tag tag##_; 
