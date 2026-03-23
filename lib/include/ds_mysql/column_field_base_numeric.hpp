@@ -24,15 +24,13 @@ struct base<float_type<Precision, Scale>> : column_field_tag {
         std::is_nothrow_move_constructible_v<float_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(float v) noexcept : value(v) {
+    }
 
     constexpr base& operator=(float_type<Precision, Scale> v) noexcept(
         std::is_nothrow_move_assignable_v<float_type<Precision, Scale>>) {
         value = std::move(v);
         return *this;
-    }
-
-    // Constructors and assignments from POD float type
-    constexpr base(float v) noexcept : value(v) {
     }
 
     constexpr base& operator=(float v) noexcept {
@@ -68,9 +66,14 @@ struct base<std::optional<float_type<Precision, Scale>>> : column_field_tag {
         std::is_nothrow_move_constructible_v<float_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(float v) noexcept : value(v) {
+    }
     constexpr base(std::optional<float_type<Precision, Scale>> v) noexcept(
         std::is_nothrow_move_constructible_v<std::optional<float_type<Precision, Scale>>>)
         : value(std::move(v)) {
+    }
+    constexpr base(std::optional<float> v) noexcept
+        : value(v ? std::optional<float_type<Precision, Scale>>{*v} : std::nullopt) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
@@ -87,13 +90,12 @@ struct base<std::optional<float_type<Precision, Scale>>> : column_field_tag {
         value = std::move(v);
         return *this;
     }
-
-    // Constructors and assignments from POD float type
-    constexpr base(float v) noexcept : value(v) {
-    }
-
     constexpr base& operator=(float v) noexcept {
         value = v;
+        return *this;
+    }
+    constexpr base& operator=(std::optional<float> v) noexcept {
+        value = v ? std::optional<float_type<Precision, Scale>>{*v} : std::nullopt;
         return *this;
     }
 
@@ -127,15 +129,13 @@ struct base<double_type<Precision, Scale>> : column_field_tag {
         std::is_nothrow_move_constructible_v<double_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(double v) noexcept : value(v) {
+    }
 
     constexpr base& operator=(double_type<Precision, Scale> v) noexcept(
         std::is_nothrow_move_assignable_v<double_type<Precision, Scale>>) {
         value = std::move(v);
         return *this;
-    }
-
-    // Constructors and assignments from POD double type
-    constexpr base(double v) noexcept : value(v) {
     }
 
     constexpr base& operator=(double v) noexcept {
@@ -171,9 +171,14 @@ struct base<std::optional<double_type<Precision, Scale>>> : column_field_tag {
         std::is_nothrow_move_constructible_v<double_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(double v) noexcept : value(v) {
+    }
     constexpr base(std::optional<double_type<Precision, Scale>> v) noexcept(
         std::is_nothrow_move_constructible_v<std::optional<double_type<Precision, Scale>>>)
         : value(std::move(v)) {
+    }
+    constexpr base(std::optional<double> v) noexcept
+        : value(v ? std::optional<double_type<Precision, Scale>>{*v} : std::nullopt) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
@@ -190,13 +195,12 @@ struct base<std::optional<double_type<Precision, Scale>>> : column_field_tag {
         value = std::move(v);
         return *this;
     }
-
-    // Constructors and assignments from POD double type
-    constexpr base(double v) noexcept : value(v) {
-    }
-
     constexpr base& operator=(double v) noexcept {
         value = v;
+        return *this;
+    }
+    constexpr base& operator=(std::optional<double> v) noexcept {
+        value = v ? std::optional<double_type<Precision, Scale>>{*v} : std::nullopt;
         return *this;
     }
 
@@ -230,18 +234,16 @@ struct base<decimal_type<Precision, Scale>> : column_field_tag {
         std::is_nothrow_move_constructible_v<decimal_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(double v) noexcept : value(v) {
+    }
+
+    constexpr base(long double v) noexcept : value(static_cast<double>(v)) {
+    }
 
     constexpr base& operator=(decimal_type<Precision, Scale> v) noexcept(
         std::is_nothrow_move_assignable_v<decimal_type<Precision, Scale>>) {
         value = std::move(v);
         return *this;
-    }
-
-    // Constructors and assignments from POD double and long double types
-    constexpr base(double v) noexcept : value(v) {
-    }
-
-    constexpr base(long double v) noexcept : value(static_cast<double>(v)) {
     }
 
     constexpr base& operator=(double v) noexcept {
@@ -282,9 +284,16 @@ struct base<std::optional<decimal_type<Precision, Scale>>> : column_field_tag {
         std::is_nothrow_move_constructible_v<decimal_type<Precision, Scale>>)
         : value(std::move(v)) {
     }
+    constexpr base(double v) noexcept : value(v) {
+    }
+    constexpr base(long double v) noexcept : value(static_cast<double>(v)) {
+    }
     constexpr base(std::optional<decimal_type<Precision, Scale>> v) noexcept(
         std::is_nothrow_move_constructible_v<std::optional<decimal_type<Precision, Scale>>>)
         : value(std::move(v)) {
+    }
+    constexpr base(std::optional<double> v) noexcept
+        : value(v ? std::optional<decimal_type<Precision, Scale>>{*v} : std::nullopt) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
@@ -302,13 +311,6 @@ struct base<std::optional<decimal_type<Precision, Scale>>> : column_field_tag {
         return *this;
     }
 
-    // Constructors and assignments from POD double and long double types
-    constexpr base(double v) noexcept : value(v) {
-    }
-
-    constexpr base(long double v) noexcept : value(static_cast<double>(v)) {
-    }
-
     constexpr base& operator=(double v) noexcept {
         value = v;
         return *this;
@@ -316,6 +318,10 @@ struct base<std::optional<decimal_type<Precision, Scale>>> : column_field_tag {
 
     constexpr base& operator=(long double v) noexcept {
         value = static_cast<double>(v);
+        return *this;
+    }
+    constexpr base& operator=(std::optional<double> v) noexcept {
+        value = v ? std::optional<decimal_type<Precision, Scale>>{*v} : std::nullopt;
         return *this;
     }
 

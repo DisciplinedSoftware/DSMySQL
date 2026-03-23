@@ -1,18 +1,20 @@
 #include <boost/ut.hpp>
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include "ds_mysql/column_field.hpp"
+#include "ds_mysql/config.hpp"
 #include "ds_mysql/credentials.hpp"
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/host_name.hpp"
-#include "ds_mysql/config.hpp"
 #include "ds_mysql/port_number.hpp"
 #include "ds_mysql/sql_identifiers.hpp"
+#include "ds_mysql/sql_numeric.hpp"
 #include "ds_mysql/sql_text.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 #include "ds_mysql/user_name.hpp"
 #include "ds_mysql/user_password.hpp"
-#include "ds_mysql/sql_varchar.hpp"
 #include "ds_mysql/version.hpp"
 
 using namespace boost::ut;
@@ -215,6 +217,50 @@ suite<"column_field string constructors"> column_field_string_suite = [] {
         std::string const str = "assigned";
         col = str;
         expect(col.value == "assigned");
+    };
+};
+
+suite<"column_field numeric optional POD interop"> column_field_numeric_optional_pod_suite = [] {
+    "optional<float_type> construct from optional<float> (value)"_test = [] {
+        using col_t = column_field<"f", std::optional<float_type<10, 2>>>;
+        col_t col{std::optional<float>{12.5f}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 12.5f);
+    };
+
+    "optional<float_type> assign from optional<float> (nullopt)"_test = [] {
+        using col_t = column_field<"f", std::optional<float_type<10, 2>>>;
+        col_t col{1.0f};
+        col = std::optional<float>{};
+        expect(!col.value.has_value());
+    };
+
+    "optional<double_type> construct from optional<double> (value)"_test = [] {
+        using col_t = column_field<"d", std::optional<double_type<12, 4>>>;
+        col_t col{std::optional<double>{123.4567}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 123.4567);
+    };
+
+    "optional<double_type> assign from optional<double> (nullopt)"_test = [] {
+        using col_t = column_field<"d", std::optional<double_type<12, 4>>>;
+        col_t col{42.0};
+        col = std::optional<double>{};
+        expect(!col.value.has_value());
+    };
+
+    "optional<decimal_type> construct from optional<double> (value)"_test = [] {
+        using col_t = column_field<"m", std::optional<decimal_type<18, 6>>>;
+        col_t col{std::optional<double>{99.123456}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 99.123456);
+    };
+
+    "optional<decimal_type> assign from optional<double> (nullopt)"_test = [] {
+        using col_t = column_field<"m", std::optional<decimal_type<18, 6>>>;
+        col_t col{9.0};
+        col = std::optional<double>{};
+        expect(!col.value.has_value());
     };
 };
 
