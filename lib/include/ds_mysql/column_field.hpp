@@ -10,6 +10,7 @@
 
 #include "ds_mysql/fixed_string.hpp"
 #include "ds_mysql/name_reflection.hpp"
+#include "ds_mysql/numeric_field.hpp"
 #include "ds_mysql/sql_temporal.hpp"
 #include "ds_mysql/varchar_field.hpp"
 

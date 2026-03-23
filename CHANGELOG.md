@@ -10,6 +10,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] - 2026-03-23
+
+### Added
+
+- Typed formatted numeric column wrappers: `float_type`, `double_type`, and `decimal_type`.
+- Support for `<>`, `<precision>`, and `<precision, scale>` numeric wrapper forms in schema generation.
+- Nullable formatted numeric columns via `std::optional<...>` wrappers.
+- Unit coverage for formatted numeric DDL generation and DML serialization/deserialization.
+
+---
+
 ## [1.0.0] – 2026-03-21
 
 ### Added
@@ -33,5 +44,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.0.0

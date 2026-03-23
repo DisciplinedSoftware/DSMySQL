@@ -34,6 +34,18 @@ struct numeric_format_table {
     COLUMN_FIELD(amount, std::optional<double>)
 };
 
+struct formatted_numeric_column_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(value0, float_type<>)
+    COLUMN_FIELD(value1, float_type<12, 4>)
+    COLUMN_FIELD(value2a, double_type<12>)
+    COLUMN_FIELD(value2, double_type<12, 4>)
+    COLUMN_FIELD(value3a, decimal_type<>)
+    COLUMN_FIELD(value3b, decimal_type<12>)
+    COLUMN_FIELD(value3, decimal_type<12, 4>)
+    COLUMN_FIELD(value4, std::optional<decimal_type<12, 4>>)
+};
+
 struct test_db : ds_mysql::database_schema {
     struct symbol {
         COLUMN_FIELD(id, uint32_t)
@@ -203,6 +215,23 @@ suite<"DDL"> ddl_suite = [] {
                "    price FLOAT(12,4) NOT NULL,\n"
                "    ratio DOUBLE(16,8) NOT NULL,\n"
                "    amount DECIMAL(18,6)\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_table with formatted numeric wrapper types - emits inferred FLOAT/DOUBLE/DECIMAL definitions"_test = [] {
+        auto const sql = create_table<formatted_numeric_column_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE formatted_numeric_column_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    value0 FLOAT NOT NULL,\n"
+               "    value1 FLOAT(12,4) NOT NULL,\n"
+               "    value2a DOUBLE(12) NOT NULL,\n"
+               "    value2 DOUBLE(12,4) NOT NULL,\n"
+               "    value3a DECIMAL NOT NULL,\n"
+               "    value3b DECIMAL(12) NOT NULL,\n"
+               "    value3 DECIMAL(12,4) NOT NULL,\n"
+               "    value4 DECIMAL(12,4)\n"
                ");\n"s)
             << sql;
     };

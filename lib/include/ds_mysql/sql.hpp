@@ -250,6 +250,8 @@ std::string to_sql_value(T const& v) {
         return format_datetime(v);
     } else if constexpr (std::same_as<T, bool>) {
         return v ? "1" : "0";
+    } else if constexpr (is_formatted_numeric_type_v<T>) {
+        return to_sql_value(static_cast<typename T::underlying_type>(v));
     } else if constexpr (std::integral<T>) {
         return std::to_string(v);
     } else if constexpr (std::floating_point<T>) {
@@ -262,7 +264,8 @@ std::string to_sql_value(T const& v) {
         static_assert(false,
                       "to_sql_value: unsupported type. "
                       "Supported: column_field<T>, optional<T>, sql_datetime, sql_timestamp, bool, "
-                      "integral types, floating-point types, varchar_field<N>, std::string, "
+                      "integral types, floating-point types, float_type<P,S>, double_type<P,S>, "
+                      "decimal_type<P,S>, varchar_field<N>, std::string, "
                       "std::chrono::system_clock::time_point");
     }
 }
@@ -277,7 +280,7 @@ template <typename T>
 concept SqlValue =
     ColumnFieldType<T> || is_optional_v<T> || std::same_as<T, sql_datetime> || std::same_as<T, sql_timestamp> ||
     std::same_as<T, std::chrono::system_clock::time_point> || std::same_as<T, bool> || std::integral<T> ||
-    std::floating_point<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
+    std::floating_point<T> || is_formatted_numeric_type_v<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
 
 // ===================================================================
 // where_condition — a typed SQL WHERE fragment
@@ -4913,6 +4916,8 @@ T from_mysql_value_nonnull(std::string_view sv) {
         return static_cast<uint64_t>(std::stoull(std::string{sv}));
     } else if constexpr (std::same_as<T, int64_t>) {
         return static_cast<int64_t>(std::stoll(std::string{sv}));
+    } else if constexpr (is_formatted_numeric_type_v<T>) {
+        return T{from_mysql_value_nonnull<typename T::underlying_type>(sv)};
     } else if constexpr (std::same_as<T, float>) {
         return std::stof(std::string{sv});
     } else if constexpr (std::same_as<T, double>) {
@@ -4931,8 +4936,9 @@ T from_mysql_value_nonnull(std::string_view sv) {
     } else {
         static_assert(false,
                       "Unsupported type for MySQL deserialization. "
-                      "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, bool, "
-                      "std::string, varchar_field<N>, std::chrono::system_clock::time_point, "
+                      "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, float_type<P,S>, "
+                      "double_type<P,S>, decimal_type<P,S>, bool, std::string, varchar_field<N>, "
+                      "std::chrono::system_clock::time_point, "
                       "and their std::optional variants.");
     }
 }

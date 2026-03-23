@@ -66,6 +66,8 @@ struct sql_type_name {
                 return "BIGINT UNSIGNED";
             } else if constexpr (std::same_as<base_type, int64_t>) {
                 return "BIGINT";
+            } else if constexpr (is_formatted_numeric_type_v<base_type>) {
+                return base_type::sql_type();
             } else if constexpr (std::same_as<base_type, float>) {
                 return "FLOAT";
             } else if constexpr (std::same_as<base_type, double>) {
@@ -92,7 +94,8 @@ struct sql_type_name {
             } else {
                 static_assert(false,
                               "Unsupported type for SQL mapping. Supported: uint32_t, int32_t, uint64_t, "
-                              "int64_t, float, double, bool, varchar_field<N>, text_field (TEXT), "
+                              "int64_t, float, double, float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
+                              "bool, varchar_field<N>, text_field (TEXT), "
                               "mediumtext_field (MEDIUMTEXT, MySQL), longtext_field (LONGTEXT, MySQL), "
                               "std::chrono::system_clock::time_point, sql_datetime, sql_timestamp, and their "
                               "std::optional variants");

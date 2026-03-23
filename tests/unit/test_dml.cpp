@@ -1,5 +1,6 @@
 #include <boost/ut.hpp>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -25,6 +26,13 @@ struct asset {
     COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
     COLUMN_FIELD(created_date, sql_datetime)
     COLUMN_FIELD(last_updated_date, sql_datetime)
+};
+
+struct formatted_numeric_asset {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(value1, float_type<12, 4>)
+    COLUMN_FIELD(value2, std::optional<double_type<12, 4>>)
+    COLUMN_FIELD(value3, decimal_type<12, 4>)
 };
 }  // namespace
 
@@ -136,6 +144,42 @@ suite<"DML"> dml_suite = [] {
         expect(sql_detail::to_sql_value(sql_datetime{sql_now, 4}) == "NOW(4)"s);
         expect(sql_detail::to_sql_value(sql_timestamp{sql_now}) == "CURRENT_TIMESTAMP"s);
         expect(sql_detail::to_sql_value(sql_timestamp{sql_now, 5}) == "CURRENT_TIMESTAMP(5)"s);
+    };
+
+    "formatted numeric wrapper types serialize and deserialize like their underlying values"_test = [] {
+        expect(sql_type_for<float_type<>>() == "FLOAT"s);
+        expect(sql_type_for<float_type<12, 4>>() == "FLOAT(12,4)"s);
+        expect(sql_type_for<double_type<12>>() == "DOUBLE(12)"s);
+        expect(sql_type_for<double_type<12, 4>>() == "DOUBLE(12,4)"s);
+        expect(sql_type_for<decimal_type<>>() == "DECIMAL"s);
+        expect(sql_type_for<decimal_type<12>>() == "DECIMAL(12)"s);
+        expect(sql_type_for<decimal_type<12, 4>>() == "DECIMAL(12,4)"s);
+
+        expect(sql_detail::to_sql_value(float_type<12, 4>{12.5f}) == "12.500000"s);
+        expect(sql_detail::to_sql_value(double_type<12, 4>{42.125}) == "42.125000"s);
+        expect(sql_detail::to_sql_value(decimal_type<12, 4>{99.5}) == "99.500000"s);
+
+        auto const float_value = ::ds_mysql::detail::from_mysql_value_nonnull<float_type<12, 4>>("12.5");
+        auto const double_value = ::ds_mysql::detail::from_mysql_value_nonnull<double_type<12, 4>>("42.125");
+        auto const decimal_value = ::ds_mysql::detail::from_mysql_value_nonnull<decimal_type<12, 4>>("99.5");
+
+        expect(std::fabs(static_cast<float>(float_value) - 12.5f) < 0.0001f);
+        expect(std::fabs(static_cast<double>(double_value) - 42.125) < 0.0000001);
+        expect(std::fabs(static_cast<double>(decimal_value) - 99.5) < 0.0000001);
+    };
+
+    "insert into - typed formatted numeric wrappers generate SQL literals and preserve nullability"_test = [] {
+        formatted_numeric_asset row;
+        row.id_ = 7u;
+        row.value1_ = 12.5f;
+        row.value2_ = std::nullopt;
+        row.value3_ = 99.5;
+
+        auto const sql = insert_into<formatted_numeric_asset>().values(row).build_sql();
+        expect(sql ==
+               "INSERT INTO formatted_numeric_asset (id, value1, value2, value3) VALUES (7, 12.500000, NULL, "
+               "99.500000)"s)
+            << sql;
     };
 
     // -------------------------------------------------------------------
