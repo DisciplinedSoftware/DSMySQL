@@ -24,8 +24,8 @@ struct asset {
     COLUMN_FIELD(name, std::optional<varchar_field<255>>)
     COLUMN_FIELD(sector, std::optional<varchar_field<255>>)
     COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
-    COLUMN_FIELD(created_date, sql_datetime)
-    COLUMN_FIELD(last_updated_date, sql_datetime)
+    COLUMN_FIELD(created_date, datetime_type)
+    COLUMN_FIELD(last_updated_date, datetime_type)
 };
 
 struct formatted_numeric_asset {
@@ -106,7 +106,7 @@ suite<"DML"> dml_suite = [] {
         row.instrument_ = "instrument";
         row.name_ = "name";
         row.currency_ = "currency";
-        row.created_date_ = sql_datetime{system_clock::time_point{sys_days{year{2024} / January / 1}}};
+        row.created_date_ = datetime_type{system_clock::time_point{sys_days{year{2024} / January / 1}}};
         row.last_updated_date_ = sql_now;
         auto const sql = insert_into<asset>().values(row).build_sql();
         expect(
@@ -123,7 +123,7 @@ suite<"DML"> dml_suite = [] {
         row.ticker_ = "ticker";
         row.instrument_ = "instrument";
         row.created_date_ =
-            sql_datetime{system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{123456}, 6};
+            datetime_type{system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{123456}, 6};
         row.last_updated_date_ = sql_now;
         auto const sql = insert_into<asset>().values(row).build_sql();
         expect(
@@ -136,57 +136,57 @@ suite<"DML"> dml_suite = [] {
         using namespace std::chrono;
         auto const tp = system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{987654};
 
-        expect(sql_detail::to_sql_value(sql_datetime{tp}) == "'2024-01-01 00:00:00'"s);
-        expect(sql_detail::to_sql_value(sql_datetime{tp, 3}) == "'2024-01-01 00:00:00.987'"s);
-        expect(sql_detail::to_sql_value(sql_timestamp{tp, 2}) == "'2024-01-01 00:00:00.98'"s);
+        expect(sql_detail::to_sql_value(datetime_type{tp}) == "'2024-01-01 00:00:00'"s);
+        expect(sql_detail::to_sql_value(datetime_type{tp, 3}) == "'2024-01-01 00:00:00.987'"s);
+        expect(sql_detail::to_sql_value(timestamp_type{tp, 2}) == "'2024-01-01 00:00:00.98'"s);
 
-        expect(sql_detail::to_sql_value(sql_datetime{sql_now}) == "NOW()"s);
-        expect(sql_detail::to_sql_value(sql_datetime{sql_now, 4}) == "NOW(4)"s);
-        expect(sql_detail::to_sql_value(sql_timestamp{sql_now}) == "CURRENT_TIMESTAMP"s);
-        expect(sql_detail::to_sql_value(sql_timestamp{sql_now, 5}) == "CURRENT_TIMESTAMP(5)"s);
+        expect(sql_detail::to_sql_value(datetime_type{sql_now}) == "NOW()"s);
+        expect(sql_detail::to_sql_value(datetime_type{sql_now, 4}) == "NOW(4)"s);
+        expect(sql_detail::to_sql_value(timestamp_type{sql_now}) == "CURRENT_TIMESTAMP"s);
+        expect(sql_detail::to_sql_value(timestamp_type{sql_now, 5}) == "CURRENT_TIMESTAMP(5)"s);
     };
 
-    "sql_time serialization reflects duration and fractional-second precision"_test = [] {
+    "time_type serialization reflects duration and fractional-second precision"_test = [] {
         using namespace std::chrono;
         // 08:30:00
-        auto const t1 = sql_time{microseconds{(8 * 3600 + 30 * 60) * 1000000LL}};
+        auto const t1 = time_type{microseconds{(8 * 3600 + 30 * 60) * 1000000LL}};
         expect(sql_detail::to_sql_value(t1) == "'08:30:00'"s);
 
         // 00:00:00
-        expect(sql_detail::to_sql_value(sql_time{}) == "'00:00:00'"s);
+        expect(sql_detail::to_sql_value(time_type{}) == "'00:00:00'"s);
 
         // 838:59:59 (MySQL maximum)
-        auto const t_max = sql_time{microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL}};
+        auto const t_max = time_type{microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL}};
         expect(sql_detail::to_sql_value(t_max) == "'838:59:59'"s);
 
         // Negative duration: -10:05:00
-        auto const t_neg = sql_time{microseconds{-(10 * 3600 + 5 * 60) * 1000000LL}};
+        auto const t_neg = time_type{microseconds{-(10 * 3600 + 5 * 60) * 1000000LL}};
         expect(sql_detail::to_sql_value(t_neg) == "'-10:05:00'"s);
 
         // Fractional seconds precision=3: 01:02:03.456000 → '01:02:03.456'
-        auto const t_frac = sql_time{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 3};
+        auto const t_frac = time_type{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 3};
         expect(sql_detail::to_sql_value(t_frac) == "'01:02:03.456'"s);
 
         // Fractional seconds precision=6: '01:02:03.456789'
-        auto const t_frac6 = sql_time{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 6};
+        auto const t_frac6 = time_type{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 6};
         expect(sql_detail::to_sql_value(t_frac6) == "'01:02:03.456789'"s);
     };
 
-    "sql_time deserialization parses MySQL TIME strings correctly"_test = [] {
+    "time_type deserialization parses MySQL TIME strings correctly"_test = [] {
         using namespace std::chrono;
-        auto const t1 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("08:30:00");
+        auto const t1 = ::ds_mysql::detail::from_mysql_value_nonnull<time_type>("08:30:00");
         expect(t1.duration() == microseconds{(8 * 3600 + 30 * 60) * 1000000LL});
 
-        auto const t2 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("00:00:00");
+        auto const t2 = ::ds_mysql::detail::from_mysql_value_nonnull<time_type>("00:00:00");
         expect(t2.duration() == microseconds{0});
 
-        auto const t3 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("-10:05:00");
+        auto const t3 = ::ds_mysql::detail::from_mysql_value_nonnull<time_type>("-10:05:00");
         expect(t3.duration() == microseconds{-(10 * 3600 + 5 * 60) * 1000000LL});
 
-        auto const t4 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("01:02:03.456789");
+        auto const t4 = ::ds_mysql::detail::from_mysql_value_nonnull<time_type>("01:02:03.456789");
         expect(t4.duration() == microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL});
 
-        auto const t5 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("838:59:59");
+        auto const t5 = ::ds_mysql::detail::from_mysql_value_nonnull<time_type>("838:59:59");
         expect(t5.duration() == microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL});
     };
 

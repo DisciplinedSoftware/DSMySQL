@@ -75,13 +75,13 @@ struct renamed_table {
 struct temporal_table {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point)
-    COLUMN_FIELD(updated_at, sql_timestamp)
+    COLUMN_FIELD(updated_at, timestamp_type)
 };
 
 struct time_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(start_time, sql_time)
-    COLUMN_FIELD(end_time, std::optional<sql_time>)
+    COLUMN_FIELD(start_time, time_type)
+    COLUMN_FIELD(end_time, std::optional<time_type>)
 };
 
 struct symbol_with_indexes {

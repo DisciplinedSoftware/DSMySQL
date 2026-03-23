@@ -27,8 +27,8 @@ struct trade {
     COLUMN_FIELD(name,        std::optional<varchar_field<255>>)
     COLUMN_FIELD(category,    std::optional<varchar_field<255>>)
     COLUMN_FIELD(currency,    std::optional<varchar_field<32>>)
-    COLUMN_FIELD(executed_at, sql_datetime)
-    COLUMN_FIELD(recorded_at, sql_datetime)
+    COLUMN_FIELD(executed_at, datetime_type)
+    COLUMN_FIELD(recorded_at, datetime_type)
 };
 
 [[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
@@ -108,8 +108,8 @@ struct multi_table_db : ds_mysql::database_schema {
 struct temporal_precision_trade {
     COLUMN_FIELD(id,          uint32_t)
     COLUMN_FIELD(code,        varchar_field<32>)
-    COLUMN_FIELD(executed_at, sql_datetime)
-    COLUMN_FIELD(recorded_at, sql_timestamp)
+    COLUMN_FIELD(executed_at, datetime_type)
+    COLUMN_FIELD(recorded_at, timestamp_type)
 };
 
 }  // namespace
@@ -265,8 +265,8 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         temporal_precision_trade row;
         row.code_ = "PREC";
         auto const tp = system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{987654};
-        row.executed_at_ = sql_datetime{tp, 3};
-        row.recorded_at_ = sql_timestamp{tp, 2};
+        row.executed_at_ = datetime_type{tp, 3};
+        row.recorded_at_ = timestamp_type{tp, 2};
 
         expect(db->execute(insert_into<temporal_precision_trade>().values(row)).has_value());
 

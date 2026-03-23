@@ -48,7 +48,7 @@ struct product {
     COLUMN_FIELD(price, double)
     COLUMN_FIELD(stock, uint32_t)
     COLUMN_FIELD(description, std::optional<ds_mysql::varchar_field<512>>)
-    COLUMN_FIELD(created_at, ds_mysql::sql_datetime)
+    COLUMN_FIELD(created_at, ds_mysql::datetime_type)
 };
 
 // ===================================================================

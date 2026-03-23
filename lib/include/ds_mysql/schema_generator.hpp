@@ -87,11 +87,11 @@ struct sql_type_name {
                 }
             } else if constexpr (std::same_as<base_type, std::chrono::system_clock::time_point>) {
                 return "DATETIME";
-            } else if constexpr (std::same_as<base_type, sql_datetime>) {
+            } else if constexpr (std::same_as<base_type, datetime_type>) {
                 return "DATETIME";
-            } else if constexpr (std::same_as<base_type, sql_timestamp>) {
+            } else if constexpr (std::same_as<base_type, timestamp_type>) {
                 return "TIMESTAMP";
-            } else if constexpr (std::same_as<base_type, sql_time>) {
+            } else if constexpr (std::same_as<base_type, time_type>) {
                 return "TIME";
             } else {
                 static_assert(false,
@@ -99,7 +99,7 @@ struct sql_type_name {
                               "int64_t, float, double, float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
                               "bool, varchar_field<N>, text_field (TEXT), "
                               "mediumtext_field (MEDIUMTEXT, MySQL), longtext_field (LONGTEXT, MySQL), "
-                              "std::chrono::system_clock::time_point, sql_datetime, sql_timestamp, sql_time, "
+                              "std::chrono::system_clock::time_point, datetime_type, timestamp_type, time_type, "
                               "and their std::optional variants");
             }
         }  // end else (not ColumnFieldType)

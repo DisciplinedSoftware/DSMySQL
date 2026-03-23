@@ -32,7 +32,7 @@ struct event_log {
     struct event_id_tag {};
     using id = tagged_column_field<event_id_tag, uint32_t>;
     id id_;
-    COLUMN_FIELD(created_at, sql_datetime)
+    COLUMN_FIELD(created_at, datetime_type)
 };
 
 }  // namespace
