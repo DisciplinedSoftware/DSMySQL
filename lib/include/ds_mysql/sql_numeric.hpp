@@ -10,7 +10,7 @@ namespace ds_mysql {
 
 namespace detail {
 
-inline constexpr uint32_t unspecified_numeric_scale = std::numeric_limits<uint32_t>::max();
+inline constexpr uint32_t unspecified_numeric_scale = (std::numeric_limits<uint32_t>::max)();
 
 template <typename Derived, typename Repr>
 struct formatted_numeric_base {
