@@ -20,6 +20,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `decimal_type` naming scheme introduced in v1.1.0:
   - `sql_datetime`  → `datetime_type`
   - `sql_timestamp` → `timestamp_type`
+- **Breaking:** Removed monolithic `ds_mysql/sql.hpp`. Include `ds_mysql/ds_mysql.hpp` for the umbrella API,
+  or include `ds_mysql/sql_ddl.hpp`, `ds_mysql/sql_dml.hpp`, and `ds_mysql/sql_dql.hpp` directly.
 
 ---
 
