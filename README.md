@@ -48,6 +48,11 @@ struct product {
 //   using price = tagged_column_field<price_tag, double>;
 //   price price_;
 //   // IMPORTANT: tag structs must be nested inside the table struct — not at global scope.
+//
+//   // For wrapper types with default template parameters, use the provided aliases:
+//   struct amount_tag {};
+//   using amount = tagged_column_field<amount_tag, decimal_type_default>;
+//   amount amount_;
 
 // c) Fixed string literal — column name embedded directly, no tag needed.
 //    ⚠ Two tables with identically-named and -typed columns share the same C++ type,
@@ -259,16 +264,27 @@ auto r2 = db.validate_database<my_db>();
 ```cpp
 struct event {
     COLUMN_FIELD(id,         uint32_t)
-    COLUMN_FIELD(created_at, datetime_type)           // DATETIME — defaults to NOW()
-    COLUMN_FIELD(updated_at, timestamp_type)          // TIMESTAMP — defaults to NOW()
-    COLUMN_FIELD(duration,   time_type)               // TIME
-    COLUMN_FIELD(started_at, std::optional<datetime_type>)  // nullable DATETIME
+    COLUMN_FIELD(created_at, datetime_type<>)           // DATETIME — defaults to NOW()
+    COLUMN_FIELD(updated_at, timestamp_type<>)          // TIMESTAMP — defaults to NOW()
+    COLUMN_FIELD(duration,   time_type<>)               // TIME
+    COLUMN_FIELD(started_at, std::optional<datetime_type<>>)  // nullable DATETIME
 };
 
 // Fractional-second precision (0–6) is set on the value object:
 event row;
-row.created_at_  = datetime_type{tp, 3};   // DATETIME(3)
-row.duration_    = time_type{std::chrono::milliseconds{1500}, 3};  // TIME(3) = 00:00:01.500
+row.created_at_  = datetime_type<>{tp, 3};   // DATETIME(3)
+row.duration_    = time_type<>{std::chrono::milliseconds{1500}, 3};  // TIME(3) = 00:00:01.500
+
+// Non-macro form with concise aliases:
+struct audit_event {
+    struct created_at_tag {};
+    using created_at = tagged_column_field<created_at_tag, datetime_type_default>;
+    created_at created_at_;
+
+    struct amount_tag {};
+    using amount = tagged_column_field<amount_tag, decimal_type_default>;
+    amount amount_;
+};
 ```
 
 ### Numeric Precision Overrides

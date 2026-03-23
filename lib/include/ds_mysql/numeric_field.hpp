@@ -110,6 +110,10 @@ struct decimal_type : detail::formatted_numeric_base<decimal_type<Precision, Sca
     }
 };
 
+using float_type_default = float_type<>;
+using double_type_default = double_type<>;
+using decimal_type_default = decimal_type<>;
+
 template <typename T>
 struct is_formatted_numeric_type : std::false_type {};
 

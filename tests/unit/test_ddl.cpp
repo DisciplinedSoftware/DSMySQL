@@ -111,6 +111,24 @@ struct tagged_temporal_alias_table {
     duration duration_;
 };
 
+struct tagged_numeric_alias_table {
+    struct id_tag {};
+    using id = tagged_column_field<id_tag, uint32_t>;
+    id id_;
+
+    struct value0_tag {};
+    using value0 = tagged_column_field<value0_tag, float_type_default>;
+    value0 value0_;
+
+    struct value1_tag {};
+    using value1 = tagged_column_field<value1_tag, double_type_default>;
+    value1 value1_;
+
+    struct value2_tag {};
+    using value2 = tagged_column_field<value2_tag, decimal_type_default>;
+    value2 value2_;
+};
+
 struct symbol_with_indexes {
     COLUMN_FIELD(id, int32_t)
     COLUMN_FIELD(exchange_id, std::optional<int32_t>)
@@ -299,6 +317,22 @@ suite<"DDL"> ddl_suite = [] {
                "    created_at DATETIME NOT NULL,\n"
                "    updated_at TIMESTAMP NOT NULL,\n"
                "    duration TIME NOT NULL\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "tagged_column_field with numeric default aliases - emits FLOAT/DOUBLE/DECIMAL"_test = [] {
+        expect(sql_type_for<float_type_default>() == "FLOAT"s);
+        expect(sql_type_for<double_type_default>() == "DOUBLE"s);
+        expect(sql_type_for<decimal_type_default>() == "DECIMAL"s);
+
+        auto const sql = create_table<tagged_numeric_alias_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE tagged_numeric_alias_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    value0 FLOAT NOT NULL,\n"
+               "    value1 DOUBLE NOT NULL,\n"
+               "    value2 DECIMAL NOT NULL\n"
                ");\n"s)
             << sql;
     };
