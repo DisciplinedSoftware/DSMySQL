@@ -1,8 +1,8 @@
 # DSMySQL
 
-[![GCC CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-gcc&label=GCC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
-[![Clang CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-clang&label=Clang)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
-[![MSVC CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-msvc&label=MSVC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+[![GCC CI](https://img.shields.io/badge/dynamic/json?url=https://api.github.com/repos/DisciplinedSoftware/DSMySQL/commits/main/check-runs?check_name=tests-gcc&query=$.check_runs[0].conclusion&label=GCC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+[![Clang CI](https://img.shields.io/badge/dynamic/json?url=https://api.github.com/repos/DisciplinedSoftware/DSMySQL/commits/main/check-runs?check_name=tests-clang&query=$.check_runs[0].conclusion&label=Clang)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+[![MSVC CI](https://img.shields.io/badge/dynamic/json?url=https://api.github.com/repos/DisciplinedSoftware/DSMySQL/commits/main/check-runs?check_name=tests-msvc&query=$.check_runs[0].conclusion&label=MSVC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
 
 A portable C++23 type-safe MySQL query builder and database wrapper.
 
