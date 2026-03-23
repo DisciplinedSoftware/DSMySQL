@@ -6,7 +6,7 @@
 
 #include "ds_mysql/sql.hpp"
 #include "ds_mysql/sql_extension.hpp"
-#include "ds_mysql/text_field.hpp"
+#include "ds_mysql/sql_text.hpp"
 
 using namespace boost::ut;
 using namespace ds_mysql;
@@ -19,8 +19,8 @@ using namespace std::string_literals;
 namespace {
 struct test_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(name, varchar_field<255>)
-    COLUMN_FIELD(tag, std::optional<varchar_field<64>>)
+    COLUMN_FIELD(name, varchar_type<255>)
+    COLUMN_FIELD(tag, std::optional<varchar_type<64>>)
 };
 
 struct new_table {
@@ -132,20 +132,20 @@ struct tagged_numeric_alias_table {
 struct symbol_with_indexes {
     COLUMN_FIELD(id, int32_t)
     COLUMN_FIELD(exchange_id, std::optional<int32_t>)
-    COLUMN_FIELD(ticker, varchar_field<32>)
-    COLUMN_FIELD(instrument, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(sector, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(ticker, varchar_type<32>)
+    COLUMN_FIELD(instrument, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(sector, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_type<32>>)
     COLUMN_FIELD(created_date, std::chrono::system_clock::time_point)
     COLUMN_FIELD(last_updated_date, std::chrono::system_clock::time_point)
 };
 
 struct audit_log {
     COLUMN_FIELD(id, uint32_t, column_attr::auto_increment)
-    COLUMN_FIELD(event_type, varchar_field<64>)
+    COLUMN_FIELD(event_type, varchar_type<64>)
     COLUMN_FIELD(user_id, uint32_t, column_attr::comment<"User who triggered the event">)
-    COLUMN_FIELD(description, varchar_field<255>)
+    COLUMN_FIELD(description, varchar_type<255>)
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_current_timestamp,
                  column_attr::on_update_current_timestamp)
 };
@@ -963,21 +963,21 @@ static_assert(Database<test_db>, "test_db must satisfy Database concept");
 static_assert(!Database<test_table>, "plain table must NOT satisfy Database concept");
 
 // ===================================================================
-// DDL — text_field column types (TEXT, MEDIUMTEXT, LONGTEXT)
+// DDL — text_type column types (TEXT, MEDIUMTEXT, LONGTEXT)
 // ===================================================================
 
 namespace {
 struct text_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(description, text_field<>)
-    COLUMN_FIELD(notes, mediumtext_field)
-    COLUMN_FIELD(body, longtext_field)
-    COLUMN_FIELD(opt_notes, std::optional<text_field<>>)
+    COLUMN_FIELD(description, text_type<>)
+    COLUMN_FIELD(notes, mediumtext_type)
+    COLUMN_FIELD(body, longtext_type)
+    COLUMN_FIELD(opt_notes, std::optional<text_type<>>)
 };
 }  // namespace
 
-suite<"DDL text_field types"> ddl_text_field_suite = [] {
-    "create_table with text_field - emits TEXT column"_test = [] {
+suite<"DDL text_type types"> ddl_text_type_suite = [] {
+    "create_table with text_type - emits TEXT column"_test = [] {
         auto const sql = create_table<text_table>().build_sql();
         expect(sql ==
                "CREATE TABLE text_table (\n"

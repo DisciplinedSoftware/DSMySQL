@@ -23,11 +23,11 @@
 struct symbol {
     COLUMN_FIELD(id, int32_t)
     COLUMN_FIELD(exchange_id, std::optional<int32_t>)
-    COLUMN_FIELD(ticker, ds_mysql::varchar_field<32>)
-    COLUMN_FIELD(instrument, ds_mysql::varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<ds_mysql::varchar_field<255>>)
-    COLUMN_FIELD(sector, std::optional<ds_mysql::varchar_field<255>>)
-    COLUMN_FIELD(currency, std::optional<ds_mysql::varchar_field<32>>)
+    COLUMN_FIELD(ticker, ds_mysql::varchar_type<32>)
+    COLUMN_FIELD(instrument, ds_mysql::varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<ds_mysql::varchar_type<255>>)
+    COLUMN_FIELD(sector, std::optional<ds_mysql::varchar_type<255>>)
+    COLUMN_FIELD(currency, std::optional<ds_mysql::varchar_type<32>>)
     COLUMN_FIELD(created_date, ds_mysql::datetime_type<>)
     COLUMN_FIELD(last_updated_date, ds_mysql::datetime_type<>)
 };

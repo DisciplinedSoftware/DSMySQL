@@ -18,11 +18,11 @@ namespace {
 struct product {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(category_id, std::optional<uint32_t>)
-    COLUMN_FIELD(sku, varchar_field<32>)
-    COLUMN_FIELD(type, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(tag, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(unit, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(sku, varchar_type<32>)
+    COLUMN_FIELD(type, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(tag, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(unit, std::optional<varchar_type<32>>)
     COLUMN_FIELD(created_at, datetime_type<>)
     COLUMN_FIELD(last_updated_at, datetime_type<>)
 };
@@ -515,7 +515,7 @@ suite<"DQL MySQL Metadata Queries"> dql_mysql_metadata_suite = [] {
 namespace {
 struct category {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(label, varchar_field<64>)
+    COLUMN_FIELD(label, varchar_type<64>)
 };
 }  // namespace
 
@@ -575,8 +575,8 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
 // ===================================================================
 
 static_assert(std::is_same_v<decltype(select<product::id, product::sku>().from<product>())::result_row_type,
-                             std::tuple<uint32_t, varchar_field<32>>>,
-              "result_row_type must be std::tuple<uint32_t, varchar_field<32>>");
+                             std::tuple<uint32_t, varchar_type<32>>>,
+              "result_row_type must be std::tuple<uint32_t, varchar_type<32>>");
 static_assert(std::is_same_v<decltype(select<count_all>().from<product>())::result_row_type, std::tuple<uint64_t>>,
               "result_row_type must be std::tuple<uint64_t>");
 

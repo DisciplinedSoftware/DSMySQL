@@ -5,7 +5,7 @@
 
 #include "ds_mysql/sql.hpp"
 #include "ds_mysql/sql_extension.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 
 using namespace boost::ut;
 using namespace ds_mysql;
@@ -17,15 +17,15 @@ namespace {
 struct product {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(category_id, std::optional<uint32_t>)
-    COLUMN_FIELD(sku, varchar_field<32>)
-    COLUMN_FIELD(type, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(sku, varchar_type<32>)
+    COLUMN_FIELD(type, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
     COLUMN_FIELD(price_val, double)
 };
 
 struct category {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(label, varchar_field<64>)
+    COLUMN_FIELD(label, varchar_type<64>)
 };
 
 struct event_log {

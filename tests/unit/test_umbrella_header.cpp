@@ -10,8 +10,8 @@ namespace {
 
 struct api_product {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(sku, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
+    COLUMN_FIELD(sku, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
 };
 
 }  // namespace

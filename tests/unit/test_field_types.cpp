@@ -9,10 +9,10 @@
 #include "ds_mysql/config.hpp"
 #include "ds_mysql/port_number.hpp"
 #include "ds_mysql/sql_identifiers.hpp"
-#include "ds_mysql/text_field.hpp"
+#include "ds_mysql/sql_text.hpp"
 #include "ds_mysql/user_name.hpp"
 #include "ds_mysql/user_password.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 #include "ds_mysql/version.hpp"
 
 using namespace boost::ut;
@@ -20,149 +20,149 @@ using namespace ds_mysql;
 using namespace std::string_view_literals;
 
 // ===================================================================
-// text_field
+// text_type
 // ===================================================================
 
-suite<"text_field"> text_field_suite = [] {
-    "text_field default-constructed is empty"_test = [] {
-        text_field<> f;
+suite<"text_type"> text_type_suite = [] {
+    "text_type default-constructed is empty"_test = [] {
+        text_type<> f;
         expect(f.empty());
         expect(f.size() == 0_u);
     };
 
-    "text_field constructed from string_view stores value"_test = [] {
-        text_field<> f{"hello"};
+    "text_type constructed from string_view stores value"_test = [] {
+        text_type<> f{"hello"};
         expect(f.view() == "hello"sv);
         expect(f.size() == 5_u);
         expect(!f.empty());
     };
 
-    "text_field equality - same value"_test = [] {
-        text_field<> a{"foo"};
-        text_field<> b{"foo"};
+    "text_type equality - same value"_test = [] {
+        text_type<> a{"foo"};
+        text_type<> b{"foo"};
         expect(a == b);
     };
 
-    "text_field equality - different value"_test = [] {
-        text_field<> a{"foo"};
-        text_field<> b{"bar"};
+    "text_type equality - different value"_test = [] {
+        text_type<> a{"foo"};
+        text_type<> b{"bar"};
         expect(!(a == b));
     };
 
-    "text_field equality with string_view"_test = [] {
-        text_field<> f{"hello"};
+    "text_type equality with string_view"_test = [] {
+        text_type<> f{"hello"};
         expect(f == "hello"sv);
     };
 
-    "text_field implicit conversion to string_view"_test = [] {
-        text_field<> f{"world"};
+    "text_type implicit conversion to string_view"_test = [] {
+        text_type<> f{"world"};
         std::string_view sv = f;
         expect(sv == "world"sv);
     };
 
-    "mediumtext_field stores and retrieves value"_test = [] {
-        mediumtext_field f{"medium content"};
+    "mediumtext_type stores and retrieves value"_test = [] {
+        mediumtext_type f{"medium content"};
         expect(f.view() == "medium content"sv);
     };
 
-    "longtext_field stores and retrieves value"_test = [] {
-        longtext_field f{"long content"};
+    "longtext_type stores and retrieves value"_test = [] {
+        longtext_type f{"long content"};
         expect(f.view() == "long content"sv);
     };
 
     // Compile-time trait checks
-    static_assert(is_text_field_v<text_field<>>);
-    static_assert(is_text_field_v<mediumtext_field>);
-    static_assert(is_text_field_v<longtext_field>);
-    static_assert(!is_text_field_v<int>);
-    static_assert(is_text_field<text_field<>>::kind == text_kind::text);
-    static_assert(is_text_field<mediumtext_field>::kind == text_kind::mediumtext);
-    static_assert(is_text_field<longtext_field>::kind == text_kind::longtext);
+    static_assert(is_text_type_v<text_type<>>);
+    static_assert(is_text_type_v<mediumtext_type>);
+    static_assert(is_text_type_v<longtext_type>);
+    static_assert(!is_text_type_v<int>);
+    static_assert(is_text_type<text_type<>>::kind == text_kind::text);
+    static_assert(is_text_type<mediumtext_type>::kind == text_kind::mediumtext);
+    static_assert(is_text_type<longtext_type>::kind == text_kind::longtext);
 };
 
 // ===================================================================
-// varchar_field
+// varchar_type
 // ===================================================================
 
-suite<"varchar_field"> varchar_field_suite = [] {
-    "varchar_field create — valid string within capacity"_test = [] {
-        auto result = varchar_field<8>::create("AAPL");
+suite<"varchar_type"> varchar_type_suite = [] {
+    "varchar_type create — valid string within capacity"_test = [] {
+        auto result = varchar_type<8>::create("AAPL");
         expect(fatal(result.has_value()));
         expect(result->view() == "AAPL"sv);
         expect(result->size() == 4_u);
     };
 
-    "varchar_field create — string at exact capacity"_test = [] {
-        auto result = varchar_field<4>::create("AAPL");
+    "varchar_type create — string at exact capacity"_test = [] {
+        auto result = varchar_type<4>::create("AAPL");
         expect(fatal(result.has_value()));
         expect(result->view() == "AAPL"sv);
     };
 
-    "varchar_field create — string exceeds capacity returns error"_test = [] {
-        auto result = varchar_field<3>::create("AAPL");
+    "varchar_type create — string exceeds capacity returns error"_test = [] {
+        auto result = varchar_type<3>::create("AAPL");
         expect(!result.has_value());
         expect(result.error() == varchar_error::too_long);
     };
 
-    "varchar_field create — empty string"_test = [] {
-        auto result = varchar_field<32>::create("");
+    "varchar_type create — empty string"_test = [] {
+        auto result = varchar_type<32>::create("");
         expect(fatal(result.has_value()));
         expect(result->empty());
     };
 
-    "varchar_field default-constructed is empty"_test = [] {
-        varchar_field<32> f;
+    "varchar_type default-constructed is empty"_test = [] {
+        varchar_type<32> f;
         expect(f.empty());
         expect(f.size() == 0_u);
         expect(f.view() == ""sv);
     };
 
-    "varchar_field constructed from string literal stores value"_test = [] {
-        varchar_field<32> f{"AAPL"};
+    "varchar_type constructed from string literal stores value"_test = [] {
+        varchar_type<32> f{"AAPL"};
         expect(f.view() == "AAPL"sv);
         expect(f.size() == 4_u);
         expect(!f.empty());
     };
 
-    "varchar_field equality — same value"_test = [] {
-        varchar_field<32> a{"AAPL"};
-        varchar_field<32> b{"AAPL"};
+    "varchar_type equality — same value"_test = [] {
+        varchar_type<32> a{"AAPL"};
+        varchar_type<32> b{"AAPL"};
         expect(a == b);
     };
 
-    "varchar_field equality — different value"_test = [] {
-        varchar_field<32> a{"AAPL"};
-        varchar_field<32> b{"MSFT"};
+    "varchar_type equality — different value"_test = [] {
+        varchar_type<32> a{"AAPL"};
+        varchar_type<32> b{"MSFT"};
         expect(!(a == b));
     };
 
-    "varchar_field equality with string_view"_test = [] {
-        varchar_field<32> f{"AAPL"};
+    "varchar_type equality with string_view"_test = [] {
+        varchar_type<32> f{"AAPL"};
         expect(f == "AAPL"sv);
     };
 
-    "varchar_field implicit conversion to string_view"_test = [] {
-        varchar_field<32> f{"AAPL"};
+    "varchar_type implicit conversion to string_view"_test = [] {
+        varchar_type<32> f{"AAPL"};
         std::string_view sv = f;
         expect(sv == "AAPL"sv);
     };
 
-    "varchar_field c_str is null-terminated"_test = [] {
-        varchar_field<32> f{"hi"};
+    "varchar_type c_str is null-terminated"_test = [] {
+        varchar_type<32> f{"hi"};
         expect(std::string_view{f.c_str()} == "hi"sv);
     };
 
     // Compile-time trait checks
-    static_assert(is_varchar_field_v<varchar_field<32>>);
-    static_assert(is_varchar_field_v<varchar_field<255>>);
-    static_assert(!is_varchar_field_v<int>);
-    static_assert(!is_varchar_field_v<std::string_view>);
-    static_assert(is_varchar_field<varchar_field<64>>::capacity == 64);
+    static_assert(is_varchar_type_v<varchar_type<32>>);
+    static_assert(is_varchar_type_v<varchar_type<255>>);
+    static_assert(!is_varchar_type_v<int>);
+    static_assert(!is_varchar_type_v<std::string_view>);
+    static_assert(is_varchar_type<varchar_type<64>>::capacity == 64);
 
-    // varchar_field capacity matches template parameter
-    static_assert(varchar_field<32>::capacity == 32);
-    static_assert(varchar_field<255>::capacity == 255);
-    static_assert(varchar_field<32>::max_size() == 32);
+    // varchar_type capacity matches template parameter
+    static_assert(varchar_type<32>::capacity == 32);
+    static_assert(varchar_type<255>::capacity == 255);
+    static_assert(varchar_type<32>::max_size() == 32);
 };
 
 // ===================================================================

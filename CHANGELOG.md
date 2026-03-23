@@ -45,7 +45,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Boost.PFR powered compile-time reflection — no macros required for reflection.
 - `COLUMN_FIELD` macro for ergonomic per-table, per-column unique type definitions.
 - Strong-type wrappers: `host_name`, `database_name`, `port_number`, `user_name`,
-  `user_password`, `varchar_field<N>`, `text_field`.
+  `user_password`, `varchar_type<N>`, `text_type`.
 - `std::optional<T>` support mapping to nullable SQL columns.
 - `std::expected`-based error handling throughout — no exceptions in the query path.
 - SQL extension helpers: `ROUND`, `FORMAT`, `COALESCE`, `IFNULL`, `DATE_FORMAT`,

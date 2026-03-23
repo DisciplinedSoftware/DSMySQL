@@ -13,9 +13,10 @@
 #include "ds_mysql/column_field.hpp"
 #include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/sql_identifiers.hpp"
+#include "ds_mysql/sql_numeric.hpp"
 #include "ds_mysql/sql_temporal.hpp"
-#include "ds_mysql/text_field.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/sql_text.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 
 namespace ds_mysql {
 
@@ -74,17 +75,8 @@ struct sql_type_name {
                 return "DOUBLE";
             } else if constexpr (std::same_as<base_type, bool>) {
                 return "BOOLEAN";
-            } else if constexpr (is_varchar_field_v<base_type>) {
-                return "VARCHAR(" + std::to_string(is_varchar_field<base_type>::capacity) + ")";
-            } else if constexpr (is_text_field_v<base_type>) {
-                constexpr auto kind = is_text_field<base_type>::kind;
-                if constexpr (kind == text_kind::mediumtext) {
-                    return "MEDIUMTEXT";
-                } else if constexpr (kind == text_kind::longtext) {
-                    return "LONGTEXT";
-                } else {
-                    return "TEXT";
-                }
+            } else if constexpr (is_varchar_type_v<base_type> || is_text_type_v<base_type>) {
+                return base_type::sql_type();
             } else if constexpr (std::same_as<base_type, std::chrono::system_clock::time_point>) {
                 return "DATETIME";
             } else if constexpr (is_datetime_type_v<base_type>) {
@@ -109,8 +101,8 @@ struct sql_type_name {
                 static_assert(false,
                               "Unsupported type for SQL mapping. Supported: uint32_t, int32_t, uint64_t, "
                               "int64_t, float, double, float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
-                              "bool, varchar_field<N>, text_field (TEXT), "
-                              "mediumtext_field (MEDIUMTEXT, MySQL), longtext_field (LONGTEXT, MySQL), "
+                              "bool, varchar_type<N>, text_type (TEXT), "
+                              "mediumtext_type (MEDIUMTEXT, MySQL), longtext_type (LONGTEXT, MySQL), "
                               "std::chrono::system_clock::time_point, datetime_type<Fsp>, timestamp_type<Fsp>, "
                               "time_type<Fsp>, and their std::optional variants");
             }

@@ -57,7 +57,7 @@ DSMySQL/
 | `ds_mysql/column_field.hpp` | Typed column descriptors |
 | `ds_mysql/schema_generator.hpp` | Schema generation |
 | `ds_mysql/config.hpp` | Connection configuration |
-| `ds_mysql/varchar_field.hpp` | Fixed-length string type |
+| `ds_mysql/sql_varchar.hpp` | Fixed-length string type |
 
 ## Environment Variables (Integration Tests)
 

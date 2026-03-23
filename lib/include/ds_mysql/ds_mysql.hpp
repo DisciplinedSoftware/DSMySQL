@@ -9,7 +9,7 @@
 //   metadata.hpp        — runtime metadata helpers (column info, schema introspection)
 //
 // All other library headers (column_field, schema_generator, sql_identifiers,
-// sql_temporal, varchar_field, text_field, config, credentials, …) are
+// sql_temporal, sql_varchar, sql_text, config, credentials, …) are
 // pulled in transitively by the four headers above.
 
 #include "ds_mysql/database.hpp"

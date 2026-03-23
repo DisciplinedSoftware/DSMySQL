@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <expected>
+#include <string>
 #include <string_view>
 
 namespace ds_mysql {
@@ -18,24 +19,28 @@ struct varchar_unchecked_tag {};
 }  // namespace detail
 
 template <std::size_t max_length>
-class varchar_field {
+class varchar_type {
 public:
     static constexpr std::size_t capacity = max_length;
 
-    constexpr varchar_field() noexcept = default;
+    constexpr varchar_type() noexcept = default;
 
     // Compile-time constructor for string literals — capacity validated at compile time.
     template <std::size_t M>
-    constexpr varchar_field(char const (&str)[M]) noexcept : storage_(str, M - 1) {
-        static_assert(M - 1 <= capacity, "string literal exceeds varchar_field capacity");
+    constexpr varchar_type(char const (&str)[M]) noexcept : storage_(str, M - 1) {
+        static_assert(M - 1 <= capacity, "string literal exceeds varchar_type capacity");
     }
 
     // Factory for runtime strings — validates capacity, returns std::expected.
-    [[nodiscard]] static std::expected<varchar_field, varchar_error> create(std::string_view value) noexcept {
+    [[nodiscard]] static std::expected<varchar_type, varchar_error> create(std::string_view value) noexcept {
         if (value.size() > capacity) {
             return std::unexpected(varchar_error::too_long);
         }
-        return varchar_field{detail::varchar_unchecked_tag{}, value};
+        return varchar_type{detail::varchar_unchecked_tag{}, value};
+    }
+
+    [[nodiscard]] static std::string sql_type() {
+        return "VARCHAR(" + std::to_string(capacity) + ")";
     }
 
     [[nodiscard]] constexpr std::size_t size() const noexcept {
@@ -62,7 +67,7 @@ public:
         return view();
     }
 
-    [[nodiscard]] constexpr bool operator==(varchar_field const& other) const noexcept {
+    [[nodiscard]] constexpr bool operator==(varchar_type const& other) const noexcept {
         return view() == other.view();
     }
 
@@ -76,21 +81,21 @@ public:
     }
 
 private:
-    varchar_field(detail::varchar_unchecked_tag, std::string_view value) noexcept : storage_(value) {
+    varchar_type(detail::varchar_unchecked_tag, std::string_view value) noexcept : storage_(value) {
     }
 
     std::string_view storage_;
 };
 
 template <typename T>
-struct is_varchar_field : std::false_type {};
+struct is_varchar_type : std::false_type {};
 
 template <std::size_t max_length>
-struct is_varchar_field<varchar_field<max_length>> : std::true_type {
+struct is_varchar_type<varchar_type<max_length>> : std::true_type {
     static constexpr std::size_t capacity = max_length;
 };
 
 template <typename T>
-constexpr bool is_varchar_field_v = is_varchar_field<T>::value;
+constexpr bool is_varchar_type_v = is_varchar_type<T>::value;
 
 }  // namespace ds_mysql

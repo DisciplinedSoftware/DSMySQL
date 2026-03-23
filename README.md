@@ -12,7 +12,7 @@ DSMySQL provides a **header-only** library for building type-safe SQL queries an
 - **Schema validation** — verify a live database schema against your C++ definitions
 - **C++23** — uses `std::expected`, concepts, ranges, and structured bindings
 - **Zero-overhead abstractions** — all query building happens at compile time
-- **Strong types** — `host_name`, `database_name`, `port_number`, `varchar_field<N>`, etc.
+- **Strong types** — `host_name`, `database_name`, `port_number`, `varchar_type<N>`, etc.
 - **Optional support** — `std::optional<T>` maps to nullable SQL columns automatically
 - **Temporal types** — `datetime_type`, `timestamp_type`, and `time_type` map to MySQL
   `DATETIME`, `TIMESTAMP`, and `TIME`; `sql_now` sentinel resolves to `NOW()`
@@ -31,8 +31,8 @@ using namespace ds_mysql;
 //    one-liner that generates a nested tag struct, a type alias, and a member.
 struct product {
     COLUMN_FIELD(id,    uint32_t)
-    COLUMN_FIELD(sku,   varchar_field<64>)
-    COLUMN_FIELD(name,  varchar_field<255>)
+    COLUMN_FIELD(sku,   varchar_type<64>)
+    COLUMN_FIELD(name,  varchar_type<255>)
     COLUMN_FIELD(price, double)
 };
 
@@ -77,7 +77,7 @@ auto db = mysql_database::connect(mysql_config{
 // CREATE TABLE IF NOT EXISTS product (...)
 db.execute(create_table<product>().if_not_exists());
 
-// Type-safe SELECT: returns std::expected<std::vector<std::tuple<uint32_t, varchar_field<255>>>, std::string>
+// Type-safe SELECT: returns std::expected<std::vector<std::tuple<uint32_t, varchar_type<255>>>, std::string>
 auto rows = db.query(select<product::id, product::name>()
                          .from<product>()
                          .where(product::price{9.99})

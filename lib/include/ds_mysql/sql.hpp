@@ -25,7 +25,7 @@
 #include "ds_mysql/name_reflection.hpp"
 #include "ds_mysql/schema_generator.hpp"
 #include "ds_mysql/sql_temporal.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 
 namespace ds_mysql {
 
@@ -236,7 +236,7 @@ inline std::string format_time(std::chrono::microseconds dur, uint32_t fractiona
  * to_sql_value — convert a typed C++ value to its SQL literal representation.
  *
  * Handles: column_field<T> wrappers, std::optional<T>, datetime_type, bool,
- * integral types, floating-point types, varchar_field<N>, std::string, and
+ * integral types, floating-point types, varchar_type<N>, text_type, std::string, and
  * std::chrono::system_clock::time_point.
  */
 template <typename T>
@@ -278,7 +278,7 @@ std::string to_sql_value(T const& v) {
         return std::to_string(v);
     } else if constexpr (std::floating_point<T>) {
         return std::to_string(v);
-    } else if constexpr (is_varchar_field_v<T>) {
+    } else if constexpr (is_varchar_type_v<T> || is_text_type_v<T>) {
         return "'" + escape_sql_string(v.view()) + "'";
     } else if constexpr (std::same_as<T, std::string>) {
         return "'" + escape_sql_string(v) + "'";
@@ -287,7 +287,7 @@ std::string to_sql_value(T const& v) {
                       "to_sql_value: unsupported type. "
                       "Supported: column_field<T>, optional<T>, datetime_type, timestamp_type, bool, "
                       "integral types, floating-point types, float_type<P,S>, double_type<P,S>, "
-                      "decimal_type<P,S>, varchar_field<N>, std::string, "
+                      "decimal_type<P,S>, varchar_type<N>, text_type, std::string, "
                       "std::chrono::system_clock::time_point, time_type");
     }
 }
@@ -299,10 +299,11 @@ std::string to_sql_value(T const& v) {
 // Constrains template parameters that must produce a valid SQL literal.
 // ===================================================================
 template <typename T>
-concept SqlValue = ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> || is_timestamp_type_v<T> ||
-                   std::same_as<T, std::chrono::system_clock::time_point> || is_time_type_v<T> ||
-                   std::same_as<T, bool> || std::integral<T> || std::floating_point<T> ||
-                   is_formatted_numeric_type_v<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
+concept SqlValue =
+    ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> || is_timestamp_type_v<T> ||
+    std::same_as<T, std::chrono::system_clock::time_point> || is_time_type_v<T> || std::same_as<T, bool> ||
+    std::integral<T> || std::floating_point<T> || is_formatted_numeric_type_v<T> || is_varchar_type_v<T> ||
+    is_text_type_v<T> || std::same_as<T, std::string>;
 
 // ===================================================================
 // where_condition — a typed SQL WHERE fragment
@@ -655,7 +656,7 @@ struct col_expr {
     using value_type = typename Col::value_type;
 
     // Operators accept value_type directly; callers must construct explicitly
-    // (e.g. col_ref<trade::code> == varchar_field<32>{"AAPL"}).
+    // (e.g. col_ref<trade::code> == varchar_type<32>{"AAPL"}).
     [[nodiscard]] where_condition operator==(value_type const& val) const {
         return equal<Col>(Col{val});
     }
@@ -4948,8 +4949,10 @@ T from_mysql_value_nonnull(std::string_view sv) {
         return sv != "0" && sv != "false" && !sv.empty();
     } else if constexpr (std::same_as<T, std::string>) {
         return std::string{sv};
-    } else if constexpr (is_varchar_field_v<T>) {
+    } else if constexpr (is_varchar_type_v<T>) {
         return T::create(sv).value_or(T{});
+    } else if constexpr (is_text_type_v<T>) {
+        return T{sv};
     } else if constexpr (std::same_as<T, std::chrono::system_clock::time_point>) {
         std::istringstream ss{std::string{sv}};
         std::tm tm{};
@@ -4980,7 +4983,7 @@ T from_mysql_value_nonnull(std::string_view sv) {
         static_assert(false,
                       "Unsupported type for MySQL deserialization. "
                       "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, float_type<P,S>, "
-                      "double_type<P,S>, decimal_type<P,S>, bool, std::string, varchar_field<N>, "
+                      "double_type<P,S>, decimal_type<P,S>, bool, std::string, varchar_type<N>, text_type, "
                       "std::chrono::system_clock::time_point (for DATETIME/TIMESTAMP), time_type, "
                       "and their std::optional variants.");
     }

@@ -22,11 +22,11 @@ namespace {
 struct trade {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(account_id, std::optional<uint32_t>)
-    COLUMN_FIELD(code, varchar_field<32>)
-    COLUMN_FIELD(type, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(category, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(code, varchar_type<32>)
+    COLUMN_FIELD(type, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(category, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_type<32>>)
     COLUMN_FIELD(executed_at, datetime_type<>)
     COLUMN_FIELD(recorded_at, datetime_type<>)
 };
@@ -86,7 +86,7 @@ struct trade_db : ds_mysql::database_schema {
 // validate_table / validate_database will detect the count discrepancy.
 struct trade_few_columns {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(code, varchar_field<32>)
+    COLUMN_FIELD(code, varchar_type<32>)
 };
 
 // A database struct wrapping trade_few_columns for validate_database mismatch tests.
@@ -97,7 +97,7 @@ struct trade_few_columns_db : ds_mysql::database_schema {
 // A second table used for multi-table validate_database tests.
 struct account {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(name, varchar_field<64>)
+    COLUMN_FIELD(name, varchar_type<64>)
 };
 
 // A database struct with two tables for multi-table validation tests.
@@ -107,7 +107,7 @@ struct multi_table_db : ds_mysql::database_schema {
 
 struct temporal_precision_trade {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(code, varchar_field<32>)
+    COLUMN_FIELD(code, varchar_type<32>)
     COLUMN_FIELD(executed_at, datetime_type<>)
     COLUMN_FIELD(recorded_at, timestamp_type<>)
 };
@@ -235,7 +235,7 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
 
         expect(db->execute(drop_table<trade>().if_exists().then().create_table<trade>()).has_value());
 
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -302,7 +302,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
 
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -351,14 +351,14 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         auto const& [id, account_id, code, type, name, category, currency, executed_at, recorded_at] = (*results)[0];
         expect(id == 1u) << id;
         expect(!account_id.has_value());
-        expect(code == varchar_field<32>{"AAPL"});
-        expect(type == varchar_field<64>{"Stock"});
+        expect(code == varchar_type<32>{"AAPL"});
+        expect(type == varchar_type<64>{"Stock"});
         expect(name.has_value());
-        expect(name.value() == varchar_field<255>{"Apple Inc."});
+        expect(name.value() == varchar_type<255>{"Apple Inc."});
         expect(category.has_value());
-        expect(category.value() == varchar_field<255>{"Technology"});
+        expect(category.value() == varchar_type<255>{"Technology"});
         expect(currency.has_value());
-        expect(currency.value() == varchar_field<32>{"USD"});
+        expect(currency.value() == varchar_type<32>{"USD"});
         expect(!executed_at.empty());
         expect(!recorded_at.empty());
     };
@@ -375,7 +375,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -431,8 +431,8 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"},
-                                varchar_field<32>{"AMZN"}, varchar_field<32>{"TSLA"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"},
+                                varchar_type<32>{"AMZN"}, varchar_type<32>{"TSLA"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -468,13 +468,13 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
         expect(db->execute(delete_from<trade>()).has_value());
 
         trade row;
-        row.code_ = varchar_field<32>{"AAPL"};
-        row.type_ = varchar_field<64>{"Stock"};
-        row.name_ = varchar_field<255>{"Apple Inc."};
+        row.code_ = varchar_type<32>{"AAPL"};
+        row.type_ = varchar_type<64>{"Stock"};
+        row.name_ = varchar_type<255>{"Apple Inc."};
         expect(db->execute(insert_into<trade>().values(row)).has_value());
 
         expect(db->execute(update<trade>()
-                               .set(trade::name{varchar_field<255>{"Apple Corporation"}})
+                               .set(trade::name{varchar_type<255>{"Apple Corporation"}})
                                .where(equal<trade::code>("AAPL")))
                    .has_value())
             << "Update should succeed";
@@ -531,7 +531,7 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -589,7 +589,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -614,7 +614,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -640,7 +640,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -667,7 +667,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -693,7 +693,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
-        for (auto const code : {varchar_field<32>{"AAPL"}, varchar_field<32>{"GOOGL"}, varchar_field<32>{"MSFT"}}) {
+        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -1038,17 +1038,17 @@ namespace {
 // C++ struct matching the layout of the tables created in validate_field tests.
 struct mismatch_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(right_name, varchar_field<32>)
+    COLUMN_FIELD(right_name, varchar_type<32>)
 };
 
 struct type_mismatch_struct {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(code, varchar_field<32>)  // expects VARCHAR(32)
+    COLUMN_FIELD(code, varchar_type<32>)  // expects VARCHAR(32)
 };
 
 struct nullability_mismatch_struct {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(code, varchar_field<32>)  // expects NOT NULL
+    COLUMN_FIELD(code, varchar_type<32>)  // expects NOT NULL
 };
 }  // namespace
 
@@ -1191,8 +1191,8 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
         expect(db->execute(delete_from<trade>()).has_value());
         trade row;
-        row.code_ = varchar_field<32>{"AAPL"};
-        row.type_ = varchar_field<64>{"Stock"};
+        row.code_ = varchar_type<32>{"AAPL"};
+        row.type_ = varchar_type<64>{"Stock"};
         expect(db->execute(insert_into<trade>().values(row)).has_value());
 
         // one_col_query::result_row_type has 1 column but the SQL returns 2.

@@ -19,11 +19,11 @@ namespace {
 struct asset {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(exchange_id, std::optional<uint32_t>)
-    COLUMN_FIELD(ticker, varchar_field<32>)
-    COLUMN_FIELD(instrument, varchar_field<64>)
-    COLUMN_FIELD(name, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(sector, std::optional<varchar_field<255>>)
-    COLUMN_FIELD(currency, std::optional<varchar_field<32>>)
+    COLUMN_FIELD(ticker, varchar_type<32>)
+    COLUMN_FIELD(instrument, varchar_type<64>)
+    COLUMN_FIELD(name, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(sector, std::optional<varchar_type<255>>)
+    COLUMN_FIELD(currency, std::optional<varchar_type<32>>)
     COLUMN_FIELD(created_date, datetime_type<>)
     COLUMN_FIELD(last_updated_date, datetime_type<>)
 };

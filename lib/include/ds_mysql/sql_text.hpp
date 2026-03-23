@@ -13,14 +13,24 @@ enum class text_kind {
 };
 
 template <text_kind Kind = text_kind::text>
-class text_field {
+class text_type {
 public:
-    text_field() = default;
-    explicit text_field(std::string value) : value_(std::move(value)) {
+    text_type() = default;
+    explicit text_type(std::string value) : value_(std::move(value)) {
     }
-    explicit text_field(std::string_view value) : value_(value) {
+    explicit text_type(std::string_view value) : value_(value) {
     }
-    explicit text_field(char const* value) : value_(value) {
+    explicit text_type(char const* value) : value_(value) {
+    }
+
+    [[nodiscard]] static std::string sql_type() {
+        if constexpr (Kind == text_kind::mediumtext) {
+            return "MEDIUMTEXT";
+        } else if constexpr (Kind == text_kind::longtext) {
+            return "LONGTEXT";
+        } else {
+            return "TEXT";
+        }
     }
 
     [[nodiscard]] std::string const& str() const noexcept {
@@ -40,7 +50,7 @@ public:
         return view();
     }
 
-    [[nodiscard]] bool operator==(text_field const& other) const noexcept {
+    [[nodiscard]] bool operator==(text_type const& other) const noexcept {
         return value_ == other.value_;
     }
     [[nodiscard]] bool operator==(std::string_view other) const noexcept {
@@ -51,18 +61,18 @@ private:
     std::string value_;
 };
 
-using mediumtext_field = text_field<text_kind::mediumtext>;
-using longtext_field = text_field<text_kind::longtext>;
+using mediumtext_type = text_type<text_kind::mediumtext>;
+using longtext_type = text_type<text_kind::longtext>;
 
 template <typename T>
-struct is_text_field : std::false_type {};
+struct is_text_type : std::false_type {};
 
 template <text_kind Kind>
-struct is_text_field<text_field<Kind>> : std::true_type {
+struct is_text_type<text_type<Kind>> : std::true_type {
     static constexpr text_kind kind = Kind;
 };
 
 template <typename T>
-constexpr bool is_text_field_v = is_text_field<T>::value;
+constexpr bool is_text_type_v = is_text_type<T>::value;
 
 }  // namespace ds_mysql

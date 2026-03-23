@@ -10,9 +10,9 @@
 
 #include "ds_mysql/fixed_string.hpp"
 #include "ds_mysql/name_reflection.hpp"
-#include "ds_mysql/numeric_field.hpp"
+#include "ds_mysql/sql_numeric.hpp"
 #include "ds_mysql/sql_temporal.hpp"
-#include "ds_mysql/varchar_field.hpp"
+#include "ds_mysql/sql_varchar.hpp"
 
 namespace ds_mysql {
 
@@ -316,42 +316,42 @@ struct base<std::string> : column_field_tag {
 };
 
 template <std::size_t N>
-struct base<varchar_field<N>> : column_field_tag {
-    using value_type = varchar_field<N>;
+struct base<varchar_type<N>> : column_field_tag {
+    using value_type = varchar_type<N>;
 
-    varchar_field<N> value{};
+    varchar_type<N> value{};
 
     constexpr base() = default;
-    constexpr base(varchar_field<N> v) noexcept(std::is_nothrow_move_constructible_v<varchar_field<N>>)
+    constexpr base(varchar_type<N> v) noexcept(std::is_nothrow_move_constructible_v<varchar_type<N>>)
         : value(std::move(v)) {
     }
 
     template <std::size_t M>
-    constexpr base(char const (&v)[M]) noexcept(std::is_nothrow_move_constructible_v<varchar_field<N>>) : value(v) {
+    constexpr base(char const (&v)[M]) noexcept(std::is_nothrow_move_constructible_v<varchar_type<N>>) : value(v) {
     }
 
-    constexpr base& operator=(varchar_field<N> v) noexcept(std::is_nothrow_move_assignable_v<varchar_field<N>>) {
+    constexpr base& operator=(varchar_type<N> v) noexcept(std::is_nothrow_move_assignable_v<varchar_type<N>>) {
         value = std::move(v);
         return *this;
     }
 
     template <std::size_t M>
-    constexpr base& operator=(char const (&v)[M]) noexcept(std::is_nothrow_move_assignable_v<varchar_field<N>>) {
+    constexpr base& operator=(char const (&v)[M]) noexcept(std::is_nothrow_move_assignable_v<varchar_type<N>>) {
         value = v;
         return *this;
     }
 
-    [[nodiscard]] constexpr varchar_field<N> const& get() const noexcept {
+    [[nodiscard]] constexpr varchar_type<N> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr varchar_field<N>& get() noexcept {
+    [[nodiscard]] constexpr varchar_type<N>& get() noexcept {
         return value;
     }
 
-    constexpr operator varchar_field<N> const&() const noexcept {
+    constexpr operator varchar_type<N> const&() const noexcept {
         return value;
     }
-    constexpr operator varchar_field<N>&() noexcept {
+    constexpr operator varchar_type<N>&() noexcept {
         return value;
     }
     constexpr operator std::string_view() const noexcept {
@@ -360,57 +360,57 @@ struct base<varchar_field<N>> : column_field_tag {
 };
 
 template <std::size_t N>
-struct base<std::optional<varchar_field<N>>> : column_field_tag {
-    using value_type = std::optional<varchar_field<N>>;
+struct base<std::optional<varchar_type<N>>> : column_field_tag {
+    using value_type = std::optional<varchar_type<N>>;
 
-    std::optional<varchar_field<N>> value{};
+    std::optional<varchar_type<N>> value{};
 
     constexpr base() = default;
     constexpr base(std::nullopt_t) noexcept : value(std::nullopt) {
     }
-    constexpr base(varchar_field<N> v) noexcept(std::is_nothrow_move_constructible_v<varchar_field<N>>)
+    constexpr base(varchar_type<N> v) noexcept(std::is_nothrow_move_constructible_v<varchar_type<N>>)
         : value(std::move(v)) {
     }
-    constexpr base(std::optional<varchar_field<N>> v) noexcept(
-        std::is_nothrow_move_constructible_v<std::optional<varchar_field<N>>>)
+    constexpr base(std::optional<varchar_type<N>> v) noexcept(
+        std::is_nothrow_move_constructible_v<std::optional<varchar_type<N>>>)
         : value(std::move(v)) {
     }
 
     template <std::size_t M>
-    constexpr base(char const (&v)[M]) noexcept(std::is_nothrow_move_constructible_v<varchar_field<N>>) : value(v) {
+    constexpr base(char const (&v)[M]) noexcept(std::is_nothrow_move_constructible_v<varchar_type<N>>) : value(v) {
     }
 
     constexpr base& operator=(std::nullopt_t) noexcept {
         value = std::nullopt;
         return *this;
     }
-    constexpr base& operator=(varchar_field<N> v) noexcept(std::is_nothrow_move_assignable_v<varchar_field<N>>) {
+    constexpr base& operator=(varchar_type<N> v) noexcept(std::is_nothrow_move_assignable_v<varchar_type<N>>) {
         value = std::move(v);
         return *this;
     }
-    constexpr base& operator=(std::optional<varchar_field<N>> v) noexcept(
-        std::is_nothrow_move_assignable_v<std::optional<varchar_field<N>>>) {
+    constexpr base& operator=(std::optional<varchar_type<N>> v) noexcept(
+        std::is_nothrow_move_assignable_v<std::optional<varchar_type<N>>>) {
         value = std::move(v);
         return *this;
     }
 
     template <std::size_t M>
-    constexpr base& operator=(char const (&v)[M]) noexcept(std::is_nothrow_move_assignable_v<varchar_field<N>>) {
-        value = varchar_field<N>{v};
+    constexpr base& operator=(char const (&v)[M]) noexcept(std::is_nothrow_move_assignable_v<varchar_type<N>>) {
+        value = varchar_type<N>{v};
         return *this;
     }
 
-    [[nodiscard]] constexpr std::optional<varchar_field<N>> const& get() const noexcept {
+    [[nodiscard]] constexpr std::optional<varchar_type<N>> const& get() const noexcept {
         return value;
     }
-    [[nodiscard]] constexpr std::optional<varchar_field<N>>& get() noexcept {
+    [[nodiscard]] constexpr std::optional<varchar_type<N>>& get() noexcept {
         return value;
     }
 
-    constexpr operator std::optional<varchar_field<N>> const&() const noexcept {
+    constexpr operator std::optional<varchar_type<N>> const&() const noexcept {
         return value;
     }
-    constexpr operator std::optional<varchar_field<N>>&() noexcept {
+    constexpr operator std::optional<varchar_type<N>>&() noexcept {
         return value;
     }
 };
@@ -622,8 +622,8 @@ struct base<std::optional<timestamp_type<Fsp>>> : column_field_tag {
  * internal base type.
  *
  *   using id     = column_field<"id",     uint32_t>;
- *   using ticker = column_field<"ticker", varchar_field<32>>;
- *   using sector = column_field<"sector", std::optional<varchar_field<64>>>;
+ *   using ticker = column_field<"ticker", varchar_type<32>>;
+ *   using sector = column_field<"sector", std::optional<varchar_type<64>>>;
  *
  *   id     id_;
  *   ticker ticker_;
