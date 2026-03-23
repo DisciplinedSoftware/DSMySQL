@@ -87,4 +87,38 @@ private:
     uint32_t fractional_second_precision_;
 };
 
+/**
+ * sql_time — a typed SQL TIME value holding a signed duration.
+ *
+ * MySQL's TIME type stores a duration in the range -838:59:59 to 838:59:59,
+ * with optional fractional-second precision (0–6).
+ *
+ * Rendered as 'HHH:MM:SS[.fraction]' (or '-HHH:MM:SS[.fraction]' for negative
+ * durations) in SQL literals.
+ *
+ * Example:
+ *   using namespace std::chrono_literals;
+ *   row.duration_.value = sql_time{8h + 30min};         // → '08:30:00'
+ *   row.duration_.value = sql_time{-(10h + 5min), 3};   // → '-10:05:00.000'
+ */
+class sql_time {
+public:
+    sql_time() noexcept = default;
+    explicit sql_time(std::chrono::microseconds duration, uint32_t fractional_second_precision = 0) noexcept
+        : duration_(duration), fractional_second_precision_(fractional_second_precision) {
+    }
+
+    [[nodiscard]] std::chrono::microseconds duration() const noexcept {
+        return duration_;
+    }
+
+    [[nodiscard]] uint32_t fractional_second_precision() const noexcept {
+        return fractional_second_precision_;
+    }
+
+private:
+    std::chrono::microseconds duration_{};
+    uint32_t fractional_second_precision_{0};
+};
+
 }  // namespace ds_mysql

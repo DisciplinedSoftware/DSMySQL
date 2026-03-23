@@ -146,6 +146,50 @@ suite<"DML"> dml_suite = [] {
         expect(sql_detail::to_sql_value(sql_timestamp{sql_now, 5}) == "CURRENT_TIMESTAMP(5)"s);
     };
 
+    "sql_time serialization reflects duration and fractional-second precision"_test = [] {
+        using namespace std::chrono;
+        // 08:30:00
+        auto const t1 = sql_time{microseconds{(8 * 3600 + 30 * 60) * 1000000LL}};
+        expect(sql_detail::to_sql_value(t1) == "'08:30:00'"s);
+
+        // 00:00:00
+        expect(sql_detail::to_sql_value(sql_time{}) == "'00:00:00'"s);
+
+        // 838:59:59 (MySQL maximum)
+        auto const t_max = sql_time{microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL}};
+        expect(sql_detail::to_sql_value(t_max) == "'838:59:59'"s);
+
+        // Negative duration: -10:05:00
+        auto const t_neg = sql_time{microseconds{-(10 * 3600 + 5 * 60) * 1000000LL}};
+        expect(sql_detail::to_sql_value(t_neg) == "'-10:05:00'"s);
+
+        // Fractional seconds precision=3: 01:02:03.456000 → '01:02:03.456'
+        auto const t_frac = sql_time{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 3};
+        expect(sql_detail::to_sql_value(t_frac) == "'01:02:03.456'"s);
+
+        // Fractional seconds precision=6: '01:02:03.456789'
+        auto const t_frac6 = sql_time{microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL}, 6};
+        expect(sql_detail::to_sql_value(t_frac6) == "'01:02:03.456789'"s);
+    };
+
+    "sql_time deserialization parses MySQL TIME strings correctly"_test = [] {
+        using namespace std::chrono;
+        auto const t1 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("08:30:00");
+        expect(t1.duration() == microseconds{(8 * 3600 + 30 * 60) * 1000000LL});
+
+        auto const t2 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("00:00:00");
+        expect(t2.duration() == microseconds{0});
+
+        auto const t3 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("-10:05:00");
+        expect(t3.duration() == microseconds{-(10 * 3600 + 5 * 60) * 1000000LL});
+
+        auto const t4 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("01:02:03.456789");
+        expect(t4.duration() == microseconds{(3600LL + 2 * 60LL + 3LL) * 1000000LL + 456789LL});
+
+        auto const t5 = ::ds_mysql::detail::from_mysql_value_nonnull<sql_time>("838:59:59");
+        expect(t5.duration() == microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL});
+    };
+
     "formatted numeric wrapper types serialize and deserialize like their underlying values"_test = [] {
         expect(sql_type_for<float_type<>>() == "FLOAT"s);
         expect(sql_type_for<float_type<12, 4>>() == "FLOAT(12,4)"s);

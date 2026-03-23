@@ -212,6 +212,26 @@ inline std::string format_datetime(std::chrono::system_clock::time_point tp, uin
     return std::format("'{:%Y-%m-%d %H:%M:%S}.{:0{}d}'", secs, scaled_fraction, precision);
 }
 
+inline std::string format_time(std::chrono::microseconds dur, uint32_t fractional_second_precision = 0) {
+    auto const precision = normalize_fractional_second_precision(fractional_second_precision);
+    bool const negative = dur.count() < 0;
+    auto const abs_dur = negative ? -dur : dur;
+    auto const total_secs = std::chrono::duration_cast<std::chrono::seconds>(abs_dur).count();
+    auto const hours = total_secs / 3600;
+    auto const mins = (total_secs % 3600) / 60;
+    auto const secs = total_secs % 60;
+    std::string result = std::format("'{}{:02d}:{:02d}:{:02d}", negative ? "-" : "", hours, mins, secs);
+    if (precision > 0U) {
+        constexpr std::array<uint32_t, 7> divisors{1000000U, 100000U, 10000U, 1000U, 100U, 10U, 1U};
+        auto const fractional_us =
+            static_cast<uint32_t>((abs_dur - std::chrono::duration_cast<std::chrono::seconds>(abs_dur)).count());
+        auto const scaled_fraction = fractional_us / divisors[precision];
+        result += std::format(".{:0{}d}", scaled_fraction, precision);
+    }
+    result += '\'';
+    return result;
+}
+
 /**
  * to_sql_value — convert a typed C++ value to its SQL literal representation.
  *
@@ -248,6 +268,8 @@ std::string to_sql_value(T const& v) {
         return format_datetime(v.time_point(), v.fractional_second_precision());
     } else if constexpr (std::same_as<T, std::chrono::system_clock::time_point>) {
         return format_datetime(v);
+    } else if constexpr (std::same_as<T, sql_time>) {
+        return format_time(v.duration(), v.fractional_second_precision());
     } else if constexpr (std::same_as<T, bool>) {
         return v ? "1" : "0";
     } else if constexpr (is_formatted_numeric_type_v<T>) {
@@ -266,7 +288,7 @@ std::string to_sql_value(T const& v) {
                       "Supported: column_field<T>, optional<T>, sql_datetime, sql_timestamp, bool, "
                       "integral types, floating-point types, float_type<P,S>, double_type<P,S>, "
                       "decimal_type<P,S>, varchar_field<N>, std::string, "
-                      "std::chrono::system_clock::time_point");
+                      "std::chrono::system_clock::time_point, sql_time");
     }
 }
 
@@ -277,10 +299,10 @@ std::string to_sql_value(T const& v) {
 // Constrains template parameters that must produce a valid SQL literal.
 // ===================================================================
 template <typename T>
-concept SqlValue =
-    ColumnFieldType<T> || is_optional_v<T> || std::same_as<T, sql_datetime> || std::same_as<T, sql_timestamp> ||
-    std::same_as<T, std::chrono::system_clock::time_point> || std::same_as<T, bool> || std::integral<T> ||
-    std::floating_point<T> || is_formatted_numeric_type_v<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
+concept SqlValue = ColumnFieldType<T> || is_optional_v<T> || std::same_as<T, sql_datetime> ||
+                   std::same_as<T, sql_timestamp> || std::same_as<T, std::chrono::system_clock::time_point> ||
+                   std::same_as<T, sql_time> || std::same_as<T, bool> || std::integral<T> || std::floating_point<T> ||
+                   is_formatted_numeric_type_v<T> || is_varchar_field_v<T> || std::same_as<T, std::string>;
 
 // ===================================================================
 // where_condition — a typed SQL WHERE fragment
@@ -4933,12 +4955,33 @@ T from_mysql_value_nonnull(std::string_view sv) {
         std::tm tm{};
         ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
         return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    } else if constexpr (std::same_as<T, sql_time>) {
+        bool const negative = !sv.empty() && sv[0] == '-';
+        std::string_view const s = negative ? sv.substr(1) : sv;
+        auto const c1 = s.find(':');
+        auto const c2 = s.find(':', c1 + 1);
+        int64_t const hours = std::stoll(std::string{s.substr(0, c1)});
+        int64_t const mins = std::stoll(std::string{s.substr(c1 + 1, c2 - c1 - 1)});
+        auto const secs_frac = s.substr(c2 + 1);
+        auto const dot = secs_frac.find('.');
+        int64_t const secs =
+            std::stoll(std::string{secs_frac.substr(0, dot == std::string_view::npos ? secs_frac.size() : dot)});
+        int64_t frac_us = 0;
+        if (dot != std::string_view::npos) {
+            std::string frac{secs_frac.substr(dot + 1)};
+            frac.resize(6, '0');
+            frac_us = std::stoll(frac);
+        }
+        int64_t total_us = (hours * 3600LL + mins * 60LL + secs) * 1000000LL + frac_us;
+        if (negative)
+            total_us = -total_us;
+        return sql_time{std::chrono::microseconds{total_us}};
     } else {
         static_assert(false,
                       "Unsupported type for MySQL deserialization. "
                       "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, float_type<P,S>, "
                       "double_type<P,S>, decimal_type<P,S>, bool, std::string, varchar_field<N>, "
-                      "std::chrono::system_clock::time_point, "
+                      "std::chrono::system_clock::time_point (for DATETIME/TIMESTAMP), sql_time, "
                       "and their std::optional variants.");
     }
 }

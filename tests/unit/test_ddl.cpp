@@ -78,6 +78,12 @@ struct temporal_table {
     COLUMN_FIELD(updated_at, sql_timestamp)
 };
 
+struct time_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(start_time, sql_time)
+    COLUMN_FIELD(end_time, std::optional<sql_time>)
+};
+
 struct symbol_with_indexes {
     COLUMN_FIELD(id, int32_t)
     COLUMN_FIELD(exchange_id, std::optional<int32_t>)
@@ -194,6 +200,10 @@ suite<"DDL"> ddl_suite = [] {
 
         expect(sql_type_format::timestamp_type() == "TIMESTAMP"s);
         expect(sql_type_format::timestamp_type(6) == "TIMESTAMP(6)"s);
+
+        expect(sql_type_format::time_type() == "TIME"s);
+        expect(sql_type_format::time_type(3) == "TIME(3)"s);
+        expect(sql_type_format::time_type(6) == "TIME(6)"s);
     };
 
     "create_table temporal types - emits DATETIME and TIMESTAMP definitions"_test = [] {
@@ -203,6 +213,17 @@ suite<"DDL"> ddl_suite = [] {
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
                "    created_at DATETIME NOT NULL,\n"
                "    updated_at TIMESTAMP NOT NULL\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_table time type - emits TIME definitions"_test = [] {
+        auto const sql = create_table<time_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE time_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    start_time TIME NOT NULL,\n"
+               "    end_time TIME\n"
                ");\n"s)
             << sql;
     };
