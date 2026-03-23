@@ -961,8 +961,8 @@ template <ColumnDescriptor... Cols>
 //   drop_table<T>().if_exists().then().create_table<T>().if_not_exists()
 //
 // All stages terminate with .build_sql() -> std::string.
-// Note: use<DB>() (MySQL extension) is in sql_extension.hpp.
-// ===================================================================
+// Note: use<DB>() sets the default database for the session.
+// ==================================================================="}
 
 namespace ddl_detail {
 
@@ -1897,7 +1897,7 @@ class create_all_tables_builder;
 template <Database DB>
 class create_all_tables_cond_builder;
 template <typename T>
-class use_builder;  // defined in sql_extension.hpp
+class use_builder;  // defined below in ddl_detail namespace
 
 // ---------------------------------------------------------------
 // ddl_continuation — returned by .then(), allows chaining
@@ -1929,7 +1929,7 @@ public:
 
     [[nodiscard]] drop_database_named_builder drop_database(database_name const& name) const;
 
-    // Defined in sql_extension.hpp — include it to enable this chain.
+    // USE <database> — sets default database for the session.
     template <Database T>
     [[nodiscard]] use_builder<T> use() const;
 
@@ -5960,7 +5960,7 @@ template <AnySelectQuery Q>
 }
 
 // ===================================================================
-// DML extensions
+// DML features
 //
 // INSERT IGNORE, INSERT ... SELECT, REPLACE INTO, UPDATE with JOIN
 // ===================================================================
@@ -6277,5 +6277,92 @@ concept SqlStatement = requires(T const& t) {
 
 template <typename T>
 concept SqlExecuteStatement = SqlStatement<T> && !TypedSelectQuery<T>;
+
+namespace ddl_detail {
+
+// ---------------------------------------------------------------
+// use_builder — USE <database>
+// ---------------------------------------------------------------
+template <typename T>
+class use_builder {
+public:
+    using ddl_tag_type = void;
+
+    explicit use_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = database_name_for<T>::value();
+        std::string s;
+        s.reserve(prior_sql_.size() + 4 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "USE ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    std::string prior_sql_;
+};
+
+// Out-of-line definition for ddl_continuation::use<T>()
+// (declared in ddl_continuation; defined here after use_builder<T> is complete)
+template <Database T>
+[[nodiscard]] use_builder<T> ddl_continuation::use() const {
+    return use_builder<T>{sql_};
+}
+
+}  // namespace ddl_detail
+
+/**
+ * use<DB>() — USE <database>.
+ *
+ * Sets the default database for the session.
+ * DB must inherit from database_schema.
+ *
+ * Example:
+ *   db.execute(use<my_db>());
+ *   db.execute(create_database<my_db>().if_not_exists()
+ *                  .then().use<my_db>());
+ */
+template <Database T>
+[[nodiscard]] ddl_detail::use_builder<T> use() {
+    using _ = typename database_tables<T>::type;
+    (void)sizeof(_);
+    return ddl_detail::use_builder<T>{};
+}
+
+// ===================================================================
+// MySQL-specific template aliases
+// ===================================================================
+template <ColumnDescriptor Col>
+using mysql_group_concat = group_concat<Col>;
+
+template <ColumnDescriptor Col1, ColumnDescriptor Col2>
+using mysql_ifnull_of = ifnull_of<Col1, Col2>;
+
+template <Projection P, int Scale>
+using mysql_format_to = format_to<P, Scale>;
+
+template <Projection P, fixed_string Format>
+using mysql_date_format_of = date_format_of<P, Format>;
+
+template <Projection P, sql_cast_type Type>
+using mysql_convert_as = convert_as<P, Type>;
+
+template <ColumnDescriptor Col, typename Value>
+[[nodiscard]] where_condition mysql_null_safe_equal(Value&& value) {
+    return null_safe_equal<Col>(std::forward<Value>(value));
+}
+
+template <ColumnDescriptor Col>
+[[nodiscard]] where_condition mysql_regexp(std::string_view pattern) {
+    return regexp<Col>(pattern);
+}
 
 }  // namespace ds_mysql

@@ -5,7 +5,6 @@
 #include <string>
 
 #include "ds_mysql/sql.hpp"
-#include "ds_mysql/sql_extension.hpp"
 #include "ds_mysql/sql_text.hpp"
 
 using namespace boost::ut;
@@ -873,7 +872,7 @@ suite<"DDL DROP DATABASE"> ddl_drop_database_suite = [] {
     };
 };
 
-suite<"DDL Extensions"> ddl_extensions_suite = [] {
+suite<"DDL Features"> ddl_features_suite = [] {
     "create_view.as(select) - generates CREATE VIEW AS SELECT"_test = [] {
         auto const sql = create_view<new_table>().as(select<test_table::id>().from<test_table>()).build_sql();
         expect(sql == "CREATE VIEW new_table AS SELECT id FROM test_table;\n"s) << sql;

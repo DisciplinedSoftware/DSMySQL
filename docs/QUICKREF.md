@@ -50,8 +50,7 @@ DSMySQL/
 |--------|---------|
 | `ds_mysql.hpp` | **Umbrella header** — include this to get everything |
 | `ds_mysql/database.hpp` | MySQL connection & queries |
-| `ds_mysql/sql.hpp` | SQL query builder |
-| `ds_mysql/sql_extension.hpp` | MySQL-specific extensions |
+| `ds_mysql/sql.hpp` | SQL query builder (includes helpers & MySQL features) |
 | `ds_mysql/sql_temporal.hpp` | Temporal types: `datetime_type`, `timestamp_type`, `time_type` |
 | `ds_mysql/metadata.hpp` | MySQL information_schema types |
 | `ds_mysql/column_field.hpp` | Typed column descriptors |

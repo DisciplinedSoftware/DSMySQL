@@ -48,7 +48,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `user_password`, `varchar_type<N>`, `text_type`.
 - `std::optional<T>` support mapping to nullable SQL columns.
 - `std::expected`-based error handling throughout — no exceptions in the query path.
-- SQL extension helpers: `ROUND`, `FORMAT`, `COALESCE`, `IFNULL`, `DATE_FORMAT`,
+- SQL helper functions: `ROUND`, `FORMAT`, `COALESCE`, `IFNULL`, `DATE_FORMAT`,
   `NOW`, `CURDATE`, `CURRENT_TIMESTAMP`, and more.
 - Runtime metadata helpers (`mysql_metadata`) for column introspection.
 - `.env` file support for integration-test configuration (via laserpants/dotenv).

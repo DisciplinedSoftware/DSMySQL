@@ -27,7 +27,7 @@ DSMySQL is a header-only library. All functionality lives in `lib/include/ds_mys
 1. Create a new header under `lib/include/ds_mysql/`
 2. Use `#pragma once`
 3. Put all code in the `ds_mysql` namespace
-4. Include it transitively through `ds_mysql/database.hpp`, `ds_mysql/metadata.hpp`, or `ds_mysql/sql_extension.hpp` if appropriate (those three are pulled in by the `ds_mysql/ds_mysql.hpp` umbrella header)
+4. Include it transitively through `ds_mysql/database.hpp`, `ds_mysql/metadata.hpp`, or `ds_mysql/sql.hpp` if appropriate (those three are pulled in by the `ds_mysql/ds_mysql.hpp` umbrella header)
 
 ## Adding Unit Tests
 

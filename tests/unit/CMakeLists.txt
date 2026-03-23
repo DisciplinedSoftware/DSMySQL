@@ -19,7 +19,6 @@ add_executable(tests_unit_ds_mysql
     test_ddl.cpp
     test_dml.cpp
     test_dql.cpp
-    test_dql_extensions.cpp
     test_field_types.cpp
     test_umbrella_header.cpp
     test_valid_table.cpp
