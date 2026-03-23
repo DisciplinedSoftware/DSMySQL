@@ -1,5 +1,9 @@
 # DSMySQL
 
+[![GCC CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-gcc&label=GCC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+[![Clang CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-clang&label=Clang)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+[![MSVC CI](https://img.shields.io/github/actions/workflow/status/DisciplinedSoftware/DSMySQL/ci.yml?branch=main&job=tests-msvc&label=MSVC)](https://github.com/DisciplinedSoftware/DSMySQL/actions/workflows/ci.yml)
+
 A portable C++23 type-safe MySQL query builder and database wrapper.
 
 DSMySQL provides a **header-only** library for building type-safe SQL queries and interacting with MySQL databases using compile-time reflection via Boost.PFR. Define your schema as C++ structs and let the compiler verify column names, types, and nullability.

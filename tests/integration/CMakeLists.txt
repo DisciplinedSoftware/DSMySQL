@@ -14,8 +14,6 @@ if(NOT TARGET Boost::ut)
     FetchContent_MakeAvailable(boost_ut)
 endif()
 
-find_package(PkgConfig REQUIRED)
-
 # Add integration test cmake modules path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -32,12 +30,10 @@ target_link_libraries(tests_integration_ds_mysql
     PRIVATE
         ds_mysql
         Boost::ut
+        ${MYSQL_LIBRARIES}
 )
 
-# Link with MySQL client library
-pkg_check_modules(MYSQL REQUIRED mysqlclient)
 target_include_directories(tests_integration_ds_mysql PRIVATE ${MYSQL_INCLUDE_DIRS})
-target_link_libraries(tests_integration_ds_mysql PRIVATE ${MYSQL_LIBRARIES})
 
 target_include_directories(tests_integration_ds_mysql PRIVATE
     "${CMAKE_SOURCE_DIR}/lib/include"

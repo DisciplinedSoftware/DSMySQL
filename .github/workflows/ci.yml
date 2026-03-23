@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Export mapped MySQL service port
-        run: echo "DS_MYSQL_TEST_PORT=${{ job.services.mysql.ports['3306'] }}" >> "$GITHUB_ENV"
+        run: echo "DS_MYSQL_TEST_PORT=${{ job.services.mysql.ports[3306] }}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: |
@@ -73,8 +73,34 @@ jobs:
   tests-clang:
     runs-on: ubuntu-latest
 
+    env:
+      DS_MYSQL_TEST_HOST: 127.0.0.1
+      DS_MYSQL_TEST_PORT: 3306
+      DS_MYSQL_TEST_DATABASE: ds_mysql_test
+      DS_MYSQL_TEST_USER: ds_mysql_test_user
+      DS_MYSQL_TEST_PASSWORD: ds_mysql_test_password
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ds_mysql_test
+          MYSQL_USER: ds_mysql_test_user
+          MYSQL_PASSWORD: ds_mysql_test_password
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --protocol=tcp"
+          --health-interval=5s
+          --health-timeout=10s
+          --health-retries=10
+
     steps:
       - uses: actions/checkout@v6
+
+      - name: Export mapped MySQL service port
+        run: echo "DS_MYSQL_TEST_PORT=${{ job.services.mysql.ports[3306] }}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: |
@@ -97,7 +123,7 @@ jobs:
             libmysqlclient-dev pkg-config
 
       - name: Configure
-        run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON -DBUILD_INTEGRATION_TESTS=OFF -DBUILD_EXAMPLES=OFF
+        run: cmake --preset release -DSKIP_DOCKER_MANAGEMENT=ON
         env:
           CXX: clang++-20
           CC: clang-20
@@ -107,6 +133,9 @@ jobs:
 
       - name: Unit tests
         run: ctest --preset release -R tests_unit_ds_mysql
+
+      - name: Integration tests
+        run: ctest --preset release -R tests_integration_ds_mysql
 
   package-consumer-smoke:
     runs-on: ubuntu-latest
@@ -170,6 +199,13 @@ jobs:
   tests-msvc:
     runs-on: windows-latest
 
+    env:
+      DS_MYSQL_TEST_HOST: 127.0.0.1
+      DS_MYSQL_TEST_PORT: 3306
+      DS_MYSQL_TEST_DATABASE: ds_mysql_test
+      DS_MYSQL_TEST_USER: ds_mysql_test_user
+      DS_MYSQL_TEST_PASSWORD: ds_mysql_test_password
+
     steps:
       - uses: actions/checkout@v6
 
@@ -226,13 +262,69 @@ jobs:
           Write-Host "Detected MYSQL_ROOT_DIR: $root"
           echo "MYSQL_ROOT_DIR=$root" >> $env:GITHUB_ENV
           echo "$root\lib" >> $env:GITHUB_PATH
+          echo "MYSQL_BIN_DIR=$(Join-Path $root 'bin')" >> $env:GITHUB_ENV
+
+      - name: Start MySQL server
+        shell: pwsh
+        run: |
+          $dataDir = Join-Path $env:RUNNER_TEMP "mysql-data"
+          $logFile = Join-Path $env:RUNNER_TEMP "mysql-server.log"
+          $mysqlExe = Join-Path $env:MYSQL_BIN_DIR "mysql.exe"
+          $mysqlAdminExe = Join-Path $env:MYSQL_BIN_DIR "mysqladmin.exe"
+          $mysqldExe = Join-Path $env:MYSQL_BIN_DIR "mysqld.exe"
+
+          if (-not (Test-Path $mysqldExe)) {
+            throw "mysqld.exe not found at $mysqldExe"
+          }
+
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+          & $mysqldExe --initialize-insecure --datadir="$dataDir"
+          if ($LASTEXITCODE -ne 0) {
+            throw "mysqld --initialize-insecure failed with exit code $LASTEXITCODE"
+          }
+
+          $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
+            "--datadir=$dataDir",
+            "--port=$env:DS_MYSQL_TEST_PORT",
+            "--bind-address=$env:DS_MYSQL_TEST_HOST",
+            "--console"
+          ) -RedirectStandardOutput $logFile -RedirectStandardError $logFile -PassThru
+
+          "MYSQL_SERVER_PID=$($process.Id)" >> $env:GITHUB_ENV
+
+          for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            & $mysqlAdminExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root ping --silent
+            if ($LASTEXITCODE -eq 0) {
+              break
+            }
+            Start-Sleep -Seconds 2
+          }
+
+          & $mysqlAdminExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root ping --silent
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content $logFile
+            throw "MySQL server did not become ready"
+          }
+
+          $sql = @(
+            "CREATE DATABASE IF NOT EXISTS $env:DS_MYSQL_TEST_DATABASE;"
+            "CREATE USER IF NOT EXISTS '$env:DS_MYSQL_TEST_USER'@'%' IDENTIFIED BY '$env:DS_MYSQL_TEST_PASSWORD';"
+            "GRANT ALL PRIVILEGES ON $env:DS_MYSQL_TEST_DATABASE.* TO '$env:DS_MYSQL_TEST_USER'@'%';"
+            "FLUSH PRIVILEGES;"
+          ) -join ' '
+
+          & $mysqlExe --host=$env:DS_MYSQL_TEST_HOST --port=$env:DS_MYSQL_TEST_PORT --user=root --execute="$sql"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to initialize MySQL test database"
+          }
 
       - name: Configure
         shell: pwsh
         run: |
           cmake -B build `
             -G "Visual Studio 17 2022" -A x64 `
-            -DBUILD_INTEGRATION_TESTS=OFF `
+            -DSKIP_DOCKER_MANAGEMENT=ON `
             -DBUILD_EXAMPLES=OFF `
             "-DMYSQL_ROOT_DIR=$env:MYSQL_ROOT_DIR"
 
@@ -241,3 +333,15 @@ jobs:
 
       - name: Unit tests
         run: ctest --test-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
+
+      - name: Integration tests
+        shell: pwsh
+        run: ctest --test-dir build -C Release -R tests_integration_ds_mysql --output-on-failure
+
+      - name: Stop MySQL server
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:MYSQL_SERVER_PID) {
+            Stop-Process -Id ([int]$env:MYSQL_SERVER_PID) -Force -ErrorAction SilentlyContinue
+          }
