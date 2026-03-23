@@ -13,5 +13,7 @@
 
 #include "ds_mysql/database.hpp"
 #include "ds_mysql/metadata.hpp"
-#include "ds_mysql/sql.hpp"
+#include "ds_mysql/sql_ddl.hpp"
+#include "ds_mysql/sql_dml.hpp"
+#include "ds_mysql/sql_dql.hpp"
 #include "ds_mysql/version.hpp"

@@ -4,7 +4,8 @@
 #include <optional>
 #include <string>
 
-#include "ds_mysql/sql.hpp"
+#include "ds_mysql/sql_ddl.hpp"
+#include "ds_mysql/sql_dql.hpp"
 #include "ds_mysql/sql_text.hpp"
 
 using namespace boost::ut;

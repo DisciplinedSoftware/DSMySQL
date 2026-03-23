@@ -5,7 +5,9 @@
 
 #include "ds_mysql/column_field.hpp"
 #include "ds_mysql/name_reflection.hpp"
-#include "ds_mysql/sql.hpp"
+#include "ds_mysql/sql_ddl.hpp"
+#include "ds_mysql/sql_dml.hpp"
+#include "ds_mysql/sql_dql.hpp"
 
 using namespace boost::ut;
 using namespace ds_mysql;

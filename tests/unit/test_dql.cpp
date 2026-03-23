@@ -4,7 +4,7 @@
 #include <type_traits>
 
 #include "ds_mysql/metadata.hpp"
-#include "ds_mysql/sql.hpp"
+#include "ds_mysql/sql_dql.hpp"
 
 using namespace boost::ut;
 using namespace ds_mysql;
