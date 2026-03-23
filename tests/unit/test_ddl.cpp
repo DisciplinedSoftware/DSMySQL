@@ -93,6 +93,24 @@ struct fsp_temporal_table {
     COLUMN_FIELD(opt_duration, std::optional<time_type<6>>)
 };
 
+struct tagged_temporal_alias_table {
+    struct id_tag {};
+    using id = tagged_column_field<id_tag, uint32_t>;
+    id id_;
+
+    struct created_at_tag {};
+    using created_at = tagged_column_field<created_at_tag, datetime_type_default>;
+    created_at created_at_;
+
+    struct updated_at_tag {};
+    using updated_at = tagged_column_field<updated_at_tag, timestamp_type_default>;
+    updated_at updated_at_;
+
+    struct duration_tag {};
+    using duration = tagged_column_field<duration_tag, time_type_default>;
+    duration duration_;
+};
+
 struct symbol_with_indexes {
     COLUMN_FIELD(id, int32_t)
     COLUMN_FIELD(exchange_id, std::optional<int32_t>)
@@ -265,6 +283,22 @@ suite<"DDL"> ddl_suite = [] {
                "    duration TIME(4) NOT NULL,\n"
                "    opt_created_at DATETIME(3),\n"
                "    opt_duration TIME(6)\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "tagged_column_field with temporal default aliases - emits DATETIME/TIMESTAMP/TIME"_test = [] {
+        expect(sql_type_for<datetime_type_default>() == "DATETIME"s);
+        expect(sql_type_for<timestamp_type_default>() == "TIMESTAMP"s);
+        expect(sql_type_for<time_type_default>() == "TIME"s);
+
+        auto const sql = create_table<tagged_temporal_alias_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE tagged_temporal_alias_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    created_at DATETIME NOT NULL,\n"
+               "    updated_at TIMESTAMP NOT NULL,\n"
+               "    duration TIME NOT NULL\n"
                ");\n"s)
             << sql;
     };

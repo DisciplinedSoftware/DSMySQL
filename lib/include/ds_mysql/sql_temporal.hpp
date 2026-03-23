@@ -103,6 +103,10 @@ private:
     uint32_t fractional_second_precision_;
 };
 
+using datetime_type_default = datetime_type<>;
+using timestamp_type_default = timestamp_type<>;
+using time_type_default = time_type<>;
+
 // ===================================================================
 // Type detection traits
 // ===================================================================
