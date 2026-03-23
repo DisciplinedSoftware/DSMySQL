@@ -26,7 +26,8 @@ namespace ds_mysql {
 // ===================================================================
 // raw_sql — explicit escape hatch for raw SQL strings.
 //
-// Use this only when none of the typed builders in sql.hpp cover your
+// Use this only when none of the typed builders in sql_ddl.hpp, sql_dml.hpp,
+// or sql_dql.hpp cover your
 // case. Always returns std::expected<std::vector<std::vector<std::optional<std::string>>>, std::string>.
 // Each inner vector is a row; each element is a nullable cell value.
 // DDL / DML statements that produce no result set return an empty outer vector.
@@ -123,7 +124,8 @@ void validate_table_fields(std::vector<describe_row_type> const& rows, std::stri
 // mysql_database — thin wrapper around the MySQL C API.
 //
 // Provides type-safe query() and execute() methods that accept any builder
-// from sql.hpp, plus a raw_sql overload for unhandled cases.
+// from sql_ddl.hpp, sql_dml.hpp, and sql_dql.hpp, plus a raw_sql overload
+// for unhandled cases.
 //
 // Factory methods:
 //   mysql_database::connect(host, database, credentials, port)

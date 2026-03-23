@@ -4,12 +4,14 @@
 //
 // Transitively provides:
 //   database.hpp        — database connection, query execution, result sets
-//   sql.hpp             — query builder (SELECT / INSERT / UPDATE / DELETE / ...) and helpers
+//   sql_ddl.hpp         — DDL query builder (CREATE / DROP / ALTER / ...)
+//   sql_dml.hpp         — DML query builder (INSERT / UPDATE / DELETE / DESCRIBE / ...)
+//   sql_dql.hpp         — DQL query builder (SELECT / projections / expressions / ...)
 //   metadata.hpp        — runtime metadata helpers (column info, schema introspection)
 //
 // All other library headers (column_field, schema_generator, sql_identifiers,
 // sql_temporal, sql_varchar, sql_text, config, credentials, …) are
-// pulled in transitively by the three headers above.
+// pulled in transitively by the headers above.
 
 #include "ds_mysql/database.hpp"
 #include "ds_mysql/metadata.hpp"

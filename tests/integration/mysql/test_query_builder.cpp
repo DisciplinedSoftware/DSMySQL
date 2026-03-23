@@ -905,7 +905,7 @@ suite<"Connection Error"> connection_error_suite = [] {
             mysql_database::connect(config->host(), config->database(), config->credentials(), config->port());
         expect(fatal(db)) << "Explicit overload should succeed with valid connection parameters";
 
-        auto const rows = db->query(raw_sql{"SELECT 1"});
+        auto const rows = db->query(sql_raw{"SELECT 1"});
         expect(fatal(rows.has_value()));
         expect(rows->size() == 1u);
         expect((*rows)[0].size() == 1u);
@@ -958,7 +958,7 @@ suite<"Execute Failure"> execute_failure_suite = [] {
 // ===================================================================
 
 suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
-    "query(raw_sql DML) returns empty result set"_test = [] {
+    "query(sql_raw DML) returns empty result set"_test = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
@@ -970,29 +970,29 @@ suite<"Raw SQL DML"> raw_sql_dml_suite = [] {
 
         expect(db->execute(create_table<trade>().if_not_exists()).has_value());
 
-        // A DML statement via raw_sql triggers the DDL/DML no-result-set path.
-        auto const result = db->query(raw_sql{"DELETE FROM trade WHERE id = 0"});
-        expect(result.has_value()) << "DML via raw_sql should succeed";
+        // A DML statement via sql_raw triggers the DDL/DML no-result-set path.
+        auto const result = db->query(sql_raw{"DELETE FROM trade WHERE id = 0"});
+        expect(result.has_value()) << "DML via sql_raw should succeed";
         expect(result->empty()) << "DML result should be empty (no result set)";
     };
 
-    "query(raw_sql DDL) returns empty result set"_test = [] {
+    "query(sql_raw DDL) returns empty result set"_test = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
 
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
-            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS raw_ddl_test"}));
+            (void)(db->query(sql_raw{"DROP TABLE IF EXISTS raw_ddl_test"}));
         }};
 
-        // DDL via raw_sql also returns no result set.
+        // DDL via sql_raw also returns no result set.
         auto const result =
-            db->query(raw_sql{"CREATE TABLE IF NOT EXISTS raw_ddl_test (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY)"});
-        expect(result.has_value()) << "DDL via raw_sql should succeed";
+            db->query(sql_raw{"CREATE TABLE IF NOT EXISTS raw_ddl_test (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY)"});
+        expect(result.has_value()) << "DDL via sql_raw should succeed";
         expect(result->empty()) << "DDL result should be empty (no result set)";
 
-        auto const drop = db->query(raw_sql{"DROP TABLE IF EXISTS raw_ddl_test"});
+        auto const drop = db->query(sql_raw{"DROP TABLE IF EXISTS raw_ddl_test"});
         expect(drop.has_value());
     };
 };
@@ -1081,14 +1081,14 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
-            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"}));
+            (void)(db->query(sql_raw{"DROP TABLE IF EXISTS mismatch_name_tbl"}));
         }};
 
         // Create a table where column 2 is 'wrong_col_name' but struct expects 'right_name'.
-        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"});
+        auto drop = db->query(sql_raw{"DROP TABLE IF EXISTS mismatch_name_tbl"});
         expect(drop.has_value());
         auto create =
-            db->query(raw_sql{"CREATE TABLE mismatch_name_tbl "
+            db->query(sql_raw{"CREATE TABLE mismatch_name_tbl "
                               "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
                               "wrong_col_name VARCHAR(32) NOT NULL, "
                               "PRIMARY KEY (id))"});
@@ -1099,7 +1099,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         expect(!result.has_value() && result.error().find("name expected") != std::string::npos)
             << "Error should mention 'name expected' — got: " + (result.has_value() ? "" : result.error());
 
-        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS mismatch_name_tbl"});
+        auto cleanup = db->query(sql_raw{"DROP TABLE IF EXISTS mismatch_name_tbl"});
         expect(cleanup.has_value());
     };
 
@@ -1110,14 +1110,14 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
-            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"}));
+            (void)(db->query(sql_raw{"DROP TABLE IF EXISTS type_mismatch_tbl"}));
         }};
 
         // Create a table where 'code' is INT but struct expects VARCHAR(32).
-        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"});
+        auto drop = db->query(sql_raw{"DROP TABLE IF EXISTS type_mismatch_tbl"});
         expect(drop.has_value());
         auto create =
-            db->query(raw_sql{"CREATE TABLE type_mismatch_tbl "
+            db->query(sql_raw{"CREATE TABLE type_mismatch_tbl "
                               "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
                               "code INT NOT NULL, "
                               "PRIMARY KEY (id))"});
@@ -1128,7 +1128,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         expect(!result.has_value() && result.error().find("type expected") != std::string::npos)
             << "Error should mention 'type expected' — got: " + (result.has_value() ? "" : result.error());
 
-        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS type_mismatch_tbl"});
+        auto cleanup = db->query(sql_raw{"DROP TABLE IF EXISTS type_mismatch_tbl"});
         expect(cleanup.has_value());
     };
 
@@ -1139,14 +1139,14 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         auto const db = mysql_database::connect(*config);
         expect(fatal(db));
         auto _ = scope_guard{[&] {
-            (void)(db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"}));
+            (void)(db->query(sql_raw{"DROP TABLE IF EXISTS nullable_mismatch_tbl"}));
         }};
 
         // Create a table where 'code' is nullable but struct expects NOT NULL.
-        auto drop = db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
+        auto drop = db->query(sql_raw{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
         expect(drop.has_value());
         auto create =
-            db->query(raw_sql{"CREATE TABLE nullable_mismatch_tbl "
+            db->query(sql_raw{"CREATE TABLE nullable_mismatch_tbl "
                               "(id INT UNSIGNED NOT NULL AUTO_INCREMENT, "
                               "code VARCHAR(32) NULL, "
                               "PRIMARY KEY (id))"});
@@ -1157,7 +1157,7 @@ suite<"validate_field Error Paths"> validate_field_errors_suite = [] {
         expect(!result.has_value() && result.error().find("nullability expected") != std::string::npos)
             << "Error should mention 'nullability expected' — got: " + (result.has_value() ? "" : result.error());
 
-        auto cleanup = db->query(raw_sql{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
+        auto cleanup = db->query(sql_raw{"DROP TABLE IF EXISTS nullable_mismatch_tbl"});
         expect(cleanup.has_value());
     };
 };

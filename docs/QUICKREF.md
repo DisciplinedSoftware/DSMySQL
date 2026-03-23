@@ -47,10 +47,12 @@ DSMySQL/
 ## Key Headers
 
 | Header | Purpose |
-|--------|---------|
+| ------ | ------- |
 | `ds_mysql.hpp` | **Umbrella header** — include this to get everything |
 | `ds_mysql/database.hpp` | MySQL connection & queries |
-| `ds_mysql/sql.hpp` | SQL query builder (includes helpers & MySQL features) |
+| `ds_mysql/sql_ddl.hpp` | DDL query builder (CREATE / DROP / ALTER / ...) |
+| `ds_mysql/sql_dml.hpp` | DML query builder (INSERT / UPDATE / DELETE / DESCRIBE / ...) |
+| `ds_mysql/sql_dql.hpp` | DQL query builder (SELECT / projections / expressions / ...) |
 | `ds_mysql/sql_temporal.hpp` | Temporal types: `datetime_type`, `timestamp_type`, `time_type` |
 | `ds_mysql/metadata.hpp` | MySQL information_schema types |
 | `ds_mysql/column_field.hpp` | Typed column descriptors |
@@ -61,7 +63,7 @@ DSMySQL/
 ## Environment Variables (Integration Tests)
 
 | Variable | Default |
-|----------|---------|
+| -------- | ------- |
 | `DS_MYSQL_TEST_HOST` | `127.0.0.1` |
 | `DS_MYSQL_TEST_PORT` | `3307` |
 | `DS_MYSQL_TEST_DATABASE` | `ds_mysql_test` |
