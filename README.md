@@ -14,6 +14,10 @@ DSMySQL provides a **header-only** library for building type-safe SQL queries an
 - **Zero-overhead abstractions** — all query building happens at compile time
 - **Strong types** — `host_name`, `database_name`, `port_number`, `varchar_field<N>`, etc.
 - **Optional support** — `std::optional<T>` maps to nullable SQL columns automatically
+- **Temporal types** — `datetime_type`, `timestamp_type`, and `time_type` map to MySQL
+  `DATETIME`, `TIMESTAMP`, and `TIME`; `sql_now` sentinel resolves to `NOW()`
+- **Numeric precision wrappers** — `float_type`, `double_type`, and `decimal_type` with
+  optional `<precision>` and `<precision, scale>` overrides
 
 ## Quick Start
 
@@ -248,6 +252,23 @@ if (!r) std::println(stderr, "Mismatch: {}", r.error());
 
 // Validate all tables in a database schema
 auto r2 = db.validate_database<my_db>();
+```
+
+### Temporal Types
+
+```cpp
+struct event {
+    COLUMN_FIELD(id,         uint32_t)
+    COLUMN_FIELD(created_at, datetime_type)           // DATETIME — defaults to NOW()
+    COLUMN_FIELD(updated_at, timestamp_type)          // TIMESTAMP — defaults to NOW()
+    COLUMN_FIELD(duration,   time_type)               // TIME
+    COLUMN_FIELD(started_at, std::optional<datetime_type>)  // nullable DATETIME
+};
+
+// Fractional-second precision (0–6) is set on the value object:
+event row;
+row.created_at_  = datetime_type{tp, 3};   // DATETIME(3)
+row.duration_    = time_type{std::chrono::milliseconds{1500}, 3};  // TIME(3) = 00:00:01.500
 ```
 
 ### Numeric Precision Overrides

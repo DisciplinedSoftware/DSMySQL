@@ -8,6 +8,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `time_type` — maps to SQL `TIME`; wraps a `std::chrono::microseconds` duration with optional
+  fractional-second precision (0–6). Supports `INSERT`/`UPDATE` serialization and `SELECT`
+  deserialization, including negative durations.
+
+### Changed
+
+- **Breaking:** Renamed temporal value types to align with the `float_type` / `double_type` /
+  `decimal_type` naming scheme introduced in v1.1.0:
+  - `sql_datetime`  → `datetime_type`
+  - `sql_timestamp` → `timestamp_type`
+
 ---
 
 ## [1.1.0] - 2026-03-23

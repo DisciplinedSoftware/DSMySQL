@@ -87,6 +87,9 @@ Available helpers:
 - `sql_type_format::float_type()` / `float_type(p)` / `float_type(p, s)`
 - `sql_type_format::double_type()` / `double_type(p)` / `double_type(p, s)`
 - `sql_type_format::decimal_type()` / `decimal_type(p)` / `decimal_type(p, s)`
+- `sql_type_format::datetime_type()` / `datetime_type(fsp)` — `DATETIME` / `DATETIME(fsp)`
+- `sql_type_format::timestamp_type()` / `timestamp_type(fsp)` — `TIMESTAMP` / `TIMESTAMP(fsp)`
+- `sql_type_format::time_type()` / `time_type(fsp)` — `TIME` / `TIME(fsp)`
 
 ## Useful Commands
 
