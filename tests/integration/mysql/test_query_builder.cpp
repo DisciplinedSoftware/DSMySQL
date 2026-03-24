@@ -1,6 +1,7 @@
 #include <boost/ut.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <vector>
@@ -52,14 +53,27 @@ struct trade {
     const std::string database = getenv_or("DS_MYSQL_TEST_DATABASE", "ds_mysql_test");
     const std::string user = getenv_or("DS_MYSQL_TEST_USER");
     const std::string password = getenv_or("DS_MYSQL_TEST_PASSWORD");
+    const std::string port_str =
+        getenv_or("DS_MYSQL_TEST_PORT", std::to_string(default_mysql_port.to_unsigned_int()).c_str());
 
     if (host.empty() || user.empty() || password.empty()) {
+        std::cerr << "[ds_mysql][integration] Missing MySQL environment variables: "
+                  << "DS_MYSQL_TEST_HOST=" << (host.empty() ? "<empty>" : host) << ", "
+                  << "DS_MYSQL_TEST_PORT=" << port_str << ", "
+                  << "DS_MYSQL_TEST_DATABASE=" << database << ", "
+                  << "DS_MYSQL_TEST_USER=" << (user.empty() ? "<empty>" : user) << ", "
+                  << "DS_MYSQL_TEST_PASSWORD=" << (password.empty() ? "<empty>" : "<set>") << '\n';
         return std::nullopt;
     }
 
-    const std::string port_str =
-        getenv_or("DS_MYSQL_TEST_PORT", std::to_string(default_mysql_port.to_unsigned_int()).c_str());
-    const auto parsed_port = static_cast<unsigned int>(std::stoul(port_str));
+    unsigned int parsed_port = 0;
+    try {
+        parsed_port = static_cast<unsigned int>(std::stoul(port_str));
+    } catch (std::exception const& ex) {
+        std::cerr << "[ds_mysql][integration] Invalid DS_MYSQL_TEST_PORT='" << port_str
+                  << "': " << ex.what() << '\n';
+        return std::nullopt;
+    }
 
     return mysql_config{
         host_name{host},
