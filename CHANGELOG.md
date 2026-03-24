@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [2.0.0] – 2026-03-23
+
 ### Added
 
 - `time_type` — maps to SQL `TIME`; wraps a `std::chrono::microseconds` duration with optional
@@ -59,6 +63,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.0.0
