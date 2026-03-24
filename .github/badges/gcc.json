@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
   "label": "GCC",
-  "message": "pending",
-  "color": "blue"
+  "message": "success",
+  "color": "brightgreen"
 }
