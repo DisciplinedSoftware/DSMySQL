@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [2.1.1] – 2026-03-24
+
 ### Fixed
 
 - `create_all_tables<DB>()` now qualifies each table name as `<db_name>.<table_name>`,
@@ -81,7 +85,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.1.0
