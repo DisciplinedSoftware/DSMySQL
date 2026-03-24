@@ -114,6 +114,79 @@ using float_type_default = float_type<>;
 using double_type_default = double_type<>;
 using decimal_type_default = decimal_type<>;
 
+template <uint32_t DisplayWidth = 0U>
+struct int_type : detail::formatted_numeric_base<int_type<DisplayWidth>, int32_t> {
+    using base = detail::formatted_numeric_base<int_type<DisplayWidth>, int32_t>;
+    using base::base;
+    using base::operator=;
+
+    static constexpr uint32_t display_width = DisplayWidth;
+
+    [[nodiscard]] static std::string sql_type() {
+        if constexpr (DisplayWidth == 0U) {
+            return "INT";
+        } else {
+            return "INT(" + std::to_string(DisplayWidth) + ")";
+        }
+    }
+};
+
+template <uint32_t DisplayWidth = 0U>
+struct int_unsigned_type : detail::formatted_numeric_base<int_unsigned_type<DisplayWidth>, uint32_t> {
+    using base = detail::formatted_numeric_base<int_unsigned_type<DisplayWidth>, uint32_t>;
+    using base::base;
+    using base::operator=;
+
+    static constexpr uint32_t display_width = DisplayWidth;
+
+    [[nodiscard]] static std::string sql_type() {
+        if constexpr (DisplayWidth == 0U) {
+            return "INT UNSIGNED";
+        } else {
+            return "INT(" + std::to_string(DisplayWidth) + ") UNSIGNED";
+        }
+    }
+};
+
+template <uint32_t DisplayWidth = 0U>
+struct bigint_type : detail::formatted_numeric_base<bigint_type<DisplayWidth>, int64_t> {
+    using base = detail::formatted_numeric_base<bigint_type<DisplayWidth>, int64_t>;
+    using base::base;
+    using base::operator=;
+
+    static constexpr uint32_t display_width = DisplayWidth;
+
+    [[nodiscard]] static std::string sql_type() {
+        if constexpr (DisplayWidth == 0U) {
+            return "BIGINT";
+        } else {
+            return "BIGINT(" + std::to_string(DisplayWidth) + ")";
+        }
+    }
+};
+
+template <uint32_t DisplayWidth = 0U>
+struct bigint_unsigned_type : detail::formatted_numeric_base<bigint_unsigned_type<DisplayWidth>, uint64_t> {
+    using base = detail::formatted_numeric_base<bigint_unsigned_type<DisplayWidth>, uint64_t>;
+    using base::base;
+    using base::operator=;
+
+    static constexpr uint32_t display_width = DisplayWidth;
+
+    [[nodiscard]] static std::string sql_type() {
+        if constexpr (DisplayWidth == 0U) {
+            return "BIGINT UNSIGNED";
+        } else {
+            return "BIGINT(" + std::to_string(DisplayWidth) + ") UNSIGNED";
+        }
+    }
+};
+
+using int_type_default = int_type<>;
+using int_unsigned_type_default = int_unsigned_type<>;
+using bigint_type_default = bigint_type<>;
+using bigint_unsigned_type_default = bigint_unsigned_type<>;
+
 template <typename T>
 struct is_formatted_numeric_type : std::false_type {};
 
@@ -125,6 +198,18 @@ struct is_formatted_numeric_type<double_type<Precision, Scale>> : std::true_type
 
 template <uint32_t Precision, uint32_t Scale>
 struct is_formatted_numeric_type<decimal_type<Precision, Scale>> : std::true_type {};
+
+template <uint32_t DisplayWidth>
+struct is_formatted_numeric_type<int_type<DisplayWidth>> : std::true_type {};
+
+template <uint32_t DisplayWidth>
+struct is_formatted_numeric_type<int_unsigned_type<DisplayWidth>> : std::true_type {};
+
+template <uint32_t DisplayWidth>
+struct is_formatted_numeric_type<bigint_type<DisplayWidth>> : std::true_type {};
+
+template <uint32_t DisplayWidth>
+struct is_formatted_numeric_type<bigint_unsigned_type<DisplayWidth>> : std::true_type {};
 
 template <typename T>
 inline constexpr bool is_formatted_numeric_type_v = is_formatted_numeric_type<T>::value;

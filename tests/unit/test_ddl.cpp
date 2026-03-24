@@ -46,6 +46,20 @@ struct formatted_numeric_column_table {
     COLUMN_FIELD(value4, std::optional<decimal_type<12, 4>>)
 };
 
+struct integer_column_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(count, int_type<>)
+    COLUMN_FIELD(count_w, int_type<11>)
+    COLUMN_FIELD(flags, int_unsigned_type<>)
+    COLUMN_FIELD(flags_w, int_unsigned_type<10>)
+    COLUMN_FIELD(big, bigint_type<>)
+    COLUMN_FIELD(big_w, bigint_type<20>)
+    COLUMN_FIELD(big_flags, bigint_unsigned_type<>)
+    COLUMN_FIELD(big_flags_w, bigint_unsigned_type<20>)
+    COLUMN_FIELD(opt_count, std::optional<int_type<>>)
+    COLUMN_FIELD(opt_big, std::optional<bigint_unsigned_type<>>)
+};
+
 struct test_db : ds_mysql::database_schema {
     struct symbol {
         COLUMN_FIELD(id, uint32_t)
@@ -127,6 +141,28 @@ struct tagged_numeric_alias_table {
     struct value2_tag {};
     using value2 = tagged_column_field<value2_tag, decimal_type_default>;
     value2 value2_;
+};
+
+struct tagged_integer_alias_table {
+    struct id_tag {};
+    using id = tagged_column_field<id_tag, uint32_t>;
+    id id_;
+
+    struct count_tag {};
+    using count = tagged_column_field<count_tag, int_type_default>;
+    count count_;
+
+    struct flags_tag {};
+    using flags = tagged_column_field<flags_tag, int_unsigned_type_default>;
+    flags flags_;
+
+    struct big_tag {};
+    using big = tagged_column_field<big_tag, bigint_type_default>;
+    big big_;
+
+    struct big_flags_tag {};
+    using big_flags = tagged_column_field<big_flags_tag, bigint_unsigned_type_default>;
+    big_flags big_flags_;
 };
 
 struct symbol_with_indexes {
@@ -249,6 +285,75 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql_type_format::time_type() == "TIME"s);
         expect(sql_type_format::time_type(3) == "TIME(3)"s);
         expect(sql_type_format::time_type(6) == "TIME(6)"s);
+    };
+
+    "sql_type_format helpers - format int/bigint types"_test = [] {
+        expect(sql_type_format::int_type() == "INT"s);
+        expect(sql_type_format::int_type(11) == "INT(11)"s);
+
+        expect(sql_type_format::int_unsigned_type() == "INT UNSIGNED"s);
+        expect(sql_type_format::int_unsigned_type(10) == "INT(10) UNSIGNED"s);
+
+        expect(sql_type_format::bigint_type() == "BIGINT"s);
+        expect(sql_type_format::bigint_type(20) == "BIGINT(20)"s);
+
+        expect(sql_type_format::bigint_unsigned_type() == "BIGINT UNSIGNED"s);
+        expect(sql_type_format::bigint_unsigned_type(20) == "BIGINT(20) UNSIGNED"s);
+    };
+
+    "sql_type_for - integer wrapper types embed display width in type string"_test = [] {
+        expect(sql_type_for<int_type<>>() == "INT"s);
+        expect(sql_type_for<int_type<11>>() == "INT(11)"s);
+
+        expect(sql_type_for<int_unsigned_type<>>() == "INT UNSIGNED"s);
+        expect(sql_type_for<int_unsigned_type<10>>() == "INT(10) UNSIGNED"s);
+
+        expect(sql_type_for<bigint_type<>>() == "BIGINT"s);
+        expect(sql_type_for<bigint_type<20>>() == "BIGINT(20)"s);
+
+        expect(sql_type_for<bigint_unsigned_type<>>() == "BIGINT UNSIGNED"s);
+        expect(sql_type_for<bigint_unsigned_type<20>>() == "BIGINT(20) UNSIGNED"s);
+
+        // optional wrappers preserve the display width
+        expect(sql_type_for<std::optional<int_type<11>>>() == "INT(11)"s);
+        expect(sql_type_for<std::optional<bigint_unsigned_type<20>>>() == "BIGINT(20) UNSIGNED"s);
+    };
+
+    "create_table with integer wrapper types - emits INT/BIGINT definitions"_test = [] {
+        auto const sql = create_table<integer_column_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE integer_column_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    count INT NOT NULL,\n"
+               "    count_w INT(11) NOT NULL,\n"
+               "    flags INT UNSIGNED NOT NULL,\n"
+               "    flags_w INT(10) UNSIGNED NOT NULL,\n"
+               "    big BIGINT NOT NULL,\n"
+               "    big_w BIGINT(20) NOT NULL,\n"
+               "    big_flags BIGINT UNSIGNED NOT NULL,\n"
+               "    big_flags_w BIGINT(20) UNSIGNED NOT NULL,\n"
+               "    opt_count INT,\n"
+               "    opt_big BIGINT UNSIGNED\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "tagged_column_field with integer default aliases - emits INT/BIGINT"_test = [] {
+        expect(sql_type_for<int_type_default>() == "INT"s);
+        expect(sql_type_for<int_unsigned_type_default>() == "INT UNSIGNED"s);
+        expect(sql_type_for<bigint_type_default>() == "BIGINT"s);
+        expect(sql_type_for<bigint_unsigned_type_default>() == "BIGINT UNSIGNED"s);
+
+        auto const sql = create_table<tagged_integer_alias_table>().build_sql();
+        expect(sql ==
+               "CREATE TABLE tagged_integer_alias_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    count INT NOT NULL,\n"
+               "    flags INT UNSIGNED NOT NULL,\n"
+               "    big BIGINT NOT NULL,\n"
+               "    big_flags BIGINT UNSIGNED NOT NULL\n"
+               ");\n"s)
+            << sql;
     };
 
     "create_table temporal types - emits DATETIME and TIMESTAMP definitions"_test = [] {

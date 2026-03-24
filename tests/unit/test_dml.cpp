@@ -35,6 +35,14 @@ struct formatted_numeric_asset {
     COLUMN_FIELD(value2, std::optional<double_type<12, 4>>)
     COLUMN_FIELD(value3, decimal_type<12, 4>)
 };
+
+struct integer_typed_row {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(count, int_type<>)
+    COLUMN_FIELD(flags, std::optional<int_unsigned_type<>>)
+    COLUMN_FIELD(big, bigint_type<>)
+    COLUMN_FIELD(big_flags, bigint_unsigned_type<>)
+};
 }  // namespace
 
 // ===================================================================
@@ -211,6 +219,41 @@ suite<"DML"> dml_suite = [] {
         expect(std::fabs(static_cast<float>(float_value) - 12.5f) < 0.0001f);
         expect(std::fabs(static_cast<double>(double_value) - 42.125) < 0.0000001);
         expect(std::fabs(static_cast<double>(decimal_value) - 99.5) < 0.0000001);
+    };
+
+    "integer wrapper types serialize and deserialize like their underlying values"_test = [] {
+        expect(sql_detail::to_sql_value(int_type<>{42}) == "42"s);
+        expect(sql_detail::to_sql_value(int_type<11>{-7}) == "-7"s);
+        expect(sql_detail::to_sql_value(int_unsigned_type<>{100u}) == "100"s);
+        expect(sql_detail::to_sql_value(bigint_type<>{-9000000000LL}) == "-9000000000"s);
+        expect(sql_detail::to_sql_value(bigint_unsigned_type<>{18000000000ULL}) == "18000000000"s);
+
+        auto const int_val = ::ds_mysql::detail::from_mysql_value_nonnull<int_type<>>("42");
+        auto const int_neg = ::ds_mysql::detail::from_mysql_value_nonnull<int_type<11>>("-7");
+        auto const uint_val = ::ds_mysql::detail::from_mysql_value_nonnull<int_unsigned_type<>>("100");
+        auto const big_val = ::ds_mysql::detail::from_mysql_value_nonnull<bigint_type<>>("-9000000000");
+        auto const ubig_val = ::ds_mysql::detail::from_mysql_value_nonnull<bigint_unsigned_type<>>("18000000000");
+
+        expect(static_cast<int32_t>(int_val) == 42);
+        expect(static_cast<int32_t>(int_neg) == -7);
+        expect(static_cast<uint32_t>(uint_val) == 100u);
+        expect(static_cast<int64_t>(big_val) == -9000000000LL);
+        expect(static_cast<uint64_t>(ubig_val) == 18000000000ULL);
+    };
+
+    "insert into - integer typed wrappers generate SQL literals and preserve nullability"_test = [] {
+        integer_typed_row row;
+        row.id_ = 1u;
+        row.count_ = 42;
+        row.flags_ = std::nullopt;
+        row.big_ = -9000000000LL;
+        row.big_flags_ = 18000000000ULL;
+
+        auto const sql = insert_into<integer_typed_row>().values(row).build_sql();
+        expect(sql ==
+               "INSERT INTO integer_typed_row (id, count, flags, big, big_flags) "
+               "VALUES (1, 42, NULL, -9000000000, 18000000000)"s)
+            << sql;
     };
 
     "insert into - typed formatted numeric wrappers generate SQL literals and preserve nullability"_test = [] {

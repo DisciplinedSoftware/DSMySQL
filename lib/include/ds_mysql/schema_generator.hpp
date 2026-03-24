@@ -100,7 +100,9 @@ struct sql_type_name {
             } else {
                 static_assert(false,
                               "Unsupported type for SQL mapping. Supported: uint32_t, int32_t, uint64_t, "
-                              "int64_t, float, double, float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
+                              "int64_t, float, double, int_type<W>, int_unsigned_type<W>, "
+                              "bigint_type<W>, bigint_unsigned_type<W>, "
+                              "float_type<P,S>, double_type<P,S>, decimal_type<P,S>, "
                               "bool, varchar_type<N>, text_type (TEXT), "
                               "mediumtext_type (MEDIUMTEXT, MySQL), longtext_type (LONGTEXT, MySQL), "
                               "std::chrono::system_clock::time_point, datetime_type<Fsp>, timestamp_type<Fsp>, "
@@ -154,6 +156,38 @@ namespace sql_type_format {
 
 [[nodiscard]] inline std::string decimal_type(uint32_t precision, uint32_t scale) {
     return "DECIMAL(" + std::to_string(precision) + "," + std::to_string(scale) + ")";
+}
+
+[[nodiscard]] inline std::string int_type() {
+    return "INT";
+}
+
+[[nodiscard]] inline std::string int_type(uint32_t display_width) {
+    return "INT(" + std::to_string(display_width) + ")";
+}
+
+[[nodiscard]] inline std::string int_unsigned_type() {
+    return "INT UNSIGNED";
+}
+
+[[nodiscard]] inline std::string int_unsigned_type(uint32_t display_width) {
+    return "INT(" + std::to_string(display_width) + ") UNSIGNED";
+}
+
+[[nodiscard]] inline std::string bigint_type() {
+    return "BIGINT";
+}
+
+[[nodiscard]] inline std::string bigint_type(uint32_t display_width) {
+    return "BIGINT(" + std::to_string(display_width) + ")";
+}
+
+[[nodiscard]] inline std::string bigint_unsigned_type() {
+    return "BIGINT UNSIGNED";
+}
+
+[[nodiscard]] inline std::string bigint_unsigned_type(uint32_t display_width) {
+    return "BIGINT(" + std::to_string(display_width) + ") UNSIGNED";
 }
 
 [[nodiscard]] inline std::string datetime_type() {

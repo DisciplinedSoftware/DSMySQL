@@ -128,6 +128,15 @@ struct temporal_precision_trade {
     COLUMN_FIELD(recorded_at, timestamp_type<>)
 };
 
+struct integer_width_table {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(count, int_type<11>)
+    COLUMN_FIELD(flags, int_unsigned_type<10>)
+    COLUMN_FIELD(big, bigint_type<20>)
+    COLUMN_FIELD(big_flags, bigint_unsigned_type<20>)
+    COLUMN_FIELD(opt_count, std::optional<int_type<>>)
+};
+
 }  // namespace
 
 template <>
@@ -1191,6 +1200,144 @@ struct one_col_query {
     }
 };
 }  // namespace
+
+// ===================================================================
+// Integer wrapper type integration — int_type<W>, bigint_type<W>, etc.
+// ===================================================================
+
+suite<"Integer Type Integration"> integer_type_integration_suite = [] {
+    "create and describe table with integer display-width columns"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<integer_width_table>().if_exists()));
+        }};
+
+        expect(db->execute(drop_table<integer_width_table>().if_exists()).has_value());
+        expect(db->execute(create_table<integer_width_table>()).has_value())
+            << "Failed to create integer_width_table";
+
+        auto const describe_result = db->query(describe<integer_width_table>());
+        expect(fatal(describe_result.has_value())) << "DESCRIBE failed";
+        expect(describe_result->size() == 6u) << "integer_width_table should have 6 columns";
+    };
+
+    "insert and select integer typed wrapper values round-trip"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<integer_width_table>().if_exists()));
+        }};
+
+        expect(db->execute(create_table<integer_width_table>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<integer_width_table>()).has_value());
+
+        integer_width_table row;
+        row.count_ = -42;
+        row.flags_ = 100u;
+        row.big_ = -9000000000LL;
+        row.big_flags_ = 18000000000ULL;
+        row.opt_count_ = std::nullopt;
+
+        expect(db->execute(insert_into<integer_width_table>().values(row)).has_value())
+            << "Insert should succeed";
+
+        auto const results =
+            db->query(select<integer_width_table::count,
+                             integer_width_table::flags,
+                             integer_width_table::big,
+                             integer_width_table::big_flags,
+                             integer_width_table::opt_count>()
+                          .from<integer_width_table>()
+                          .limit(1));
+
+        expect(fatal(results.has_value()));
+        expect(fatal(results->size() == 1u));
+        auto const& [count, flags, big, big_flags, opt_count] = (*results)[0];
+        expect(static_cast<int32_t>(count) == -42) << static_cast<int32_t>(count);
+        expect(static_cast<uint32_t>(flags) == 100u) << static_cast<uint32_t>(flags);
+        expect(static_cast<int64_t>(big) == -9000000000LL) << static_cast<int64_t>(big);
+        expect(static_cast<uint64_t>(big_flags) == 18000000000ULL) << static_cast<uint64_t>(big_flags);
+        expect(!opt_count.has_value()) << "opt_count should be NULL";
+    };
+
+    "nullable int_type round-trips value and null"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<integer_width_table>().if_exists()));
+        }};
+
+        expect(db->execute(create_table<integer_width_table>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<integer_width_table>()).has_value());
+
+        integer_width_table with_value;
+        with_value.count_ = 1;
+        with_value.opt_count_ = int_type<>{7};
+        expect(db->execute(insert_into<integer_width_table>().values(with_value)).has_value());
+
+        integer_width_table without_value;
+        without_value.count_ = 2;
+        without_value.opt_count_ = std::nullopt;
+        expect(db->execute(insert_into<integer_width_table>().values(without_value)).has_value());
+
+        auto const results =
+            db->query(select<integer_width_table::count, integer_width_table::opt_count>()
+                          .from<integer_width_table>()
+                          .order_by<integer_width_table::count>());
+
+        expect(fatal(results.has_value()));
+        expect(fatal(results->size() == 2u));
+
+        auto const& [count0, opt0] = (*results)[0];
+        expect(static_cast<int32_t>(count0) == 1);
+        expect(fatal(opt0.has_value()));
+        expect(static_cast<int32_t>(*opt0) == 7) << static_cast<int32_t>(*opt0);
+
+        auto const& [count1, opt1] = (*results)[1];
+        expect(static_cast<int32_t>(count1) == 2);
+        expect(!opt1.has_value()) << "Second row opt_count should be NULL";
+    };
+
+    // format<col, 0> wraps MySQL FORMAT(expr, 0) — adds thousands separators,
+    // no decimal places. The integer column's display width (INT(11) etc.) is a
+    // schema-only hint and does not affect the FORMAT output.
+    "format<col, 0> on bigint column produces thousands-separated string"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table<integer_width_table>().if_exists()));
+        }};
+
+        expect(db->execute(create_table<integer_width_table>().if_not_exists()).has_value());
+        expect(db->execute(delete_from<integer_width_table>()).has_value());
+
+        integer_width_table row;
+        row.big_ = 1234567LL;
+        expect(db->execute(insert_into<integer_width_table>().values(row)).has_value());
+
+        auto const results =
+            db->query(select<format_to<integer_width_table::big, 0>>()
+                          .from<integer_width_table>()
+                          .limit(1));
+
+        expect(fatal(results.has_value()));
+        expect(fatal(results->size() == 1u));
+        expect(std::get<0>((*results)[0]) == "1,234,567"s) << std::get<0>((*results)[0]);
+    };
+};
 
 suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
     "query with mismatched column count returns error"_test = [] {

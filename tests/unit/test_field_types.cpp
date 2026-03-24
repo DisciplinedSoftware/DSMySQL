@@ -262,6 +262,62 @@ suite<"column_field numeric optional POD interop"> column_field_numeric_optional
         col = std::optional<double>{};
         expect(!col.value.has_value());
     };
+
+    "optional<int_type> construct from optional<int32_t> (value)"_test = [] {
+        using col_t = column_field<"i", std::optional<int_type<11>>>;
+        col_t col{std::optional<int32_t>{42}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 42);
+    };
+
+    "optional<int_type> assign from optional<int32_t> (nullopt)"_test = [] {
+        using col_t = column_field<"i", std::optional<int_type<11>>>;
+        col_t col{int_type<11>{1}};
+        col = std::optional<int32_t>{};
+        expect(!col.value.has_value());
+    };
+
+    "optional<int_unsigned_type> construct from optional<uint32_t> (value)"_test = [] {
+        using col_t = column_field<"u", std::optional<int_unsigned_type<>>>;
+        col_t col{std::optional<uint32_t>{99u}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 99u);
+    };
+
+    "optional<int_unsigned_type> assign from optional<uint32_t> (nullopt)"_test = [] {
+        using col_t = column_field<"u", std::optional<int_unsigned_type<>>>;
+        col_t col{int_unsigned_type<>{1u}};
+        col = std::optional<uint32_t>{};
+        expect(!col.value.has_value());
+    };
+
+    "optional<bigint_type> construct from optional<int64_t> (value)"_test = [] {
+        using col_t = column_field<"b", std::optional<bigint_type<>>>;
+        col_t col{std::optional<int64_t>{-9000000000LL}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == -9000000000LL);
+    };
+
+    "optional<bigint_type> assign from optional<int64_t> (nullopt)"_test = [] {
+        using col_t = column_field<"b", std::optional<bigint_type<>>>;
+        col_t col{bigint_type<>{int64_t{1}}};
+        col = std::optional<int64_t>{};
+        expect(!col.value.has_value());
+    };
+
+    "optional<bigint_unsigned_type> construct from optional<uint64_t> (value)"_test = [] {
+        using col_t = column_field<"bu", std::optional<bigint_unsigned_type<20>>>;
+        col_t col{std::optional<uint64_t>{18000000000ULL}};
+        expect(fatal(col.value.has_value()));
+        expect(col.value->get() == 18000000000ULL);
+    };
+
+    "optional<bigint_unsigned_type> assign from optional<uint64_t> (nullopt)"_test = [] {
+        using col_t = column_field<"bu", std::optional<bigint_unsigned_type<20>>>;
+        col_t col{bigint_unsigned_type<20>{uint64_t{1}}};
+        col = std::optional<uint64_t>{};
+        expect(!col.value.has_value());
+    };
 };
 
 // ===================================================================
