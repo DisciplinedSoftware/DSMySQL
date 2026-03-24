@@ -10,6 +10,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+### Added
+
+- Add int_type<W>, int_unsigned_type<W>, bigint_type<W>, and bigint_unsigned_type<W>
+to allow display width similarly to floating point types.
+- Fixed table_attributes specialization that was broken
+
 ## [2.0.0] – 2026-03-23
 
 ### Added
