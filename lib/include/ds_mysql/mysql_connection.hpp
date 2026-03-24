@@ -6,7 +6,6 @@
 #include <cassert>
 #include <cctype>
 #include <expected>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -170,13 +169,7 @@ public:
         if (!mysql_real_connect(conn.get(), host.to_string().c_str(), credentials.user().to_string().c_str(),
                                 credentials.password().to_string().c_str(), database.to_string().c_str(),
                                 port.to_unsigned_int(), nullptr, 0)) {
-            auto const error = std::string(mysql_error(conn.get()));
-            std::cerr << "[ds_mysql] mysql_real_connect failed: host=" << host.to_string()
-                      << ", port=" << port.to_unsigned_int() << ", database=" << database.to_string()
-                      << ", user=" << credentials.user().to_string()
-                      << ", password_length=" << credentials.password().to_string().size() << ", error=" << error
-                      << '\n';
-            return std::unexpected(error);
+            return std::unexpected(std::string(mysql_error(conn.get())));
         }
 
         return mysql_connection{std::move(conn)};
