@@ -10,10 +10,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.1.0] – 2026-03-24
+
+---
+
 ### Added
 
 - Add int_type<W>, int_unsigned_type<W>, bigint_type<W>, and bigint_unsigned_type<W>
 to allow display width similarly to floating point types.
+
+### Fixed
+
 - Fixed table_attributes specialization that was broken
 
 ## [2.0.0] – 2026-03-23
@@ -69,7 +76,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/releases/tag/v1.0.0
