@@ -8,6 +8,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `create_all_tables<DB>()` now qualifies each table name as `<db_name>.<table_name>`,
+  fixing table creation when no current database is selected in MySQL.
+
 ---
 
 ## [2.1.0] – 2026-03-24
