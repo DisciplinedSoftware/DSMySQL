@@ -1,0 +1,98 @@
+name: Update Compiler Badges
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-badges:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Build badge JSON payloads
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA_WORKFLOW_RUN: ${{ github.event.workflow_run.head_sha }}
+          SHA_WORKFLOW_DISPATCH: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SHA="$SHA_WORKFLOW_DISPATCH"
+          else
+            SHA="$SHA_WORKFLOW_RUN"
+          fi
+
+          mkdir -p .github/badges
+
+          get_state() {
+            local check_name="$1"
+            local api="https://api.github.com/repos/${REPO}/commits/${SHA}/check-runs?check_name=${check_name}"
+            local state
+            state=$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              "$api" | jq -r '.check_runs[0].conclusion // .check_runs[0].status // "unknown"')
+            echo "$state"
+          }
+
+          state_to_color() {
+            case "$1" in
+              success) echo "brightgreen" ;;
+              failure) echo "red" ;;
+              cancelled) echo "yellow" ;;
+              timed_out) echo "orange" ;;
+              neutral|skipped) echo "lightgrey" ;;
+              in_progress|queued|pending|requested|waiting) echo "blue" ;;
+              *) echo "lightgrey" ;;
+            esac
+          }
+
+          write_badge() {
+            local label="$1"
+            local check_name="$2"
+            local file="$3"
+            local state
+            local color
+
+            state=$(get_state "$check_name")
+            color=$(state_to_color "$state")
+
+            jq -n \
+              --arg label "$label" \
+              --arg message "$state" \
+              --arg color "$color" \
+              '{schemaVersion: 1, label: $label, message: $message, color: $color}' > "$file"
+          }
+
+          write_badge "GCC" "tests-gcc" ".github/badges/gcc.json"
+          write_badge "Clang" "tests-clang" ".github/badges/clang.json"
+          write_badge "MSVC" "tests-msvc" ".github/badges/msvc.json"
+
+      - name: Commit badge updates
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .github/badges/*.json
+
+          if git diff --cached --quiet; then
+            echo "No badge changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update compiler badge statuses"
+          git push
