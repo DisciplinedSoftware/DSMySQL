@@ -274,7 +274,22 @@ jobs:
           echo "$root\bin" >> $env:GITHUB_PATH
           echo "$root\lib" >> $env:GITHUB_PATH
 
-      - name: Start MySQL server
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DSKIP_DOCKER_MANAGEMENT=ON `
+            -DBUILD_EXAMPLES=OFF `
+            "-DMYSQL_ROOT_DIR=$env:MYSQL_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build build --config Release -j4
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
+
+      - name: Integration tests
         shell: pwsh
         run: |
           function Find-Tool([string]$toolName) {
@@ -311,54 +326,85 @@ jobs:
           $mysqlExe = Find-Tool "mysql.exe"
           $mysqlAdminExe = Find-Tool "mysqladmin.exe"
           $mysqldExe = Find-Tool "mysqld.exe"
-
-          Write-Host "Using mysql.exe: $mysqlExe"
-          Write-Host "Using mysqladmin.exe: $mysqlAdminExe"
-          Write-Host "Using mysqld.exe: $mysqldExe"
-
-          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-
-          & $mysqldExe --initialize-insecure --datadir="$dataDir" --console
-          if ($LASTEXITCODE -ne 0) {
-            throw "mysqld --initialize-insecure failed with exit code $LASTEXITCODE"
-          }
-
-          $requestedPort = [int]$env:DS_MYSQL_TEST_PORT
-          $portsToTry = @($requestedPort, 3307, 3308, 33306) | Select-Object -Unique
-          $chosenPort = $null
           $process = $null
 
-          foreach ($port in $portsToTry) {
-            Write-Host "Trying MySQL port $port"
+          try {
+            Write-Host "Using mysql.exe: $mysqlExe"
+            Write-Host "Using mysqladmin.exe: $mysqlAdminExe"
+            Write-Host "Using mysqld.exe: $mysqldExe"
 
-            $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
-              "--datadir=$dataDir",
-              "--port=$port",
-              "--bind-address=$env:DS_MYSQL_TEST_HOST",
-              "--console"
-            ) -RedirectStandardOutput $stdoutLogFile -RedirectStandardError $stderrLogFile -PassThru
+            New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
-            $ready = $false
-            for ($attempt = 0; $attempt -lt 45; $attempt++) {
-              & $mysqlAdminExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$port --user=root ping --silent
-              if ($LASTEXITCODE -eq 0) {
-                $ready = $true
+            & $mysqldExe --initialize-insecure --datadir="$dataDir" --console
+            if ($LASTEXITCODE -ne 0) {
+              throw "mysqld --initialize-insecure failed with exit code $LASTEXITCODE"
+            }
+
+            $requestedPort = [int]$env:DS_MYSQL_TEST_PORT
+            $portsToTry = @($requestedPort, 3307, 3308, 33306) | Select-Object -Unique
+            $chosenPort = $null
+
+            foreach ($port in $portsToTry) {
+              Write-Host "Trying MySQL port $port"
+
+              $process = Start-Process -FilePath $mysqldExe -ArgumentList @(
+                "--datadir=$dataDir",
+                "--port=$port",
+                "--bind-address=$env:DS_MYSQL_TEST_HOST",
+                "--console"
+              ) -RedirectStandardOutput $stdoutLogFile -RedirectStandardError $stderrLogFile -PassThru
+
+              $ready = $false
+              for ($attempt = 0; $attempt -lt 45; $attempt++) {
+                & $mysqlAdminExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$port --user=root ping --silent
+                if ($LASTEXITCODE -eq 0) {
+                  $ready = $true
+                  break
+                }
+                Start-Sleep -Seconds 2
+              }
+
+              if ($ready) {
+                $chosenPort = $port
                 break
               }
-              Start-Sleep -Seconds 2
+
+              if ($process -and -not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              }
+              $process = $null
             }
 
-            if ($ready) {
-              $chosenPort = $port
-              break
+            if (-not $chosenPort) {
+              throw "MySQL server did not become ready on any candidate port"
             }
 
-            if ($process -and -not $process.HasExited) {
-              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            $env:DS_MYSQL_TEST_PORT = [string]$chosenPort
+            Write-Host "MySQL is ready on port $chosenPort"
+
+            $sql = @(
+              "CREATE DATABASE IF NOT EXISTS $env:DS_MYSQL_TEST_DATABASE;"
+              "CREATE USER IF NOT EXISTS '$env:DS_MYSQL_TEST_USER'@'%' IDENTIFIED BY '$env:DS_MYSQL_TEST_PASSWORD';"
+              "GRANT ALL PRIVILEGES ON $env:DS_MYSQL_TEST_DATABASE.* TO '$env:DS_MYSQL_TEST_USER'@'%';"
+              "FLUSH PRIVILEGES;"
+            ) -join ' '
+
+            & $mysqlExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$chosenPort --user=root --execute="$sql"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to initialize MySQL test database"
+            }
+
+            & $mysqlAdminExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$chosenPort --user=root ping --silent
+            if ($LASTEXITCODE -ne 0) {
+              throw "MySQL server stopped responding before running integration tests"
+            }
+
+            ctest --test-dir build -C Release -R tests_integration_ds_mysql --output-on-failure
+            if ($LASTEXITCODE -ne 0) {
+              throw "Integration tests failed"
             }
           }
-
-          if (-not $chosenPort) {
+          finally {
             if (Test-Path $stdoutLogFile) {
               Write-Host "--- mysqld stdout ---"
               Get-Content $stdoutLogFile
@@ -367,48 +413,7 @@ jobs:
               Write-Host "--- mysqld stderr ---"
               Get-Content $stderrLogFile
             }
-            throw "MySQL server did not become ready on any candidate port"
-          }
-
-          Write-Host "MySQL is ready on port $chosenPort"
-          "MYSQL_SERVER_PID=$($process.Id)" >> $env:GITHUB_ENV
-          "DS_MYSQL_TEST_PORT=$chosenPort" >> $env:GITHUB_ENV
-
-          $sql = @(
-            "CREATE DATABASE IF NOT EXISTS $env:DS_MYSQL_TEST_DATABASE;"
-            "CREATE USER IF NOT EXISTS '$env:DS_MYSQL_TEST_USER'@'%' IDENTIFIED BY '$env:DS_MYSQL_TEST_PASSWORD';"
-            "GRANT ALL PRIVILEGES ON $env:DS_MYSQL_TEST_DATABASE.* TO '$env:DS_MYSQL_TEST_USER'@'%';"
-            "FLUSH PRIVILEGES;"
-          ) -join ' '
-
-          & $mysqlExe --protocol=tcp --host=$env:DS_MYSQL_TEST_HOST --port=$chosenPort --user=root --execute="$sql"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Failed to initialize MySQL test database"
-          }
-
-      - name: Configure
-        shell: pwsh
-        run: |
-          cmake -B build `
-            -G "Visual Studio 17 2022" -A x64 `
-            -DSKIP_DOCKER_MANAGEMENT=ON `
-            -DBUILD_EXAMPLES=OFF `
-            "-DMYSQL_ROOT_DIR=$env:MYSQL_ROOT_DIR"
-
-      - name: Build
-        run: cmake --build build --config Release -j4
-
-      - name: Unit tests
-        run: ctest --test-dir build -C Release -R tests_unit_ds_mysql --output-on-failure
-
-      - name: Integration tests
-        shell: pwsh
-        run: ctest --test-dir build -C Release -R tests_integration_ds_mysql --output-on-failure
-
-      - name: Stop MySQL server
-        if: always()
-        shell: pwsh
-        run: |
-          if ($env:MYSQL_SERVER_PID) {
-            Stop-Process -Id ([int]$env:MYSQL_SERVER_PID) -Force -ErrorAction SilentlyContinue
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
           }
