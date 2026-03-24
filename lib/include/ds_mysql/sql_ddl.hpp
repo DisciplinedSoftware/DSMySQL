@@ -64,7 +64,6 @@ enum class Encryption {
     N,
 };
 
-
 // ===================================================================
 // CREATE TABLE constraint customization
 //
@@ -499,6 +498,8 @@ inline constexpr std::string_view union_key = "UNION";
 
 }  // namespace table_option_sql
 
+}  // namespace ddl_detail
+
 struct create_table_option {
     void set(std::string key, std::string value_sql) {
         auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
@@ -522,204 +523,208 @@ struct create_table_option {
 
     // Fluent API for table attributes
     create_table_option& engine(Engine value) {
-        return engine(to_sql_engine(value));
+        return engine(ddl_detail::to_sql_engine(value));
     }
 
     create_table_option& engine(std::string_view value) {
-        set(std::string{table_option_sql::engine_key},
-            table_option_sql::assign(table_option_sql::engine_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::engine_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::engine_prefix, value));
         return *this;
     }
 
     create_table_option& auto_increment(std::size_t value) {
-        set(std::string{table_option_sql::auto_increment_key},
-            table_option_sql::assign_numeric(table_option_sql::auto_increment_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::auto_increment_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::auto_increment_prefix, value));
         return *this;
     }
 
     create_table_option& avg_row_length(std::size_t value) {
-        set(std::string{table_option_sql::avg_row_length_key},
-            table_option_sql::assign_numeric(table_option_sql::avg_row_length_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::avg_row_length_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::avg_row_length_prefix, value));
         return *this;
     }
 
     create_table_option& default_charset(Charset value) {
-        return default_charset(to_sql_charset(value));
+        return default_charset(ddl_detail::to_sql_charset(value));
     }
 
     create_table_option& default_charset(std::string_view value) {
-        set(std::string{table_option_sql::default_charset_key},
-            table_option_sql::assign(table_option_sql::default_charset_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::default_charset_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::default_charset_prefix, value));
         return *this;
     }
 
     create_table_option& collate(std::string_view value) {
-        set(std::string{table_option_sql::collate_key},
-            table_option_sql::assign(table_option_sql::collate_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::collate_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::collate_prefix, value));
         return *this;
     }
 
     create_table_option& checksum(bool enabled) {
-        set(std::string{table_option_sql::checksum_key},
-            table_option_sql::assign_bool(table_option_sql::checksum_prefix, enabled));
+        set(std::string{ddl_detail::table_option_sql::checksum_key},
+            ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::checksum_prefix, enabled));
         return *this;
     }
 
     create_table_option& checksum(std::size_t value) {
-        set(std::string{table_option_sql::checksum_key},
-            table_option_sql::assign_numeric(table_option_sql::checksum_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::checksum_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::checksum_prefix, value));
         return *this;
     }
 
     create_table_option& comment(std::string_view value) {
-        set(std::string{table_option_sql::comment_key},
-            table_option_sql::assign_quoted(table_option_sql::comment_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::comment_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::comment_prefix, value));
         return *this;
     }
 
     create_table_option& compression(Compression value) {
-        return compression(to_sql_compression(value));
+        return compression(ddl_detail::to_sql_compression(value));
     }
 
     create_table_option& compression(std::string_view value) {
-        set(std::string{table_option_sql::compression_key},
-            table_option_sql::assign_quoted(table_option_sql::compression_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::compression_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::compression_prefix, value));
         return *this;
     }
 
     create_table_option& connection(std::string_view value) {
-        set(std::string{table_option_sql::connection_key},
-            table_option_sql::assign_quoted(table_option_sql::connection_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::connection_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::connection_prefix, value));
         return *this;
     }
 
     create_table_option& data_directory(std::string_view value) {
-        set(std::string{table_option_sql::data_directory_key},
-            table_option_sql::assign_quoted(table_option_sql::data_directory_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::data_directory_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::data_directory_prefix, value));
         return *this;
     }
 
     create_table_option& index_directory(std::string_view value) {
-        set(std::string{table_option_sql::index_directory_key},
-            table_option_sql::assign_quoted(table_option_sql::index_directory_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::index_directory_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::index_directory_prefix, value));
         return *this;
     }
 
     create_table_option& delay_key_write(bool enabled) {
-        set(std::string{table_option_sql::delay_key_write_key},
-            table_option_sql::assign_bool(table_option_sql::delay_key_write_prefix, enabled));
+        set(std::string{ddl_detail::table_option_sql::delay_key_write_key},
+            ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::delay_key_write_prefix, enabled));
         return *this;
     }
 
     create_table_option& delay_key_write(std::size_t value) {
-        set(std::string{table_option_sql::delay_key_write_key},
-            table_option_sql::assign_numeric(table_option_sql::delay_key_write_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::delay_key_write_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::delay_key_write_prefix, value));
         return *this;
     }
 
     create_table_option& encryption(Encryption value) {
-        return encryption(to_sql_encryption(value));
+        return encryption(ddl_detail::to_sql_encryption(value));
     }
 
     create_table_option& encryption(std::string_view value) {
-        set(std::string{table_option_sql::encryption_key},
-            table_option_sql::assign_quoted(table_option_sql::encryption_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::encryption_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::encryption_prefix, value));
         return *this;
     }
 
     create_table_option& insert_method(InsertMethod value) {
-        return insert_method(to_sql_insert_method(value));
+        return insert_method(ddl_detail::to_sql_insert_method(value));
     }
 
     create_table_option& insert_method(std::string_view value) {
-        set(std::string{table_option_sql::insert_method_key},
-            table_option_sql::assign(table_option_sql::insert_method_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::insert_method_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::insert_method_prefix, value));
         return *this;
     }
 
     create_table_option& key_block_size(std::size_t value) {
-        set(std::string{table_option_sql::key_block_size_key},
-            table_option_sql::assign_numeric(table_option_sql::key_block_size_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::key_block_size_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::key_block_size_prefix, value));
         return *this;
     }
 
     create_table_option& max_rows(std::size_t value) {
-        set(std::string{table_option_sql::max_rows_key},
-            table_option_sql::assign_numeric(table_option_sql::max_rows_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::max_rows_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::max_rows_prefix, value));
         return *this;
     }
 
     create_table_option& min_rows(std::size_t value) {
-        set(std::string{table_option_sql::min_rows_key},
-            table_option_sql::assign_numeric(table_option_sql::min_rows_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::min_rows_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::min_rows_prefix, value));
         return *this;
     }
 
     create_table_option& pack_keys(PackKeys value) {
-        return pack_keys(to_sql_pack_keys(value));
+        return pack_keys(ddl_detail::to_sql_pack_keys(value));
     }
 
     create_table_option& pack_keys(std::string_view value) {
-        set(std::string{table_option_sql::pack_keys_key},
-            table_option_sql::assign(table_option_sql::pack_keys_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::pack_keys_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::pack_keys_prefix, value));
         return *this;
     }
 
     create_table_option& password(std::string_view value) {
-        set(std::string{table_option_sql::password_key},
-            table_option_sql::assign_quoted(table_option_sql::password_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::password_key},
+            ddl_detail::table_option_sql::assign_quoted(ddl_detail::table_option_sql::password_prefix, value));
         return *this;
     }
 
     create_table_option& row_format(RowFormat value) {
-        return row_format(to_sql_row_format(value));
+        return row_format(ddl_detail::to_sql_row_format(value));
     }
 
     create_table_option& row_format(std::string_view value) {
-        set(std::string{table_option_sql::row_format_key},
-            table_option_sql::assign(table_option_sql::row_format_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::row_format_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::row_format_prefix, value));
         return *this;
     }
 
     create_table_option& stats_auto_recalc(StatsPolicy value) {
-        return stats_auto_recalc(to_sql_stats_policy(value));
+        return stats_auto_recalc(ddl_detail::to_sql_stats_policy(value));
     }
 
     create_table_option& stats_auto_recalc(std::string_view value) {
-        set(std::string{table_option_sql::stats_auto_recalc_key},
-            table_option_sql::assign(table_option_sql::stats_auto_recalc_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::stats_auto_recalc_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_auto_recalc_prefix, value));
         return *this;
     }
 
     create_table_option& stats_persistent(StatsPolicy value) {
-        return stats_persistent(to_sql_stats_policy(value));
+        return stats_persistent(ddl_detail::to_sql_stats_policy(value));
     }
 
     create_table_option& stats_persistent(std::string_view value) {
-        set(std::string{table_option_sql::stats_persistent_key},
-            table_option_sql::assign(table_option_sql::stats_persistent_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::stats_persistent_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_persistent_prefix, value));
         return *this;
     }
 
     create_table_option& stats_sample_pages(std::size_t value) {
-        set(std::string{table_option_sql::stats_sample_pages_key},
-            table_option_sql::assign_numeric(table_option_sql::stats_sample_pages_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::stats_sample_pages_key},
+            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::stats_sample_pages_prefix,
+                                                         value));
         return *this;
     }
 
     create_table_option& tablespace(std::string_view value) {
-        set(std::string{table_option_sql::tablespace_key},
-            table_option_sql::assign(table_option_sql::tablespace_prefix, value));
+        set(std::string{ddl_detail::table_option_sql::tablespace_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::tablespace_prefix, value));
         return *this;
     }
 
     create_table_option& union_tables(std::vector<std::string> table_names) {
-        set(std::string{table_option_sql::union_key}, table_option_sql::union_tables_value(table_names));
+        set(std::string{ddl_detail::table_option_sql::union_key},
+            ddl_detail::table_option_sql::union_tables_value(table_names));
         return *this;
     }
 
     std::vector<std::pair<std::string, std::string>> options;
 };
+
+namespace ddl_detail {
 
 template <typename Derived>
 class create_table_attributes_mixin {
@@ -906,14 +911,6 @@ private:
     }
 };
 
-// Table attributes trait - specialize for each table to define default CREATE TABLE options
-template <typename T>
-struct table_attributes {
-    static create_table_option get() {
-        return {};  // Empty by default
-    }
-};
-
 namespace database_option_sql {
 
 inline constexpr std::string_view default_character_set_key = "DEFAULT CHARACTER SET";
@@ -932,6 +929,8 @@ inline constexpr std::string_view default_collate_prefix = "DEFAULT COLLATE ";
 
 }  // namespace database_option_sql
 
+}  // namespace ddl_detail
+
 struct create_database_option {
     [[nodiscard]] std::string to_sql() const {
         std::string out;
@@ -943,18 +942,19 @@ struct create_database_option {
     }
 
     create_database_option& default_charset(Charset value) {
-        return default_charset(to_sql_charset(value));
+        return default_charset(ddl_detail::to_sql_charset(value));
     }
 
     create_database_option& default_charset(std::string_view value) {
-        set(std::string{database_option_sql::default_character_set_key},
-            database_option_sql::assign(database_option_sql::default_character_set_prefix, value));
+        set(std::string{ddl_detail::database_option_sql::default_character_set_key},
+            ddl_detail::database_option_sql::assign(ddl_detail::database_option_sql::default_character_set_prefix,
+                                                    value));
         return *this;
     }
 
     create_database_option& default_collate(std::string_view value) {
-        set(std::string{database_option_sql::default_collate_key},
-            database_option_sql::assign(database_option_sql::default_collate_prefix, value));
+        set(std::string{ddl_detail::database_option_sql::default_collate_key},
+            ddl_detail::database_option_sql::assign(ddl_detail::database_option_sql::default_collate_prefix, value));
         return *this;
     }
 
@@ -972,6 +972,8 @@ private:
         }
     }
 };
+
+namespace ddl_detail {
 
 template <typename Derived>
 class create_database_attributes_mixin {
@@ -1568,6 +1570,23 @@ private:
     std::string column_defs_;
     create_table_option options_;
 };
+
+}  // namespace ddl_detail
+
+// Table attributes trait - specialize for each table to define default CREATE TABLE options
+// e.g.: template <> struct ds_mysql::table_attributes<MyTable> {
+//           static create_table_option get() {
+//               return create_table_option{}.engine(Engine::InnoDB).default_charset(Charset::utf8mb4);
+//           }
+//       };
+template <typename T>
+struct table_attributes {
+    static create_table_option get() {
+        return {};  // Empty by default
+    }
+};
+
+namespace ddl_detail {
 
 // ---------------------------------------------------------------
 // create_table_builder — after create_table<T>() or create_temporary_table<T>()
@@ -2238,7 +2257,6 @@ template <Database T>
 [[nodiscard]] inline ddl_detail::drop_database_named_builder drop_database(database_name const& name) {
     return ddl_detail::drop_database_named_builder{name};
 }
-
 
 namespace ddl_detail {
 

@@ -185,6 +185,11 @@ struct audit_log {
     COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_current_timestamp,
                  column_attr::on_update_current_timestamp)
 };
+
+struct table_with_attrs {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(name, varchar_type<255>)
+};
 }  // namespace
 
 template <>
@@ -239,6 +244,13 @@ struct ds_mysql::table_constraints<symbol_with_indexes> {
             table_constraint::primary_key<symbol_with_indexes::id>(),
             table_constraint::key<symbol_with_indexes::exchange_id>("index_exchange_id"),
         };
+    }
+};
+
+template <>
+struct ds_mysql::table_attributes<table_with_attrs> {
+    static create_table_option get() {
+        return create_table_option{}.engine(Engine::InnoDB).default_charset(Charset::utf8mb4);
     }
 };
 
@@ -745,6 +757,36 @@ suite<"DDL"> ddl_suite = [] {
                "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n"
                "    PRIMARY KEY (id)\n"
                ") DEFAULT CHARSET=utf8;\n"s)
+            << sql;
+    };
+
+    "create_table with table_attributes trait - emits default ENGINE and CHARSET"_test = [] {
+        auto const sql = create_table<table_with_attrs>().build_sql();
+        expect(sql ==
+               "CREATE TABLE table_with_attrs (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL\n"
+               ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n"s)
+            << sql;
+    };
+
+    "create_table with table_attributes trait + fluent override - fluent replaces default"_test = [] {
+        auto const sql = create_table<table_with_attrs>().engine(Engine::MyISAM).build_sql();
+        expect(sql ==
+               "CREATE TABLE table_with_attrs (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL\n"
+               ") ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;\n"s)
+            << sql;
+    };
+
+    "create_table with table_attributes trait + if_not_exists - propagates defaults"_test = [] {
+        auto const sql = create_table<table_with_attrs>().if_not_exists().build_sql();
+        expect(sql ==
+               "CREATE TABLE IF NOT EXISTS table_with_attrs (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL\n"
+               ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n"s)
             << sql;
     };
 
