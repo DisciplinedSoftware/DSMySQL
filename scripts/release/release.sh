@@ -144,7 +144,7 @@ if ! grep -q "^\[${NEW_VERSION}\]:" "$CHANGELOG"; then
 fi
 
 # Open CHANGELOG in $EDITOR so the author can fill in the release notes
-EDITOR="${EDITOR:-vi}"
+EDITOR="${EDITOR:-nano}"
 info "Opening CHANGELOG.md in ${EDITOR} …"
 "$EDITOR" "$CHANGELOG"
 
