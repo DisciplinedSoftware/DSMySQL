@@ -917,10 +917,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
                              .build_sql();
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
-               "CREATE TABLE account (\n"
+               "CREATE TABLE schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
                ");\n"
-               "CREATE TABLE trade (\n"
+               "CREATE TABLE schema_bootstrap_db.trade (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
                ");\n"s)
             << sql;
@@ -935,10 +935,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
                              .build_sql();
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
-               "CREATE TABLE IF NOT EXISTS account (\n"
+               "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
                ");\n"
-               "CREATE TABLE IF NOT EXISTS trade (\n"
+               "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.trade (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
                ");\n"s)
             << sql;

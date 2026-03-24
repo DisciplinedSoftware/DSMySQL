@@ -1114,12 +1114,16 @@ concept BuildsSql = requires(T const& t) {
 };
 
 template <typename Table>
-void append_create_table_sql(std::string& sql, bool if_not_exists) {
+void append_create_table_sql(std::string& sql, bool if_not_exists, std::string_view db_name = {}) {
     const auto table_name = table_name_for<Table>::value().to_string_view();
     const auto column_defs = make_column_defs<Table>();
     sql += "CREATE TABLE ";
     if (if_not_exists) {
         sql += "IF NOT EXISTS ";
+    }
+    if (!db_name.empty()) {
+        sql += db_name;
+        sql += '.';
     }
     sql += table_name;
     sql += " (\n";
@@ -1130,7 +1134,8 @@ void append_create_table_sql(std::string& sql, bool if_not_exists) {
 template <Database DB, bool IfNotExists, std::size_t... Is>
 std::string build_create_all_tables_sql_impl(std::string prior_sql, std::index_sequence<Is...>) {
     using tables_tuple = typename database_tables<DB>::type;
-    (append_create_table_sql<std::tuple_element_t<Is, tables_tuple>>(prior_sql, IfNotExists), ...);
+    const auto db_name = database_name_for<DB>::value();
+    (append_create_table_sql<std::tuple_element_t<Is, tables_tuple>>(prior_sql, IfNotExists, db_name), ...);
     return prior_sql;
 }
 
