@@ -33,8 +33,19 @@ struct trade {
 
 [[nodiscard]] std::optional<mysql_config> mysql_config_from_env() {
     auto getenv_or = [](char const* key, char const* fallback = "") -> std::string {
+#ifdef _MSC_VER
+        char* v = nullptr;
+        size_t len = 0;
+        if (::_dupenv_s(&v, &len, key) != 0 || v == nullptr) {
+            return fallback;
+        }
+        std::string result{v};
+        std::free(v);
+        return result;
+#else
         char const* v = std::getenv(key);
         return v ? v : fallback;
+#endif
     };
 
     const std::string host = getenv_or("DS_MYSQL_TEST_HOST");
