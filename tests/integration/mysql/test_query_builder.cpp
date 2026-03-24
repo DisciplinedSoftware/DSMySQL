@@ -1217,8 +1217,7 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         }};
 
         expect(db->execute(drop_table<integer_width_table>().if_exists()).has_value());
-        expect(db->execute(create_table<integer_width_table>()).has_value())
-            << "Failed to create integer_width_table";
+        expect(db->execute(create_table<integer_width_table>()).has_value()) << "Failed to create integer_width_table";
 
         auto const describe_result = db->query(describe<integer_width_table>());
         expect(fatal(describe_result.has_value())) << "DESCRIBE failed";
@@ -1245,15 +1244,11 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         row.big_flags_ = 18000000000ULL;
         row.opt_count_ = std::nullopt;
 
-        expect(db->execute(insert_into<integer_width_table>().values(row)).has_value())
-            << "Insert should succeed";
+        expect(db->execute(insert_into<integer_width_table>().values(row)).has_value()) << "Insert should succeed";
 
         auto const results =
-            db->query(select<integer_width_table::count,
-                             integer_width_table::flags,
-                             integer_width_table::big,
-                             integer_width_table::big_flags,
-                             integer_width_table::opt_count>()
+            db->query(select<integer_width_table::count, integer_width_table::flags, integer_width_table::big,
+                             integer_width_table::big_flags, integer_width_table::opt_count>()
                           .from<integer_width_table>()
                           .limit(1));
 
@@ -1290,10 +1285,9 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         without_value.opt_count_ = std::nullopt;
         expect(db->execute(insert_into<integer_width_table>().values(without_value)).has_value());
 
-        auto const results =
-            db->query(select<integer_width_table::count, integer_width_table::opt_count>()
-                          .from<integer_width_table>()
-                          .order_by<integer_width_table::count>());
+        auto const results = db->query(select<integer_width_table::count, integer_width_table::opt_count>()
+                                           .from<integer_width_table>()
+                                           .order_by<integer_width_table::count>());
 
         expect(fatal(results.has_value()));
         expect(fatal(results->size() == 2u));
@@ -1329,9 +1323,7 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         expect(db->execute(insert_into<integer_width_table>().values(row)).has_value());
 
         auto const results =
-            db->query(select<format_to<integer_width_table::big, 0>>()
-                          .from<integer_width_table>()
-                          .limit(1));
+            db->query(select<format_to<integer_width_table::big, 0>>().from<integer_width_table>().limit(1));
 
         expect(fatal(results.has_value()));
         expect(fatal(results->size() == 1u));

@@ -2768,7 +2768,6 @@ template <ValidTable T1, ValidTable T2, ColumnDescriptor LeftCol, ColumnDescript
     return dml_detail::update_join_builder<T1, T2>{std::move(join_clause)};
 }
 
-
 template <typename T>
 concept SqlExecuteStatement = SqlStatement<T> && !TypedSelectQuery<T>;
 

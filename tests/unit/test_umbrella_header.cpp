@@ -18,10 +18,8 @@ struct api_product {
 
 suite<"public api umbrella header"> public_api_umbrella_header_suite = [] {
     "ds_mysql.hpp exposes query builder and support types needed by quick start"_test = [] {
-        mysql_config const cfg{host_name{"127.0.0.1"},
-                               database_name{"catalog"},
-                               auth_credentials{user_name{"root"}, user_password{"secret"}},
-                               port_number{3306}};
+        mysql_config const cfg{host_name{"127.0.0.1"}, database_name{"catalog"},
+                               auth_credentials{user_name{"root"}, user_password{"secret"}}, port_number{3306}};
 
         expect(cfg.host().to_string() == "127.0.0.1"s);
         expect(cfg.database().to_string() == "catalog"s);

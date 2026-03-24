@@ -11,55 +11,55 @@ namespace ds_mysql::mysql_metadata {
 // MySQL metadata catalogs exposed as typed database schemas.
 struct information_schema : database_schema {
     struct schemata {
-        COLUMN_FIELD(catalog_name,               std::string)
-        COLUMN_FIELD(schema_name,                std::string)
+        COLUMN_FIELD(catalog_name, std::string)
+        COLUMN_FIELD(schema_name, std::string)
         COLUMN_FIELD(default_character_set_name, std::string)
-        COLUMN_FIELD(default_collation_name,     std::string)
+        COLUMN_FIELD(default_collation_name, std::string)
     };
 
     struct tables {
         COLUMN_FIELD(table_schema, std::string)
-        COLUMN_FIELD(table_name,   std::string)
-        COLUMN_FIELD(table_type,   std::string)
+        COLUMN_FIELD(table_name, std::string)
+        COLUMN_FIELD(table_type, std::string)
     };
 
     struct columns {
         COLUMN_FIELD(table_schema, std::string)
-        COLUMN_FIELD(table_name,   std::string)
-        COLUMN_FIELD(column_name,  std::string)
-        COLUMN_FIELD(data_type,    std::string)
+        COLUMN_FIELD(table_name, std::string)
+        COLUMN_FIELD(column_name, std::string)
+        COLUMN_FIELD(data_type, std::string)
     };
 
     struct views {
         COLUMN_FIELD(table_schema, std::string)
-        COLUMN_FIELD(table_name,   std::string)
+        COLUMN_FIELD(table_name, std::string)
     };
 
     struct table_constraints {
         COLUMN_FIELD(constraint_schema, std::string)
-        COLUMN_FIELD(table_name,        std::string)
-        COLUMN_FIELD(constraint_name,   std::string)
-        COLUMN_FIELD(constraint_type,   std::string)
+        COLUMN_FIELD(table_name, std::string)
+        COLUMN_FIELD(constraint_name, std::string)
+        COLUMN_FIELD(constraint_type, std::string)
     };
 
     struct key_column_usage {
         COLUMN_FIELD(constraint_schema, std::string)
-        COLUMN_FIELD(table_name,        std::string)
-        COLUMN_FIELD(column_name,       std::string)
+        COLUMN_FIELD(table_name, std::string)
+        COLUMN_FIELD(column_name, std::string)
     };
 
     struct referential_constraints {
-        COLUMN_FIELD(constraint_schema,        std::string)
-        COLUMN_FIELD(constraint_name,          std::string)
+        COLUMN_FIELD(constraint_schema, std::string)
+        COLUMN_FIELD(constraint_name, std::string)
         COLUMN_FIELD(unique_constraint_schema, std::string)
-        COLUMN_FIELD(unique_constraint_name,   std::string)
+        COLUMN_FIELD(unique_constraint_name, std::string)
     };
 
     struct statistics {
         COLUMN_FIELD(table_schema, std::string)
-        COLUMN_FIELD(table_name,   std::string)
-        COLUMN_FIELD(index_name,   std::string)
-        COLUMN_FIELD(column_name,  std::string)
+        COLUMN_FIELD(table_name, std::string)
+        COLUMN_FIELD(index_name, std::string)
+        COLUMN_FIELD(column_name, std::string)
     };
 };
 
