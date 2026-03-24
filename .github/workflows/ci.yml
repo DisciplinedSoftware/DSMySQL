@@ -270,8 +270,9 @@ jobs:
 
           Write-Host "Detected MYSQL_ROOT_DIR: $root"
           echo "MYSQL_ROOT_DIR=$root" >> $env:GITHUB_ENV
-          echo "$root\lib" >> $env:GITHUB_PATH
           echo "MYSQL_BIN_DIR=$(Join-Path $root 'bin')" >> $env:GITHUB_ENV
+          echo "$root\bin" >> $env:GITHUB_PATH
+          echo "$root\lib" >> $env:GITHUB_PATH
 
       - name: Start MySQL server
         shell: pwsh
