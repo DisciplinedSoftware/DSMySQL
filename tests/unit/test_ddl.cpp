@@ -1020,6 +1020,48 @@ suite<"DDL DROP DATABASE"> ddl_drop_database_suite = [] {
     };
 };
 
+suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
+    "create_all_tables - emits CREATE TABLE for every table in DB"_test = [] {
+        auto const sql = create_all_tables<schema_bootstrap_db>().build_sql();
+        expect(sql ==
+               "CREATE TABLE schema_bootstrap_db.account (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE TABLE schema_bootstrap_db.trade (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_all_tables.if_not_exists - emits IF NOT EXISTS for each table"_test = [] {
+        auto const sql = create_all_tables<schema_bootstrap_db>().if_not_exists().build_sql();
+        expect(sql ==
+               "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.account (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.trade (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_all_tables.then - chains into further DDL"_test = [] {
+        auto const sql = create_all_tables<schema_bootstrap_db>()
+                             .then()
+                             .create_database<schema_bootstrap_db>()
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE schema_bootstrap_db.account (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE TABLE schema_bootstrap_db.trade (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               ");\n"
+               "CREATE DATABASE schema_bootstrap_db;\n"s)
+            << sql;
+    };
+};
+
 suite<"DDL Features"> ddl_features_suite = [] {
     "create_view.as(select) - generates CREATE VIEW AS SELECT"_test = [] {
         auto const sql = create_view<new_table>().as(select<test_table::id>().from<test_table>()).build_sql();

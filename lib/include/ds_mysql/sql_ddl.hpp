@@ -2263,6 +2263,23 @@ template <Database T>
     return ddl_detail::drop_database_named_builder{name};
 }
 
+/**
+ * create_all_tables<DB>() — CREATE TABLE for every table in DB.
+ *
+ * DB must inherit from database_schema and define a `tables` tuple.
+ *
+ * Example:
+ *   create_all_tables<my_db>().build_sql()
+ *   create_all_tables<my_db>().if_not_exists().build_sql()
+ *   create_all_tables<my_db>().then().create_table<my_db::t>()...
+ */
+template <Database DB>
+[[nodiscard]] ddl_detail::create_all_tables_builder<DB> create_all_tables() {
+    using _ = typename database_tables<DB>::type;
+    (void)sizeof(_);
+    return ddl_detail::create_all_tables_builder<DB>{};
+}
+
 namespace ddl_detail {
 
 // ---------------------------------------------------------------
