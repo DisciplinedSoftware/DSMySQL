@@ -70,8 +70,7 @@ struct trade {
     try {
         parsed_port = static_cast<unsigned int>(std::stoul(port_str));
     } catch (std::exception const& ex) {
-        std::cerr << "[ds_mysql][integration] Invalid DS_MYSQL_TEST_PORT='" << port_str
-                  << "': " << ex.what() << '\n';
+        std::cerr << "[ds_mysql][integration] Invalid DS_MYSQL_TEST_PORT='" << port_str << "': " << ex.what() << '\n';
         return std::nullopt;
     }
 

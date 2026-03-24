@@ -174,8 +174,8 @@ public:
             std::cerr << "[ds_mysql] mysql_real_connect failed: host=" << host.to_string()
                       << ", port=" << port.to_unsigned_int() << ", database=" << database.to_string()
                       << ", user=" << credentials.user().to_string()
-                      << ", password_length=" << credentials.password().to_string().size()
-                      << ", error=" << error << '\n';
+                      << ", password_length=" << credentials.password().to_string().size() << ", error=" << error
+                      << '\n';
             return std::unexpected(error);
         }
 
