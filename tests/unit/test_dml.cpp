@@ -540,3 +540,44 @@ suite<"DML"> dml_suite = [] {
         expect(sql == "UPDATE asset SET ticker = 'AMZN', instrument = 'E-Commerce', currency = 'USD'"s) << sql;
     };
 };
+
+// ===================================================================
+// DML — Transaction Control
+// ===================================================================
+
+suite<"DML transaction_control"> dml_transaction_control_suite = [] {
+    "savepoint - generates SAVEPOINT name"_test = [] {
+        auto const sql = savepoint("sp1").build_sql();
+        expect(sql == "SAVEPOINT sp1"s) << sql;
+    };
+
+    "release_savepoint - generates RELEASE SAVEPOINT name"_test = [] {
+        auto const sql = release_savepoint("sp1").build_sql();
+        expect(sql == "RELEASE SAVEPOINT sp1"s) << sql;
+    };
+
+    "rollback_to_savepoint - generates ROLLBACK TO SAVEPOINT name"_test = [] {
+        auto const sql = rollback_to_savepoint("sp1").build_sql();
+        expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
+    };
+
+    "set_transaction_isolation_level ReadUncommitted"_test = [] {
+        auto const sql = set_transaction_isolation_level(IsolationLevel::ReadUncommitted).build_sql();
+        expect(sql == "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED"s) << sql;
+    };
+
+    "set_transaction_isolation_level ReadCommitted"_test = [] {
+        auto const sql = set_transaction_isolation_level(IsolationLevel::ReadCommitted).build_sql();
+        expect(sql == "SET TRANSACTION ISOLATION LEVEL READ COMMITTED"s) << sql;
+    };
+
+    "set_transaction_isolation_level RepeatableRead"_test = [] {
+        auto const sql = set_transaction_isolation_level(IsolationLevel::RepeatableRead).build_sql();
+        expect(sql == "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"s) << sql;
+    };
+
+    "set_transaction_isolation_level Serializable"_test = [] {
+        auto const sql = set_transaction_isolation_level(IsolationLevel::Serializable).build_sql();
+        expect(sql == "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE"s) << sql;
+    };
+};

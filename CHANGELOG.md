@@ -18,6 +18,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `alter_table<T>().convert_to_charset(Charset)` — `CONVERT TO CHARACTER SET charset`
 - `alter_table<T>().set_engine(Engine)` — `ENGINE = engine`
 - `alter_table<T>().set_auto_increment(n)` — `AUTO_INCREMENT = n`
+- `savepoint(name)` — `SAVEPOINT name`
+- `release_savepoint(name)` — `RELEASE SAVEPOINT name`
+- `rollback_to_savepoint(name)` — `ROLLBACK TO SAVEPOINT name`
+- `set_transaction_isolation_level(IsolationLevel)` — `SET TRANSACTION ISOLATION LEVEL ...` with `IsolationLevel::{ReadUncommitted, ReadCommitted, RepeatableRead, Serializable}`
 
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause
 - `inner_join_using<T, Cols...>()`, `left_join_using<T, Cols...>()`, `right_join_using<T, Cols...>()`, `full_join_using<T, Cols...>()` — `JOIN ... USING (col1, col2, ...)` with one or more column descriptors

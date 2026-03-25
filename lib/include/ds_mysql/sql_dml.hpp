@@ -435,4 +435,109 @@ template <ValidTable T>
     return {};
 }
 
+// ===================================================================
+// Transaction Control Statements
+//
+// Entry points (executeable via db.execute()):
+//   savepoint(name)                                   — SAVEPOINT name
+//   release_savepoint(name)                           — RELEASE SAVEPOINT name
+//   rollback_to_savepoint(name)                       — ROLLBACK TO SAVEPOINT name
+//   set_transaction_isolation_level(IsolationLevel)   — SET TRANSACTION ISOLATION LEVEL ...
+// ===================================================================
+
+enum class IsolationLevel {
+    ReadUncommitted,
+    ReadCommitted,
+    RepeatableRead,
+    Serializable,
+};
+
+namespace dml_detail {
+
+class savepoint_builder {
+public:
+    explicit savepoint_builder(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SAVEPOINT " + name_;
+    }
+
+private:
+    std::string name_;
+};
+
+class release_savepoint_builder {
+public:
+    explicit release_savepoint_builder(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "RELEASE SAVEPOINT " + name_;
+    }
+
+private:
+    std::string name_;
+};
+
+class rollback_to_savepoint_builder {
+public:
+    explicit rollback_to_savepoint_builder(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "ROLLBACK TO SAVEPOINT " + name_;
+    }
+
+private:
+    std::string name_;
+};
+
+class set_transaction_isolation_level_builder {
+public:
+    explicit set_transaction_isolation_level_builder(IsolationLevel level) : level_(level) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        std::string s = "SET TRANSACTION ISOLATION LEVEL ";
+        switch (level_) {
+            case IsolationLevel::ReadUncommitted:
+                s += "READ UNCOMMITTED";
+                break;
+            case IsolationLevel::ReadCommitted:
+                s += "READ COMMITTED";
+                break;
+            case IsolationLevel::RepeatableRead:
+                s += "REPEATABLE READ";
+                break;
+            case IsolationLevel::Serializable:
+                s += "SERIALIZABLE";
+                break;
+        }
+        return s;
+    }
+
+private:
+    IsolationLevel level_;
+};
+
+}  // namespace dml_detail
+
+[[nodiscard]] inline dml_detail::savepoint_builder savepoint(std::string name) {
+    return dml_detail::savepoint_builder{std::move(name)};
+}
+
+[[nodiscard]] inline dml_detail::release_savepoint_builder release_savepoint(std::string name) {
+    return dml_detail::release_savepoint_builder{std::move(name)};
+}
+
+[[nodiscard]] inline dml_detail::rollback_to_savepoint_builder rollback_to_savepoint(std::string name) {
+    return dml_detail::rollback_to_savepoint_builder{std::move(name)};
+}
+
+[[nodiscard]] inline dml_detail::set_transaction_isolation_level_builder set_transaction_isolation_level(
+    IsolationLevel level) {
+    return dml_detail::set_transaction_isolation_level_builder{level};
+}
+
 }  // namespace ds_mysql
