@@ -19,6 +19,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `natural_language_with_query_expansion`
 - All of the above are also available as methods on `col_expr` / `col_ref<Col>` (except `match_against`)
 - MySQL alias free functions: `mysql_not_regexp`, `mysql_rlike`, `mysql_not_rlike`
+- `ntile_over<N, PartitionCol, OrderCol>` — `NTILE(N) OVER (...)`
+- `percent_rank_over<PartitionCol, OrderCol>` — `PERCENT_RANK() OVER (...)`
+- `cume_dist_over<PartitionCol, OrderCol>` — `CUME_DIST() OVER (...)`
+- `first_value_over<Col, PartitionCol, OrderCol>` — `FIRST_VALUE(col) OVER (...)`
+- `last_value_over<Col, PartitionCol, OrderCol>` — `LAST_VALUE(col) OVER (...)`
+- `nth_value_over<Col, N, PartitionCol, OrderCol>` — `NTH_VALUE(col, N) OVER (...)`
 
 ---
 

@@ -457,6 +457,26 @@ concept WindowFrameSpec = requires {
 //
 //   row_number_over<PartitionCol, OrderCol>
 //      → ROW_NUMBER() OVER (PARTITION BY partition_col ORDER BY order_col)
+//   rank_over<PartitionCol, OrderCol>
+//      → RANK() OVER (PARTITION BY partition_col ORDER BY order_col)
+//   dense_rank_over<PartitionCol, OrderCol>
+//      → DENSE_RANK() OVER (PARTITION BY partition_col ORDER BY order_col)
+//   ntile_over<N, PartitionCol, OrderCol>
+//      → NTILE(N) OVER (PARTITION BY partition_col ORDER BY order_col)
+//   percent_rank_over<PartitionCol, OrderCol>
+//      → PERCENT_RANK() OVER (PARTITION BY partition_col ORDER BY order_col)
+//   cume_dist_over<PartitionCol, OrderCol>
+//      → CUME_DIST() OVER (PARTITION BY partition_col ORDER BY order_col)
+//   lag_over<Col, PartitionCol, OrderCol, Offset>
+//      → LAG(col, Offset) OVER (PARTITION BY partition_col ORDER BY order_col)
+//   lead_over<Col, PartitionCol, OrderCol, Offset>
+//      → LEAD(col, Offset) OVER (PARTITION BY partition_col ORDER BY order_col)
+//   first_value_over<Col, PartitionCol, OrderCol>
+//      → FIRST_VALUE(col) OVER (PARTITION BY partition_col ORDER BY order_col)
+//   last_value_over<Col, PartitionCol, OrderCol>
+//      → LAST_VALUE(col) OVER (PARTITION BY partition_col ORDER BY order_col)
+//   nth_value_over<Col, N, PartitionCol, OrderCol>
+//      → NTH_VALUE(col, N) OVER (PARTITION BY partition_col ORDER BY order_col)
 //
 // projection_traits specialisations are defined after the Projection concept.
 // ===================================================================
@@ -477,6 +497,18 @@ template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order D
           typename Frame = void>
 struct dense_rank_over {};
 
+template <std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
+struct ntile_over {};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
+struct percent_rank_over {};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir = sort_order::asc,
+          typename Frame = void>
+struct cume_dist_over {};
+
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
           sort_order Dir = sort_order::asc, typename Frame = void>
 struct lag_over {};
@@ -484,6 +516,18 @@ struct lag_over {};
 template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, std::size_t Offset = 1,
           sort_order Dir = sort_order::asc, typename Frame = void>
 struct lead_over {};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol,
+          sort_order Dir = sort_order::asc, typename Frame = void>
+struct first_value_over {};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol,
+          sort_order Dir = sort_order::asc, typename Frame = void>
+struct last_value_over {};
+
+template <ColumnDescriptor Col, std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol,
+          sort_order Dir = sort_order::asc, typename Frame = void>
+struct nth_value_over {};
 
 // projection_traits<P> — uniform interface over column descriptors and aggregates.
 //
@@ -1089,6 +1133,73 @@ struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir, Fra
     using value_type = typename column_traits<Col>::value_type;
     static std::string sql_expr() {
         return "LEAD(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
+               ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<ntile_over<N, PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "NTILE(" + std::to_string(N) + ") OVER (PARTITION BY " +
+               std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<percent_rank_over<PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "PERCENT_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
+struct projection_traits<cume_dist_over<PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "CUME_DIST() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
+               " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
+               (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir,
+          typename Frame>
+struct projection_traits<first_value_over<Col, PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "FIRST_VALUE(" + std::string(column_traits<Col>::column_name()) + ") OVER (PARTITION BY " +
+               std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir,
+          typename Frame>
+struct projection_traits<last_value_over<Col, PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "LAST_VALUE(" + std::string(column_traits<Col>::column_name()) + ") OVER (PARTITION BY " +
+               std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
+               std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
+               sql_window_frame_clause<Frame>() + ")";
+    }
+};
+
+template <ColumnDescriptor Col, std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol,
+          sort_order Dir, typename Frame>
+struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Frame>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "NTH_VALUE(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(N) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
                sql_window_frame_clause<Frame>() + ")";

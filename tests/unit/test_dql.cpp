@@ -1331,6 +1331,184 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
 };
 
 // ===================================================================
+// NTILE, PERCENT_RANK, CUME_DIST, FIRST_VALUE, LAST_VALUE, NTH_VALUE
+// ===================================================================
+
+suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
+    // NTILE
+    "ntile_over — NTILE(N) OVER (...)"_test = [] {
+        auto const sql = select<ext_product::id, ntile_over<4, ext_product::type, ext_product::id>>()
+                             .from<ext_product>()
+                             .build_sql();
+        expect(sql == "SELECT id, NTILE(4) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s) << sql;
+    };
+
+    "ntile_over desc — NTILE(N) OVER (... ORDER BY col DESC)"_test = [] {
+        auto const sql =
+            select<ext_product::id, ntile_over<10, ext_product::type, ext_product::id, sort_order::desc>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql == "SELECT id, NTILE(10) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
+    };
+
+    "ntile_over with frame clause"_test = [] {
+        auto const sql =
+            select<ntile_over<4, ext_product::type, ext_product::id, sort_order::asc,
+                              rows_unbounded_preceding_to_current_row>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT NTILE(4) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND "
+               "CURRENT ROW) FROM ext_product"s)
+            << sql;
+    };
+
+    // PERCENT_RANK
+    "percent_rank_over — PERCENT_RANK() OVER (...)"_test = [] {
+        auto const sql = select<ext_product::id, percent_rank_over<ext_product::type, ext_product::id>>()
+                             .from<ext_product>()
+                             .build_sql();
+        expect(sql == "SELECT id, PERCENT_RANK() OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s) << sql;
+    };
+
+    "percent_rank_over desc — PERCENT_RANK() OVER (... ORDER BY col DESC)"_test = [] {
+        auto const sql =
+            select<ext_product::id, percent_rank_over<ext_product::type, ext_product::id, sort_order::desc>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql == "SELECT id, PERCENT_RANK() OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
+    };
+
+    // CUME_DIST
+    "cume_dist_over — CUME_DIST() OVER (...)"_test = [] {
+        auto const sql = select<ext_product::id, cume_dist_over<ext_product::type, ext_product::id>>()
+                             .from<ext_product>()
+                             .build_sql();
+        expect(sql == "SELECT id, CUME_DIST() OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s) << sql;
+    };
+
+    "cume_dist_over desc — CUME_DIST() OVER (... ORDER BY col DESC)"_test = [] {
+        auto const sql =
+            select<ext_product::id, cume_dist_over<ext_product::type, ext_product::id, sort_order::desc>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql == "SELECT id, CUME_DIST() OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
+    };
+
+    // FIRST_VALUE
+    "first_value_over — FIRST_VALUE(col) OVER (...)"_test = [] {
+        auto const sql =
+            select<ext_product::id, first_value_over<ext_product::price_val, ext_product::type, ext_product::id>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT id, FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+            << sql;
+    };
+
+    "first_value_over desc — FIRST_VALUE(col) OVER (... ORDER BY col DESC)"_test = [] {
+        auto const sql =
+            select<first_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::desc>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
+            << sql;
+    };
+
+    "first_value_over with frame clause"_test = [] {
+        auto const sql =
+            select<first_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::asc,
+                                    rows_unbounded_preceding_to_current_row>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
+               "PRECEDING AND CURRENT ROW) FROM ext_product"s)
+            << sql;
+    };
+
+    // LAST_VALUE
+    "last_value_over — LAST_VALUE(col) OVER (...)"_test = [] {
+        auto const sql =
+            select<ext_product::id, last_value_over<ext_product::price_val, ext_product::type, ext_product::id>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT id, LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+            << sql;
+    };
+
+    "last_value_over with frame clause"_test = [] {
+        auto const sql =
+            select<last_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::asc,
+                                   rows_unbounded_preceding_to_unbounded_following>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
+               "PRECEDING AND UNBOUNDED FOLLOWING) FROM ext_product"s)
+            << sql;
+    };
+
+    // NTH_VALUE
+    "nth_value_over — NTH_VALUE(col, N) OVER (...)"_test = [] {
+        auto const sql =
+            select<ext_product::id,
+                   nth_value_over<ext_product::price_val, 3, ext_product::type, ext_product::id>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT id, NTH_VALUE(price_val, 3) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+            << sql;
+    };
+
+    "nth_value_over desc — NTH_VALUE(col, N) OVER (... ORDER BY col DESC)"_test = [] {
+        auto const sql =
+            select<nth_value_over<ext_product::price_val, 2, ext_product::type, ext_product::id, sort_order::desc>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT NTH_VALUE(price_val, 2) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
+            << sql;
+    };
+
+    "nth_value_over with frame clause"_test = [] {
+        auto const sql =
+            select<nth_value_over<ext_product::price_val, 1, ext_product::type, ext_product::id, sort_order::asc,
+                                  rows_unbounded_preceding_to_current_row>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT NTH_VALUE(price_val, 1) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
+               "PRECEDING AND CURRENT ROW) FROM ext_product"s)
+            << sql;
+    };
+
+    // Mixed — all 6 new functions in one query
+    "all new window functions combined in one SELECT"_test = [] {
+        auto const sql =
+            select<ntile_over<4, ext_product::type, ext_product::id>,
+                   percent_rank_over<ext_product::type, ext_product::id>,
+                   cume_dist_over<ext_product::type, ext_product::id>,
+                   first_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
+                   last_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
+                   nth_value_over<ext_product::price_val, 2, ext_product::type, ext_product::id>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT NTILE(4) OVER (PARTITION BY type ORDER BY id ASC), "
+               "PERCENT_RANK() OVER (PARTITION BY type ORDER BY id ASC), "
+               "CUME_DIST() OVER (PARTITION BY type ORDER BY id ASC), "
+               "FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC), "
+               "LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC), "
+               "NTH_VALUE(price_val, 2) OVER (PARTITION BY type ORDER BY id ASC) "
+               "FROM ext_product"s)
+            << sql;
+    };
+};
+
+// ===================================================================
 // ORDER BY features
 // ===================================================================
 
