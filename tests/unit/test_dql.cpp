@@ -1945,3 +1945,150 @@ suite<"DML Features"> dml_features_suite = [] {
         expect(sql == "REPLACE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES ()") << sql;
     };
 };
+
+// ===================================================================
+// NOT REGEXP / RLIKE / NOT RLIKE
+// ===================================================================
+
+suite<"DQL NOT REGEXP / RLIKE Predicates"> dql_not_regexp_rlike_suite = [] {
+    "not_regexp<Col>(pattern) — free function generates NOT REGEXP SQL"_test = [] {
+        auto const cond = not_regexp<ext_product::sku>("^A.*");
+        expect(cond.build_sql() == "sku NOT REGEXP '^A.*'"s) << cond.build_sql();
+    };
+
+    "col_ref.not_regexp() — method on col_expr"_test = [] {
+        auto const cond = col_ref<ext_product::sku>.not_regexp("^WIDGET");
+        expect(cond.build_sql() == "sku NOT REGEXP '^WIDGET'"s) << cond.build_sql();
+    };
+
+    "not_regexp in WHERE clause"_test = [] {
+        auto const sql = select<ext_product::id, ext_product::sku>()
+                             .from<ext_product>()
+                             .where(not_regexp<ext_product::sku>("^[A-Z]"))
+                             .build_sql();
+        expect(sql == "SELECT id, sku FROM ext_product WHERE sku NOT REGEXP '^[A-Z]'"s) << sql;
+    };
+
+    "not_regexp escapes single-quote in pattern"_test = [] {
+        auto const cond = not_regexp<ext_product::sku>("it's");
+        expect(cond.build_sql() == "sku NOT REGEXP 'it''s'"s) << cond.build_sql();
+    };
+
+    "rlike<Col>(pattern) — generates REGEXP SQL (MySQL synonym)"_test = [] {
+        auto const cond = rlike<ext_product::sku>("^RLIKE");
+        expect(cond.build_sql() == "sku REGEXP '^RLIKE'"s) << cond.build_sql();
+    };
+
+    "col_ref.rlike() — method on col_expr"_test = [] {
+        auto const cond = col_ref<ext_product::sku>.rlike("^R");
+        expect(cond.build_sql() == "sku REGEXP '^R'"s) << cond.build_sql();
+    };
+
+    "not_rlike<Col>(pattern) — generates NOT REGEXP SQL"_test = [] {
+        auto const cond = not_rlike<ext_product::sku>("^X");
+        expect(cond.build_sql() == "sku NOT REGEXP '^X'"s) << cond.build_sql();
+    };
+
+    "col_ref.not_rlike() — method on col_expr"_test = [] {
+        auto const cond = col_ref<ext_product::sku>.not_rlike("^X");
+        expect(cond.build_sql() == "sku NOT REGEXP '^X'"s) << cond.build_sql();
+    };
+
+    "mysql_not_regexp alias — generates NOT REGEXP SQL"_test = [] {
+        auto const cond = mysql_not_regexp<ext_product::sku>("^A");
+        expect(cond.build_sql() == "sku NOT REGEXP '^A'"s) << cond.build_sql();
+    };
+
+    "mysql_rlike alias — generates REGEXP SQL"_test = [] {
+        auto const cond = mysql_rlike<ext_product::sku>("^M");
+        expect(cond.build_sql() == "sku REGEXP '^M'"s) << cond.build_sql();
+    };
+
+    "mysql_not_rlike alias — generates NOT REGEXP SQL"_test = [] {
+        auto const cond = mysql_not_rlike<ext_product::sku>("^M");
+        expect(cond.build_sql() == "sku NOT REGEXP '^M'"s) << cond.build_sql();
+    };
+};
+
+// ===================================================================
+// SOUNDS LIKE
+// ===================================================================
+
+suite<"DQL SOUNDS LIKE Predicate"> dql_sounds_like_suite = [] {
+    "sounds_like<Col>(word) — free function generates SOUNDS LIKE SQL"_test = [] {
+        auto const cond = sounds_like<ext_product::sku>("widget");
+        expect(cond.build_sql() == "sku SOUNDS LIKE 'widget'"s) << cond.build_sql();
+    };
+
+    "col_ref.sounds_like() — method on col_expr"_test = [] {
+        auto const cond = col_ref<ext_product::sku>.sounds_like("widget");
+        expect(cond.build_sql() == "sku SOUNDS LIKE 'widget'"s) << cond.build_sql();
+    };
+
+    "sounds_like in WHERE clause"_test = [] {
+        auto const sql = select<ext_product::id, ext_product::sku>()
+                             .from<ext_product>()
+                             .where(sounds_like<ext_product::sku>("widget"))
+                             .build_sql();
+        expect(sql == "SELECT id, sku FROM ext_product WHERE sku SOUNDS LIKE 'widget'"s) << sql;
+    };
+
+    "sounds_like escapes single-quote in word"_test = [] {
+        auto const cond = sounds_like<ext_product::sku>("it's");
+        expect(cond.build_sql() == "sku SOUNDS LIKE 'it''s'"s) << cond.build_sql();
+    };
+};
+
+// ===================================================================
+// MATCH ... AGAINST
+// ===================================================================
+
+suite<"DQL MATCH AGAINST Predicate"> dql_match_against_suite = [] {
+    "match_against single column — default natural language mode"_test = [] {
+        auto const cond = match_against<ext_product::sku>("widget");
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('widget')"s) << cond.build_sql();
+    };
+
+    "match_against multiple columns — default natural language mode"_test = [] {
+        auto const cond = match_against<ext_product::sku, ext_product::type>("blue widget");
+        expect(cond.build_sql() == "MATCH(sku, type) AGAINST ('blue widget')"s) << cond.build_sql();
+    };
+
+    "match_against IN BOOLEAN MODE"_test = [] {
+        auto const cond = match_against<ext_product::sku>("widget", match_search_modifier::boolean_mode);
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('widget' IN BOOLEAN MODE)"s) << cond.build_sql();
+    };
+
+    "match_against IN NATURAL LANGUAGE MODE — explicit modifier"_test = [] {
+        auto const cond = match_against<ext_product::sku>("widget", match_search_modifier::natural_language);
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('widget')"s) << cond.build_sql();
+    };
+
+    "match_against WITH QUERY EXPANSION"_test = [] {
+        auto const cond = match_against<ext_product::sku>("widget", match_search_modifier::query_expansion);
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('widget' WITH QUERY EXPANSION)"s) << cond.build_sql();
+    };
+
+    "match_against IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION"_test = [] {
+        auto const cond =
+            match_against<ext_product::sku>("widget", match_search_modifier::natural_language_with_query_expansion);
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('widget' IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION)"s)
+            << cond.build_sql();
+    };
+
+    "match_against escapes single-quote in expression"_test = [] {
+        auto const cond = match_against<ext_product::sku>("it's");
+        expect(cond.build_sql() == "MATCH(sku) AGAINST ('it''s')"s) << cond.build_sql();
+    };
+
+    "match_against boolean mode in WHERE clause"_test = [] {
+        auto const sql = select<ext_product::id, ext_product::sku>()
+                             .from<ext_product>()
+                             .where(match_against<ext_product::sku, ext_product::type>("+widget -cheap",
+                                                                                       match_search_modifier::boolean_mode))
+                             .build_sql();
+        expect(sql ==
+               "SELECT id, sku FROM ext_product WHERE MATCH(sku, type) AGAINST ('+widget -cheap' IN BOOLEAN MODE)"s)
+            << sql;
+    };
+};

@@ -57,6 +57,13 @@ enum class sql_cast_type {
 
 enum class sort_order { asc, desc };
 
+enum class match_search_modifier {
+    natural_language,                       // MATCH(...) AGAINST ('expr') — default, no modifier emitted
+    boolean_mode,                           // MATCH(...) AGAINST ('expr' IN BOOLEAN MODE)
+    query_expansion,                        // MATCH(...) AGAINST ('expr' WITH QUERY EXPANSION)
+    natural_language_with_query_expansion,  // MATCH(...) AGAINST ('expr' IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION)
+};
+
 template <typename... Cols>
 struct grouping_set {};
 
@@ -292,6 +299,13 @@ struct where_condition {
 //   is_null<Col>()                       — col IS NULL
 //   is_not_null<Col>()                   — col IS NOT NULL
 //   like<Col>(pattern)                   — col LIKE 'pattern'
+//   not_like<Col>(pattern)               — col NOT LIKE 'pattern'
+//   regexp<Col>(pattern)                 — col REGEXP 'pattern'
+//   not_regexp<Col>(pattern)             — col NOT REGEXP 'pattern'
+//   rlike<Col>(pattern)                  — col RLIKE 'pattern'  (MySQL synonym for REGEXP)
+//   not_rlike<Col>(pattern)              — col NOT RLIKE 'pattern'
+//   sounds_like<Col>(word)               — col SOUNDS LIKE 'word'
+//   match_against<C1,C2,...>(expr)       — MATCH(c1,c2,...) AGAINST ('expr')
 //   and_(a, b)                           — (a AND b)
 //   or_(a, b)                            — (a OR b)
 //   not_(cond)                           — NOT (cond)
@@ -513,6 +527,83 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " REGEXP ", std::move(rhs)};
 }
 
+// not_regexp<Col>(pattern) — col NOT REGEXP 'pattern'
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition not_regexp(std::string_view pattern) {
+    auto escaped = sql_detail::escape_sql_string(pattern);
+    std::string rhs;
+    rhs.reserve(2 + escaped.size());
+    rhs += '\'';
+    rhs += std::move(escaped);
+    rhs += '\'';
+    return {column_traits<Col>::column_name(), " NOT REGEXP ", std::move(rhs)};
+}
+
+// rlike<Col>(pattern) — col RLIKE 'pattern'  (MySQL synonym for REGEXP)
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition rlike(std::string_view pattern) {
+    return regexp<Col>(pattern);
+}
+
+// not_rlike<Col>(pattern) — col NOT RLIKE 'pattern'
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition not_rlike(std::string_view pattern) {
+    return not_regexp<Col>(pattern);
+}
+
+// sounds_like<Col>(word) — col SOUNDS LIKE 'word'
+template <ColumnFieldType Col>
+[[nodiscard]] where_condition sounds_like(std::string_view word) {
+    auto escaped = sql_detail::escape_sql_string(word);
+    std::string rhs;
+    rhs.reserve(2 + escaped.size());
+    rhs += '\'';
+    rhs += std::move(escaped);
+    rhs += '\'';
+    return {column_traits<Col>::column_name(), " SOUNDS LIKE ", std::move(rhs)};
+}
+
+// match_against<Cols...>(expr [, modifier]) — MATCH(col1, col2, ...) AGAINST ('expr' [modifier])
+//
+// modifier is one of:
+//   match_search_modifier::natural_language             (default)  — no modifier emitted
+//   match_search_modifier::boolean_mode                            — IN BOOLEAN MODE
+//   match_search_modifier::query_expansion                         — WITH QUERY EXPANSION
+//   match_search_modifier::natural_language_with_query_expansion   — IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION
+template <ColumnFieldType... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] where_condition match_against(std::string_view expr,
+                                            match_search_modifier modifier = match_search_modifier::natural_language) {
+    std::string s;
+    s.reserve(64 + expr.size());
+    s += "MATCH(";
+    bool first = true;
+    auto add_col = [&](std::string_view name) {
+        if (!first) s += ", ";
+        s += name;
+        first = false;
+    };
+    (add_col(column_traits<Cols>::column_name()), ...);
+    s += ") AGAINST ('";
+    s += sql_detail::escape_sql_string(expr);
+    s += '\'';
+    switch (modifier) {
+        case match_search_modifier::boolean_mode:
+            s += " IN BOOLEAN MODE";
+            break;
+        case match_search_modifier::query_expansion:
+            s += " WITH QUERY EXPANSION";
+            break;
+        case match_search_modifier::natural_language_with_query_expansion:
+            s += " IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION";
+            break;
+        case match_search_modifier::natural_language:
+            break;
+    }
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
 template <ColumnFieldType Col, AnySelectQuery Query>
 [[nodiscard]] where_condition in_subquery(Query const& subquery) {
     auto sub = subquery.build_sql();
@@ -575,9 +666,14 @@ template <AnySelectQuery Query>
 //   col_ref<trade::name>.is_not_null()         → is_not_null<trade::name>()
 //   col_ref<trade::code>.like("AAPL%")         → like<trade::code>("AAPL%")
 //   col_ref<trade::code>.not_like("X%")        → not_like<trade::code>("X%")
-//   col_ref<trade::id>.between(1u, 10u)        → between<trade::id>(1u, 10u)
-//   col_ref<trade::code>.in({"AAPL", "GOOGL"}) → in<trade::code>({"AAPL", "GOOGL"})
-//   col_ref<trade::code>.not_in({"X", "Y"})    → not_in<trade::code>({"X", "Y"})
+//   col_ref<trade::id>.between(1u, 10u)           → between<trade::id>(1u, 10u)
+//   col_ref<trade::code>.in({"AAPL", "GOOGL"})    → in<trade::code>({"AAPL", "GOOGL"})
+//   col_ref<trade::code>.not_in({"X", "Y"})       → not_in<trade::code>({"X", "Y"})
+//   col_ref<trade::code>.regexp("^A")             → regexp<trade::code>("^A")
+//   col_ref<trade::code>.not_regexp("^A")         → not_regexp<trade::code>("^A")
+//   col_ref<trade::code>.rlike("^A")              → rlike<trade::code>("^A")
+//   col_ref<trade::code>.not_rlike("^A")          → not_rlike<trade::code>("^A")
+//   col_ref<trade::name>.sounds_like("word")      → sounds_like<trade::name>("word")
 //
 // Composing with &, |, !:
 //   col_ref<trade::code> == "AAPL" | col_ref<trade::code> == "GOOGL"
@@ -645,6 +741,18 @@ struct col_expr {
 
     [[nodiscard]] where_condition regexp(std::string_view pattern) const {
         return ds_mysql::regexp<Col>(pattern);
+    }
+    [[nodiscard]] where_condition not_regexp(std::string_view pattern) const {
+        return ds_mysql::not_regexp<Col>(pattern);
+    }
+    [[nodiscard]] where_condition rlike(std::string_view pattern) const {
+        return ds_mysql::rlike<Col>(pattern);
+    }
+    [[nodiscard]] where_condition not_rlike(std::string_view pattern) const {
+        return ds_mysql::not_rlike<Col>(pattern);
+    }
+    [[nodiscard]] where_condition sounds_like(std::string_view word) const {
+        return ds_mysql::sounds_like<Col>(word);
     }
 
     [[nodiscard]] where_condition null_safe_equal(value_type const& val) const {

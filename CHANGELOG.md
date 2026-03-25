@@ -8,6 +8,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `not_regexp<Col>(pattern)` — `col NOT REGEXP 'pattern'`
+- `rlike<Col>(pattern)` — `col RLIKE 'pattern'` (MySQL synonym for `REGEXP`)
+- `not_rlike<Col>(pattern)` — `col NOT RLIKE 'pattern'`
+- `sounds_like<Col>(word)` — `col SOUNDS LIKE 'word'`
+- `match_against<Cols...>(expr [, modifier])` — full-text search via `MATCH(...) AGAINST (...)`,
+  supporting `match_search_modifier::boolean_mode`, `query_expansion`, and
+  `natural_language_with_query_expansion`
+- All of the above are also available as methods on `col_expr` / `col_ref<Col>` (except `match_against`)
+- MySQL alias free functions: `mysql_not_regexp`, `mysql_rlike`, `mysql_not_rlike`
+
 ---
 
 ## [2.1.1] – 2026-03-24

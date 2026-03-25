@@ -2799,4 +2799,19 @@ template <ColumnDescriptor Col>
     return regexp<Col>(pattern);
 }
 
+template <ColumnDescriptor Col>
+[[nodiscard]] where_condition mysql_not_regexp(std::string_view pattern) {
+    return not_regexp<Col>(pattern);
+}
+
+template <ColumnDescriptor Col>
+[[nodiscard]] where_condition mysql_rlike(std::string_view pattern) {
+    return rlike<Col>(pattern);
+}
+
+template <ColumnDescriptor Col>
+[[nodiscard]] where_condition mysql_not_rlike(std::string_view pattern) {
+    return not_rlike<Col>(pattern);
+}
+
 }  // namespace ds_mysql
