@@ -2337,8 +2337,6 @@ template <Database T>
  */
 template <Database T>
 [[nodiscard]] constexpr ddl_detail::use_builder<T> use() {
-    using _ = typename database_tables<T>::type;
-    (void)sizeof(_);
     return ddl_detail::use_builder<T>{};
 }
 
