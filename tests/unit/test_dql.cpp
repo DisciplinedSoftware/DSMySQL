@@ -1020,6 +1020,93 @@ suite<"DQL Aggregate Features"> dql_aggregate_features_suite = [] {
                              .build_sql();
         expect(sql == "SELECT type, GROUP_CONCAT(sku), IFNULL(name, sku) FROM ext_product GROUP BY type"s) << sql;
     };
+
+    // STDDEV / VARIANCE family
+    "stddev<Col> — generates STDDEV(col)"_test = [] {
+        auto const sql = select<stddev<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STDDEV(price_val) FROM ext_product"s) << sql;
+    };
+
+    "std_of<Col> — generates STD(col)"_test = [] {
+        auto const sql = select<std_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STD(price_val) FROM ext_product"s) << sql;
+    };
+
+    "stddev_pop<Col> — generates STDDEV_POP(col)"_test = [] {
+        auto const sql = select<stddev_pop<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STDDEV_POP(price_val) FROM ext_product"s) << sql;
+    };
+
+    "stddev_samp<Col> — generates STDDEV_SAMP(col)"_test = [] {
+        auto const sql = select<stddev_samp<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STDDEV_SAMP(price_val) FROM ext_product"s) << sql;
+    };
+
+    "variance<Col> — generates VARIANCE(col)"_test = [] {
+        auto const sql = select<variance<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT VARIANCE(price_val) FROM ext_product"s) << sql;
+    };
+
+    "var_pop<Col> — generates VAR_POP(col)"_test = [] {
+        auto const sql = select<var_pop<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT VAR_POP(price_val) FROM ext_product"s) << sql;
+    };
+
+    "var_samp<Col> — generates VAR_SAMP(col)"_test = [] {
+        auto const sql = select<var_samp<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT VAR_SAMP(price_val) FROM ext_product"s) << sql;
+    };
+
+    // Bitwise aggregates
+    "bit_and_of<Col> — generates BIT_AND(col)"_test = [] {
+        auto const sql = select<bit_and_of<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_AND(id) FROM ext_product"s) << sql;
+    };
+
+    "bit_or_of<Col> — generates BIT_OR(col)"_test = [] {
+        auto const sql = select<bit_or_of<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_OR(id) FROM ext_product"s) << sql;
+    };
+
+    "bit_xor_of<Col> — generates BIT_XOR(col)"_test = [] {
+        auto const sql = select<bit_xor_of<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_XOR(id) FROM ext_product"s) << sql;
+    };
+
+    "bit_and alias — generates BIT_AND(col)"_test = [] {
+        auto const sql = select<bit_and<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_AND(id) FROM ext_product"s) << sql;
+    };
+
+    "bit_or alias — generates BIT_OR(col)"_test = [] {
+        auto const sql = select<bit_or<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_OR(id) FROM ext_product"s) << sql;
+    };
+
+    "bit_xor alias — generates BIT_XOR(col)"_test = [] {
+        auto const sql = select<bit_xor<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT BIT_XOR(id) FROM ext_product"s) << sql;
+    };
+
+    // JSON aggregates
+    "json_arrayagg<Col> — generates JSON_ARRAYAGG(col)"_test = [] {
+        auto const sql = select<json_arrayagg<ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_ARRAYAGG(name) FROM ext_product"s) << sql;
+    };
+
+    "json_objectagg<KeyCol, ValCol> — generates JSON_OBJECTAGG(key, val)"_test = [] {
+        auto const sql = select<json_objectagg<ext_product::sku, ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_OBJECTAGG(sku, name) FROM ext_product"s) << sql;
+    };
+
+    // ANY_VALUE
+    "any_value<Col> — generates ANY_VALUE(col)"_test = [] {
+        auto const sql = select<ext_product::type, any_value<ext_product::name>>()
+                             .from<ext_product>()
+                             .group_by<ext_product::type>()
+                             .build_sql();
+        expect(sql == "SELECT type, ANY_VALUE(name) FROM ext_product GROUP BY type"s) << sql;
+    };
 };
 
 // ===================================================================
@@ -1344,19 +1431,17 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
     };
 
     "ntile_over desc — NTILE(N) OVER (... ORDER BY col DESC)"_test = [] {
-        auto const sql =
-            select<ext_product::id, ntile_over<10, ext_product::type, ext_product::id, sort_order::desc>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<ext_product::id, ntile_over<10, ext_product::type, ext_product::id, sort_order::desc>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql == "SELECT id, NTILE(10) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
     };
 
     "ntile_over with frame clause"_test = [] {
-        auto const sql =
-            select<ntile_over<4, ext_product::type, ext_product::id, sort_order::asc,
-                              rows_unbounded_preceding_to_current_row>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<ntile_over<4, ext_product::type, ext_product::id, sort_order::asc,
+                                           rows_unbounded_preceding_to_current_row>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql ==
                "SELECT NTILE(4) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED PRECEDING AND "
                "CURRENT ROW) FROM ext_product"s)
@@ -1388,10 +1473,9 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
     };
 
     "cume_dist_over desc — CUME_DIST() OVER (... ORDER BY col DESC)"_test = [] {
-        auto const sql =
-            select<ext_product::id, cume_dist_over<ext_product::type, ext_product::id, sort_order::desc>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<ext_product::id, cume_dist_over<ext_product::type, ext_product::id, sort_order::desc>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql == "SELECT id, CUME_DIST() OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
     };
 
@@ -1401,8 +1485,7 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
             select<ext_product::id, first_value_over<ext_product::price_val, ext_product::type, ext_product::id>>()
                 .from<ext_product>()
                 .build_sql();
-        expect(sql ==
-               "SELECT id, FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+        expect(sql == "SELECT id, FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
             << sql;
     };
 
@@ -1411,17 +1494,15 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
             select<first_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::desc>>()
                 .from<ext_product>()
                 .build_sql();
-        expect(sql ==
-               "SELECT FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
+        expect(sql == "SELECT FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
             << sql;
     };
 
     "first_value_over with frame clause"_test = [] {
-        auto const sql =
-            select<first_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::asc,
-                                    rows_unbounded_preceding_to_current_row>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<first_value_over<ext_product::price_val, ext_product::type, ext_product::id,
+                                                 sort_order::asc, rows_unbounded_preceding_to_current_row>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql ==
                "SELECT FIRST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
                "PRECEDING AND CURRENT ROW) FROM ext_product"s)
@@ -1434,17 +1515,15 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
             select<ext_product::id, last_value_over<ext_product::price_val, ext_product::type, ext_product::id>>()
                 .from<ext_product>()
                 .build_sql();
-        expect(sql ==
-               "SELECT id, LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+        expect(sql == "SELECT id, LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
             << sql;
     };
 
     "last_value_over with frame clause"_test = [] {
-        auto const sql =
-            select<last_value_over<ext_product::price_val, ext_product::type, ext_product::id, sort_order::asc,
-                                   rows_unbounded_preceding_to_unbounded_following>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<last_value_over<ext_product::price_val, ext_product::type, ext_product::id,
+                                                sort_order::asc, rows_unbounded_preceding_to_unbounded_following>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql ==
                "SELECT LAST_VALUE(price_val) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
                "PRECEDING AND UNBOUNDED FOLLOWING) FROM ext_product"s)
@@ -1454,12 +1533,10 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
     // NTH_VALUE
     "nth_value_over — NTH_VALUE(col, N) OVER (...)"_test = [] {
         auto const sql =
-            select<ext_product::id,
-                   nth_value_over<ext_product::price_val, 3, ext_product::type, ext_product::id>>()
+            select<ext_product::id, nth_value_over<ext_product::price_val, 3, ext_product::type, ext_product::id>>()
                 .from<ext_product>()
                 .build_sql();
-        expect(sql ==
-               "SELECT id, NTH_VALUE(price_val, 3) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
+        expect(sql == "SELECT id, NTH_VALUE(price_val, 3) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s)
             << sql;
     };
 
@@ -1468,17 +1545,15 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
             select<nth_value_over<ext_product::price_val, 2, ext_product::type, ext_product::id, sort_order::desc>>()
                 .from<ext_product>()
                 .build_sql();
-        expect(sql ==
-               "SELECT NTH_VALUE(price_val, 2) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
+        expect(sql == "SELECT NTH_VALUE(price_val, 2) OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s)
             << sql;
     };
 
     "nth_value_over with frame clause"_test = [] {
-        auto const sql =
-            select<nth_value_over<ext_product::price_val, 1, ext_product::type, ext_product::id, sort_order::asc,
-                                  rows_unbounded_preceding_to_current_row>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<nth_value_over<ext_product::price_val, 1, ext_product::type, ext_product::id,
+                                               sort_order::asc, rows_unbounded_preceding_to_current_row>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql ==
                "SELECT NTH_VALUE(price_val, 1) OVER (PARTITION BY type ORDER BY id ASC ROWS BETWEEN UNBOUNDED "
                "PRECEDING AND CURRENT ROW) FROM ext_product"s)
@@ -1487,15 +1562,14 @@ suite<"DQL Window Functions Extended"> dql_window_extended_suite = [] {
 
     // Mixed — all 6 new functions in one query
     "all new window functions combined in one SELECT"_test = [] {
-        auto const sql =
-            select<ntile_over<4, ext_product::type, ext_product::id>,
-                   percent_rank_over<ext_product::type, ext_product::id>,
-                   cume_dist_over<ext_product::type, ext_product::id>,
-                   first_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
-                   last_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
-                   nth_value_over<ext_product::price_val, 2, ext_product::type, ext_product::id>>()
-                .from<ext_product>()
-                .build_sql();
+        auto const sql = select<ntile_over<4, ext_product::type, ext_product::id>,
+                                percent_rank_over<ext_product::type, ext_product::id>,
+                                cume_dist_over<ext_product::type, ext_product::id>,
+                                first_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
+                                last_value_over<ext_product::price_val, ext_product::type, ext_product::id>,
+                                nth_value_over<ext_product::price_val, 2, ext_product::type, ext_product::id>>()
+                             .from<ext_product>()
+                             .build_sql();
         expect(sql ==
                "SELECT NTILE(4) OVER (PARTITION BY type ORDER BY id ASC), "
                "PERCENT_RANK() OVER (PARTITION BY type ORDER BY id ASC), "
@@ -2262,8 +2336,8 @@ suite<"DQL MATCH AGAINST Predicate"> dql_match_against_suite = [] {
     "match_against boolean mode in WHERE clause"_test = [] {
         auto const sql = select<ext_product::id, ext_product::sku>()
                              .from<ext_product>()
-                             .where(match_against<ext_product::sku, ext_product::type>("+widget -cheap",
-                                                                                       match_search_modifier::boolean_mode))
+                             .where(match_against<ext_product::sku, ext_product::type>(
+                                 "+widget -cheap", match_search_modifier::boolean_mode))
                              .build_sql();
         expect(sql ==
                "SELECT id, sku FROM ext_product WHERE MATCH(sku, type) AGAINST ('+widget -cheap' IN BOOLEAN MODE)"s)

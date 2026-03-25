@@ -579,7 +579,8 @@ template <ColumnFieldType... Cols>
     s += "MATCH(";
     bool first = true;
     auto add_col = [&](std::string_view name) {
-        if (!first) s += ", ";
+        if (!first)
+            s += ", ";
         s += name;
         first = false;
     };

@@ -8,12 +8,27 @@ namespace ds_mysql {
 // ===================================================================
 // Aggregate projections — used with select<Proj...>().from<Table>()
 //
-//   count_all      — COUNT(*)       → uint64_t
-//   count_col<Col> — COUNT(col)     → uint64_t
-//   sum<Col>       — SUM(col)       → double
-//   avg<Col>       — AVG(col)       → double
-//   min_of<Col>    — MIN(col)       → value_type of Col
-//   max_of<Col>    — MAX(col)       → value_type of Col
+//   count_all         — COUNT(*)              → uint64_t
+//   count_col<Col>    — COUNT(col)            → uint64_t
+//   sum<Col>          — SUM(col)              → double
+//   avg<Col>          — AVG(col)              → double
+//   min_of<Col>       — MIN(col)              → value_type of Col
+//   max_of<Col>       — MAX(col)              → value_type of Col
+//   count_distinct<Col> — COUNT(DISTINCT col) → uint64_t
+//   group_concat<Col> — GROUP_CONCAT(col)     → std::string
+//   stddev<Col>       — STDDEV(col)           → double
+//   std_of<Col>       — STD(col)              → double
+//   stddev_pop<Col>   — STDDEV_POP(col)       → double
+//   stddev_samp<Col>  — STDDEV_SAMP(col)      → double
+//   variance<Col>     — VARIANCE(col)         → double
+//   var_pop<Col>      — VAR_POP(col)          → double
+//   var_samp<Col>     — VAR_SAMP(col)         → double
+//   bit_and_of<Col>   — BIT_AND(col)          → uint64_t  (alias: bit_and)
+//   bit_or_of<Col>    — BIT_OR(col)           → uint64_t  (alias: bit_or)
+//   bit_xor_of<Col>   — BIT_XOR(col)          → uint64_t  (alias: bit_xor)
+//   json_arrayagg<Col>         — JSON_ARRAYAGG(col)      → std::string
+//   json_objectagg<Key, Val>   — JSON_OBJECTAGG(key,val) → std::string
+//   any_value<Col>    — ANY_VALUE(col)         → value_type of Col
 //
 // Aggregate tags also support typed comparison operators via free functions
 // (defined after projection_traits), enabling HAVING predicate syntax:
@@ -48,6 +63,59 @@ struct count_distinct {};
 // group_concat<Col> — GROUP_CONCAT(col) → std::string  (MySQL-specific)
 template <ColumnDescriptor Col>
 struct group_concat {};
+
+// stddev<Col> — STDDEV(col) → double
+template <ColumnDescriptor Col>
+struct stddev {};
+
+// std_of<Col> — STD(col) → double  (STD is a MySQL synonym for STDDEV)
+template <ColumnDescriptor Col>
+struct std_of {};
+
+// stddev_pop<Col> — STDDEV_POP(col) → double
+template <ColumnDescriptor Col>
+struct stddev_pop {};
+
+// stddev_samp<Col> — STDDEV_SAMP(col) → double
+template <ColumnDescriptor Col>
+struct stddev_samp {};
+
+// variance<Col> — VARIANCE(col) → double
+template <ColumnDescriptor Col>
+struct variance {};
+
+// var_pop<Col> — VAR_POP(col) → double
+template <ColumnDescriptor Col>
+struct var_pop {};
+
+// var_samp<Col> — VAR_SAMP(col) → double
+template <ColumnDescriptor Col>
+struct var_samp {};
+
+// bit_and_of<Col> — BIT_AND(col) → uint64_t  (alias: bit_and)
+template <ColumnDescriptor Col>
+struct bit_and_of {};
+
+// bit_or_of<Col> — BIT_OR(col) → uint64_t  (alias: bit_or)
+template <ColumnDescriptor Col>
+struct bit_or_of {};
+
+// bit_xor_of<Col> — BIT_XOR(col) → uint64_t  (alias: bit_xor)
+template <ColumnDescriptor Col>
+struct bit_xor_of {};
+
+// json_arrayagg<Col> — JSON_ARRAYAGG(col) → std::string  (MySQL 5.7.22+)
+template <ColumnDescriptor Col>
+struct json_arrayagg {};
+
+// json_objectagg<KeyCol, ValCol> — JSON_OBJECTAGG(key, val) → std::string  (MySQL 5.7.22+)
+template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
+struct json_objectagg {};
+
+// any_value<Col> — ANY_VALUE(col) → value_type of Col
+//   Suppresses ONLY_FULL_GROUP_BY errors for non-aggregated columns.
+template <ColumnDescriptor Col>
+struct any_value {};
 
 // rand_val — RAND() projection for ORDER BY clauses (e.g. order_by<rand_val>())
 struct rand_val {};
@@ -219,6 +287,16 @@ using cast = cast_as<P, Type>;
 
 template <typename P, sql_cast_type Type>
 using convert = convert_as<P, Type>;
+
+// Convenience aliases for bitwise aggregate names that shadow std:: functors.
+template <ColumnDescriptor Col>
+using bit_and = bit_and_of<Col>;
+
+template <ColumnDescriptor Col>
+using bit_or = bit_or_of<Col>;
+
+template <ColumnDescriptor Col>
+using bit_xor = bit_xor_of<Col>;
 
 // ===================================================================
 // Arithmetic expression projections
@@ -611,6 +689,111 @@ struct projection_traits<group_concat<Col>> {
     using value_type = std::string;
     static std::string sql_expr() {
         return "GROUP_CONCAT(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<stddev<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "STDDEV(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<std_of<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "STD(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<stddev_pop<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "STDDEV_POP(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<stddev_samp<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "STDDEV_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<variance<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "VARIANCE(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<var_pop<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "VAR_POP(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<var_samp<Col>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "VAR_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<bit_and_of<Col>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "BIT_AND(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<bit_or_of<Col>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "BIT_OR(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<bit_xor_of<Col>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "BIT_XOR(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<json_arrayagg<Col>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "JSON_ARRAYAGG(" + std::string(column_traits<Col>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
+struct projection_traits<json_objectagg<KeyCol, ValCol>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "JSON_OBJECTAGG(" + std::string(column_traits<KeyCol>::column_name()) + ", " +
+               std::string(column_traits<ValCol>::column_name()) + ")";
+    }
+};
+
+template <ColumnDescriptor Col>
+struct projection_traits<any_value<Col>> {
+    using value_type = typename column_traits<Col>::value_type;
+    static std::string sql_expr() {
+        return "ANY_VALUE(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
 
@@ -1194,8 +1377,8 @@ struct projection_traits<last_value_over<Col, PartitionCol, OrderCol, Dir, Frame
     }
 };
 
-template <ColumnDescriptor Col, std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol,
-          sort_order Dir, typename Frame>
+template <ColumnDescriptor Col, std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir,
+          typename Frame>
 struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
     static std::string sql_expr() {

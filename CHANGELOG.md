@@ -25,6 +25,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `first_value_over<Col, PartitionCol, OrderCol>` — `FIRST_VALUE(col) OVER (...)`
 - `last_value_over<Col, PartitionCol, OrderCol>` — `LAST_VALUE(col) OVER (...)`
 - `nth_value_over<Col, N, PartitionCol, OrderCol>` — `NTH_VALUE(col, N) OVER (...)`
+- `stddev<Col>` — `STDDEV(col)` → `double`
+- `std_of<Col>` — `STD(col)` → `double` (MySQL synonym for `STDDEV`)
+- `stddev_pop<Col>` — `STDDEV_POP(col)` → `double`
+- `stddev_samp<Col>` — `STDDEV_SAMP(col)` → `double`
+- `variance<Col>` — `VARIANCE(col)` → `double`
+- `var_pop<Col>` — `VAR_POP(col)` → `double`
+- `var_samp<Col>` — `VAR_SAMP(col)` → `double`
+- `bit_and_of<Col>` / `bit_and<Col>` — `BIT_AND(col)` → `uint64_t`
+- `bit_or_of<Col>` / `bit_or<Col>` — `BIT_OR(col)` → `uint64_t`
+- `bit_xor_of<Col>` / `bit_xor<Col>` — `BIT_XOR(col)` → `uint64_t`
+- `json_arrayagg<Col>` — `JSON_ARRAYAGG(col)` → `std::string`
+- `json_objectagg<KeyCol, ValCol>` — `JSON_OBJECTAGG(key, val)` → `std::string`
+- `any_value<Col>` — `ANY_VALUE(col)` → `value_type` of `Col`
 
 ---
 

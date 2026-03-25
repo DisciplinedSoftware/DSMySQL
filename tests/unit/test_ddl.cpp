@@ -1046,10 +1046,8 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
     };
 
     "create_all_tables.then - chains into further DDL"_test = [] {
-        auto const sql = create_all_tables<schema_bootstrap_db>()
-                             .then()
-                             .create_database<schema_bootstrap_db>()
-                             .build_sql();
+        auto const sql =
+            create_all_tables<schema_bootstrap_db>().then().create_database<schema_bootstrap_db>().build_sql();
         expect(sql ==
                "CREATE TABLE schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
