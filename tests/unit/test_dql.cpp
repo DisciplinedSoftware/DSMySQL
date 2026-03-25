@@ -1257,6 +1257,371 @@ suite<"DQL Scalar Functions"> dql_scalar_functions_suite = [] {
 };
 
 // ===================================================================
+// Conditional scalar functions
+// ===================================================================
+
+suite<"DQL Conditional Scalar Functions"> dql_conditional_scalar_suite = [] {
+    "nullif_of<A, B> — generates NULLIF(a, b)"_test = [] {
+        auto const sql =
+            select<nullif_of<ext_product::price_val, ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT NULLIF(price_val, id) FROM ext_product"s) << sql;
+    };
+
+    "greatest_of<...> — generates GREATEST(a, b, c)"_test = [] {
+        auto const sql =
+            select<greatest_of<ext_product::id, ext_product::price_val, ext_product::id>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql == "SELECT GREATEST(id, price_val, id) FROM ext_product"s) << sql;
+    };
+
+    "least_of<...> — generates LEAST(a, b)"_test = [] {
+        auto const sql =
+            select<least_of<ext_product::id, ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LEAST(id, price_val) FROM ext_product"s) << sql;
+    };
+
+    "if_of<Cond, Then, Else> — generates IF(cond, then, else)"_test = [] {
+        auto const sql = select<if_of<"price_val > 100", ext_product::name, ext_product::sku>>()
+                             .from<ext_product>()
+                             .build_sql();
+        expect(sql == "SELECT IF(price_val > 100, name, sku) FROM ext_product"s) << sql;
+    };
+
+    "conditional aliases — nullif/greatest/least/sql_if generate expected SQL"_test = [] {
+        auto const sql =
+            select<ds_mysql::nullif<ext_product::price_val, ext_product::id>,
+                   ds_mysql::greatest<ext_product::id, ext_product::price_val>,
+                   ds_mysql::least<ext_product::id, ext_product::price_val>,
+                   ds_mysql::sql_if<"price_val > 0", ext_product::name, ext_product::sku>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT NULLIF(price_val, id), GREATEST(id, price_val), LEAST(id, price_val), "
+               "IF(price_val > 0, name, sku) FROM ext_product"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// String scalar functions
+// ===================================================================
+
+suite<"DQL String Scalar Functions"> dql_string_scalar_suite = [] {
+    "char_length_of<P> — generates CHAR_LENGTH(col)"_test = [] {
+        auto const sql = select<char_length_of<ext_product::sku>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT CHAR_LENGTH(sku) FROM ext_product"s) << sql;
+    };
+
+    "left_of<P, N> — generates LEFT(col, N)"_test = [] {
+        auto const sql = select<left_of<ext_product::sku, 3>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LEFT(sku, 3) FROM ext_product"s) << sql;
+    };
+
+    "right_of<P, N> — generates RIGHT(col, N)"_test = [] {
+        auto const sql = select<right_of<ext_product::sku, 4>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT RIGHT(sku, 4) FROM ext_product"s) << sql;
+    };
+
+    "replace_of<P, From, To> — generates REPLACE(col, 'from', 'to')"_test = [] {
+        auto const sql = select<replace_of<ext_product::sku, "foo", "bar">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT REPLACE(sku, 'foo', 'bar') FROM ext_product"s) << sql;
+    };
+
+    "lpad_of<P, Len, PadStr> — generates LPAD(col, N, 'pad')"_test = [] {
+        auto const sql = select<lpad_of<ext_product::sku, 10, "0">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LPAD(sku, 10, '0') FROM ext_product"s) << sql;
+    };
+
+    "rpad_of<P, Len, PadStr> — generates RPAD(col, N, 'pad')"_test = [] {
+        auto const sql = select<rpad_of<ext_product::sku, 8, " ">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT RPAD(sku, 8, ' ') FROM ext_product"s) << sql;
+    };
+
+    "repeat_of<P, N> — generates REPEAT(col, N)"_test = [] {
+        auto const sql = select<repeat_of<ext_product::sku, 3>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT REPEAT(sku, 3) FROM ext_product"s) << sql;
+    };
+
+    "reverse_of<P> — generates REVERSE(col)"_test = [] {
+        auto const sql = select<reverse_of<ext_product::sku>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT REVERSE(sku) FROM ext_product"s) << sql;
+    };
+
+    "locate_of<Substr, P> — generates LOCATE('substr', col)"_test = [] {
+        auto const sql = select<locate_of<"SKU", ext_product::sku>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LOCATE('SKU', sku) FROM ext_product"s) << sql;
+    };
+
+    "instr_of<P, Substr> — generates INSTR(col, 'substr')"_test = [] {
+        auto const sql = select<instr_of<ext_product::sku, "abc">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT INSTR(sku, 'abc') FROM ext_product"s) << sql;
+    };
+
+    "space_of<P> — generates SPACE(col)"_test = [] {
+        auto const sql = select<space_of<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT SPACE(id) FROM ext_product"s) << sql;
+    };
+
+    "strcmp_of<A, B> — generates STRCMP(a, b)"_test = [] {
+        auto const sql = select<strcmp_of<ext_product::sku, ext_product::type>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STRCMP(sku, type) FROM ext_product"s) << sql;
+    };
+
+    "string function aliases — generate expected SQL"_test = [] {
+        auto const sql =
+            select<ds_mysql::char_length<ext_product::sku>, ds_mysql::left<ext_product::sku, 2>,
+                   ds_mysql::right<ext_product::sku, 2>, ds_mysql::replace<ext_product::sku, "a", "b">,
+                   ds_mysql::reverse<ext_product::sku>, ds_mysql::strcmp<ext_product::sku, ext_product::type>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT CHAR_LENGTH(sku), LEFT(sku, 2), RIGHT(sku, 2), REPLACE(sku, 'a', 'b'), "
+               "REVERSE(sku), STRCMP(sku, type) FROM ext_product"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// Math scalar functions
+// ===================================================================
+
+suite<"DQL Math Scalar Functions"> dql_math_scalar_suite = [] {
+    "sqrt_of<P> — generates SQRT(col)"_test = [] {
+        auto const sql = select<sqrt_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT SQRT(price_val) FROM ext_product"s) << sql;
+    };
+
+    "log_of<P> — generates LOG(col)"_test = [] {
+        auto const sql = select<log_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LOG(price_val) FROM ext_product"s) << sql;
+    };
+
+    "log2_of<P> — generates LOG2(col)"_test = [] {
+        auto const sql = select<log2_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LOG2(price_val) FROM ext_product"s) << sql;
+    };
+
+    "log10_of<P> — generates LOG10(col)"_test = [] {
+        auto const sql = select<log10_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT LOG10(price_val) FROM ext_product"s) << sql;
+    };
+
+    "exp_of<P> — generates EXP(col)"_test = [] {
+        auto const sql = select<exp_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT EXP(price_val) FROM ext_product"s) << sql;
+    };
+
+    "trig functions — SIN/COS/TAN/DEGREES/RADIANS"_test = [] {
+        auto const sql = select<sin_of<ext_product::price_val>, cos_of<ext_product::price_val>,
+                                tan_of<ext_product::price_val>, degrees_of<ext_product::price_val>,
+                                radians_of<ext_product::price_val>>()
+                             .from<ext_product>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT SIN(price_val), COS(price_val), TAN(price_val), DEGREES(price_val), "
+               "RADIANS(price_val) FROM ext_product"s)
+            << sql;
+    };
+
+    "sign_of<P> — generates SIGN(col)"_test = [] {
+        auto const sql = select<sign_of<ext_product::price_val>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT SIGN(price_val) FROM ext_product"s) << sql;
+    };
+
+    "truncate_to<P, D> — generates TRUNCATE(col, D)"_test = [] {
+        auto const sql = select<truncate_to<ext_product::price_val, 2>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT TRUNCATE(price_val, 2) FROM ext_product"s) << sql;
+    };
+
+    "pi_val — generates PI()"_test = [] {
+        auto const sql = select<pi_val>().from<ext_product>().build_sql();
+        expect(sql == "SELECT PI() FROM ext_product"s) << sql;
+    };
+
+    "math aliases — sqrt/log/log2/log10/exp/sin/cos/tan/sign/truncate generate expected SQL"_test = [] {
+        auto const sql =
+            select<ds_mysql::sqrt<ext_product::price_val>, ds_mysql::log<ext_product::price_val>,
+                   ds_mysql::log2<ext_product::price_val>, ds_mysql::log10<ext_product::price_val>,
+                   ds_mysql::exp<ext_product::price_val>, ds_mysql::sin<ext_product::price_val>,
+                   ds_mysql::cos<ext_product::price_val>, ds_mysql::tan<ext_product::price_val>,
+                   ds_mysql::sign<ext_product::price_val>, ds_mysql::truncate<ext_product::price_val, 3>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT SQRT(price_val), LOG(price_val), LOG2(price_val), LOG10(price_val), EXP(price_val), "
+               "SIN(price_val), COS(price_val), TAN(price_val), SIGN(price_val), TRUNCATE(price_val, 3) "
+               "FROM ext_product"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// Extended date/time scalar functions
+// ===================================================================
+
+suite<"DQL DateTime Scalar Functions"> dql_datetime_scalar_suite = [] {
+    "time-part extractors — HOUR/MINUTE/SECOND/MICROSECOND"_test = [] {
+        auto const sql = select<hour_of<ext_event_log::created_at>, minute_of<ext_event_log::created_at>,
+                                second_of<ext_event_log::created_at>, microsecond_of<ext_event_log::created_at>>()
+                             .from<ext_event_log>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT HOUR(created_at), MINUTE(created_at), SECOND(created_at), "
+               "MICROSECOND(created_at) FROM ext_event_log"s)
+            << sql;
+    };
+
+    "date-part extractors — QUARTER/WEEK/WEEKDAY/DAYOFWEEK/DAYOFYEAR"_test = [] {
+        auto const sql =
+            select<quarter_of<ext_event_log::created_at>, week_of<ext_event_log::created_at>,
+                   weekday_of<ext_event_log::created_at>, dayofweek_of<ext_event_log::created_at>,
+                   dayofyear_of<ext_event_log::created_at>>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql ==
+               "SELECT QUARTER(created_at), WEEK(created_at), WEEKDAY(created_at), "
+               "DAYOFWEEK(created_at), DAYOFYEAR(created_at) FROM ext_event_log"s)
+            << sql;
+    };
+
+    "name functions — DAYNAME/MONTHNAME/LAST_DAY"_test = [] {
+        auto const sql = select<dayname_of<ext_event_log::created_at>, monthname_of<ext_event_log::created_at>,
+                                last_day_of<ext_event_log::created_at>>()
+                             .from<ext_event_log>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT DAYNAME(created_at), MONTHNAME(created_at), LAST_DAY(created_at) FROM ext_event_log"s)
+            << sql;
+    };
+
+    "str_to_date_of<P, Fmt> — generates STR_TO_DATE(col, 'fmt')"_test = [] {
+        auto const sql = select<str_to_date_of<ext_product::sku, "%Y-%m-%d">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT STR_TO_DATE(sku, '%Y-%m-%d') FROM ext_product"s) << sql;
+    };
+
+    "from_unixtime_of<P> — generates FROM_UNIXTIME(col)"_test = [] {
+        auto const sql = select<from_unixtime_of<ext_product::id>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT FROM_UNIXTIME(id) FROM ext_product"s) << sql;
+    };
+
+    "unix_timestamp_of<P> — generates UNIX_TIMESTAMP(col)"_test = [] {
+        auto const sql = select<unix_timestamp_of<ext_event_log::created_at>>().from<ext_event_log>().build_sql();
+        expect(sql == "SELECT UNIX_TIMESTAMP(created_at) FROM ext_event_log"s) << sql;
+    };
+
+    "convert_tz_of<P, From, To> — generates CONVERT_TZ(col, 'from', 'to')"_test = [] {
+        auto const sql =
+            select<convert_tz_of<ext_event_log::created_at, "UTC", "America/New_York">>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql == "SELECT CONVERT_TZ(created_at, 'UTC', 'America/New_York') FROM ext_event_log"s) << sql;
+    };
+
+    "curtime_val — generates CURTIME()"_test = [] {
+        auto const sql = select<curtime_val>().from<ext_event_log>().build_sql();
+        expect(sql == "SELECT CURTIME() FROM ext_event_log"s) << sql;
+    };
+
+    "utc_timestamp_val — generates UTC_TIMESTAMP()"_test = [] {
+        auto const sql = select<utc_timestamp_val>().from<ext_event_log>().build_sql();
+        expect(sql == "SELECT UTC_TIMESTAMP() FROM ext_event_log"s) << sql;
+    };
+
+    "addtime_of<A, B> — generates ADDTIME(a, b)"_test = [] {
+        auto const sql =
+            select<addtime_of<ext_event_log::created_at, ext_event_log::created_at>>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql == "SELECT ADDTIME(created_at, created_at) FROM ext_event_log"s) << sql;
+    };
+
+    "subtime_of<A, B> — generates SUBTIME(a, b)"_test = [] {
+        auto const sql =
+            select<subtime_of<ext_event_log::created_at, ext_event_log::created_at>>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql == "SELECT SUBTIME(created_at, created_at) FROM ext_event_log"s) << sql;
+    };
+
+    "timediff_of<A, B> — generates TIMEDIFF(a, b)"_test = [] {
+        auto const sql =
+            select<timediff_of<ext_event_log::created_at, ext_event_log::created_at>>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql == "SELECT TIMEDIFF(created_at, created_at) FROM ext_event_log"s) << sql;
+    };
+
+    "datetime aliases — hour/minute/second/quarter/week/addtime/timediff generate expected SQL"_test = [] {
+        auto const sql =
+            select<ds_mysql::hour<ext_event_log::created_at>, ds_mysql::minute<ext_event_log::created_at>,
+                   ds_mysql::second<ext_event_log::created_at>, ds_mysql::quarter<ext_event_log::created_at>,
+                   ds_mysql::week<ext_event_log::created_at>,
+                   ds_mysql::addtime<ext_event_log::created_at, ext_event_log::created_at>,
+                   ds_mysql::timediff<ext_event_log::created_at, ext_event_log::created_at>>()
+                .from<ext_event_log>()
+                .build_sql();
+        expect(sql ==
+               "SELECT HOUR(created_at), MINUTE(created_at), SECOND(created_at), QUARTER(created_at), "
+               "WEEK(created_at), ADDTIME(created_at, created_at), TIMEDIFF(created_at, created_at) "
+               "FROM ext_event_log"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// JSON scalar functions
+// ===================================================================
+
+suite<"DQL JSON Scalar Functions"> dql_json_scalar_suite = [] {
+    "json_extract_of<P, Path> — generates JSON_EXTRACT(col, 'path')"_test = [] {
+        auto const sql = select<json_extract_of<ext_product::name, "$.field">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_EXTRACT(name, '$.field') FROM ext_product"s) << sql;
+    };
+
+    "json_object_of<...> — generates JSON_OBJECT(k, v, ...)"_test = [] {
+        auto const sql =
+            select<json_object_of<ext_product::sku, ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_OBJECT(sku, name) FROM ext_product"s) << sql;
+    };
+
+    "json_array_of<...> — generates JSON_ARRAY(v, ...)"_test = [] {
+        auto const sql =
+            select<json_array_of<ext_product::id, ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_ARRAY(id, name) FROM ext_product"s) << sql;
+    };
+
+    "json_contains_of<P, Val> — generates JSON_CONTAINS(col, 'val')"_test = [] {
+        auto const sql = select<json_contains_of<ext_product::name, "\"widget\"">>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_CONTAINS(name, '\"widget\"') FROM ext_product"s) << sql;
+    };
+
+    "json_length_of<P> — generates JSON_LENGTH(col)"_test = [] {
+        auto const sql = select<json_length_of<ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_LENGTH(name) FROM ext_product"s) << sql;
+    };
+
+    "json_unquote_of<P> — generates JSON_UNQUOTE(col)"_test = [] {
+        auto const sql = select<json_unquote_of<ext_product::name>>().from<ext_product>().build_sql();
+        expect(sql == "SELECT JSON_UNQUOTE(name) FROM ext_product"s) << sql;
+    };
+
+    "JSON aliases — json_extract/json_object/json_array/json_length/json_unquote generate expected SQL"_test = [] {
+        auto const sql =
+            select<ds_mysql::json_extract<ext_product::name, "$.id">,
+                   ds_mysql::json_object<ext_product::sku, ext_product::name>,
+                   ds_mysql::json_array<ext_product::id, ext_product::name>,
+                   ds_mysql::json_length<ext_product::name>, ds_mysql::json_unquote<ext_product::name>>()
+                .from<ext_product>()
+                .build_sql();
+        expect(sql ==
+               "SELECT JSON_EXTRACT(name, '$.id'), JSON_OBJECT(sku, name), JSON_ARRAY(id, name), "
+               "JSON_LENGTH(name), JSON_UNQUOTE(name) FROM ext_product"s)
+            << sql;
+    };
+};
+
+// ===================================================================
 // Arithmetic expression projections
 // ===================================================================
 

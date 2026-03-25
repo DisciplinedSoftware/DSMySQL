@@ -218,6 +218,201 @@ struct cast_as {};
 template <typename P, sql_cast_type Type>
 struct convert_as {};
 
+// ===================================================================
+// Conditional scalar functions
+// ===================================================================
+
+template <typename A, typename B>
+struct nullif_of {};
+
+template <typename... Ps>
+struct greatest_of {};
+
+template <typename... Ps>
+struct least_of {};
+
+// IF(cond, then, else) — Cond is a compile-time SQL expression string
+template <fixed_string Cond, typename Then, typename Else>
+struct if_of {};
+
+// ===================================================================
+// String scalar functions
+// ===================================================================
+
+template <typename P>
+struct char_length_of {};
+
+template <typename P, std::size_t N>
+struct left_of {};
+
+template <typename P, std::size_t N>
+struct right_of {};
+
+template <typename P, fixed_string From, fixed_string To>
+struct replace_of {};
+
+template <typename P, std::size_t Len, fixed_string PadStr>
+struct lpad_of {};
+
+template <typename P, std::size_t Len, fixed_string PadStr>
+struct rpad_of {};
+
+template <typename P, std::size_t N>
+struct repeat_of {};
+
+template <typename P>
+struct reverse_of {};
+
+// LOCATE('substr', col) — first position of Substr in col (1-based), 0 if not found
+template <fixed_string Substr, typename P>
+struct locate_of {};
+
+// INSTR(col, 'substr') — first position of Substr in col (1-based), 0 if not found
+template <typename P, fixed_string Substr>
+struct instr_of {};
+
+// SPACE(col) — returns col spaces
+template <typename P>
+struct space_of {};
+
+template <typename A, typename B>
+struct strcmp_of {};
+
+// ===================================================================
+// Math scalar functions
+// ===================================================================
+
+template <typename P>
+struct sqrt_of {};
+
+template <typename P>
+struct log_of {};
+
+template <typename P>
+struct log2_of {};
+
+template <typename P>
+struct log10_of {};
+
+template <typename P>
+struct exp_of {};
+
+template <typename P>
+struct sin_of {};
+
+template <typename P>
+struct cos_of {};
+
+template <typename P>
+struct tan_of {};
+
+template <typename P>
+struct degrees_of {};
+
+template <typename P>
+struct radians_of {};
+
+template <typename P>
+struct sign_of {};
+
+template <typename P, int D>
+struct truncate_to {};
+
+struct pi_val {};
+
+// ===================================================================
+// Date/Time scalar functions
+// ===================================================================
+
+template <typename P>
+struct hour_of {};
+
+template <typename P>
+struct minute_of {};
+
+template <typename P>
+struct second_of {};
+
+template <typename P>
+struct microsecond_of {};
+
+template <typename P>
+struct quarter_of {};
+
+template <typename P>
+struct week_of {};
+
+template <typename P>
+struct weekday_of {};
+
+template <typename P>
+struct dayofweek_of {};
+
+template <typename P>
+struct dayofyear_of {};
+
+template <typename P>
+struct dayname_of {};
+
+template <typename P>
+struct monthname_of {};
+
+template <typename P>
+struct last_day_of {};
+
+// STR_TO_DATE(col, 'fmt') — parse col string as a date using Fmt format
+template <typename P, fixed_string Fmt>
+struct str_to_date_of {};
+
+template <typename P>
+struct from_unixtime_of {};
+
+template <typename P>
+struct unix_timestamp_of {};
+
+// CONVERT_TZ(col, 'from_tz', 'to_tz')
+template <typename P, fixed_string FromTZ, fixed_string ToTZ>
+struct convert_tz_of {};
+
+struct curtime_val {};
+
+struct utc_timestamp_val {};
+
+template <typename A, typename B>
+struct addtime_of {};
+
+template <typename A, typename B>
+struct subtime_of {};
+
+template <typename A, typename B>
+struct timediff_of {};
+
+// ===================================================================
+// JSON scalar functions
+// ===================================================================
+
+// JSON_EXTRACT(col, 'path') — e.g. JSON_EXTRACT(data, '$.field')
+template <typename P, fixed_string Path>
+struct json_extract_of {};
+
+// JSON_OBJECT(p1, p2, ...) — alternating key/value projections
+template <typename... Ps>
+struct json_object_of {};
+
+// JSON_ARRAY(p1, p2, ...) — value projections
+template <typename... Ps>
+struct json_array_of {};
+
+// JSON_CONTAINS(col, '"val"') — val is a JSON-encoded string literal
+template <typename P, fixed_string Val>
+struct json_contains_of {};
+
+template <typename P>
+struct json_length_of {};
+
+template <typename P>
+struct json_unquote_of {};
+
 // Convenience aliases for shorter SQL function projection names.
 template <ColumnDescriptor Col1, ColumnDescriptor Col2>
 using coalesce = coalesce_of<Col1, Col2>;
@@ -287,6 +482,170 @@ using cast = cast_as<P, Type>;
 
 template <typename P, sql_cast_type Type>
 using convert = convert_as<P, Type>;
+
+// --- Conditional ---
+template <typename A, typename B>
+using nullif = nullif_of<A, B>;
+
+template <typename... Ps>
+using greatest = greatest_of<Ps...>;
+
+template <typename... Ps>
+using least = least_of<Ps...>;
+
+template <fixed_string Cond, typename Then, typename Else>
+using sql_if = if_of<Cond, Then, Else>;
+
+// --- String ---
+template <typename P>
+using char_length = char_length_of<P>;
+
+template <typename P, std::size_t N>
+using left = left_of<P, N>;
+
+template <typename P, std::size_t N>
+using right = right_of<P, N>;
+
+template <typename P, fixed_string From, fixed_string To>
+using replace = replace_of<P, From, To>;
+
+template <typename P, std::size_t Len, fixed_string PadStr>
+using lpad = lpad_of<P, Len, PadStr>;
+
+template <typename P, std::size_t Len, fixed_string PadStr>
+using rpad = rpad_of<P, Len, PadStr>;
+
+template <typename P, std::size_t N>
+using repeat = repeat_of<P, N>;
+
+template <typename P>
+using reverse = reverse_of<P>;
+
+template <fixed_string Substr, typename P>
+using locate = locate_of<Substr, P>;
+
+template <typename P, fixed_string Substr>
+using instr = instr_of<P, Substr>;
+
+template <typename P>
+using space = space_of<P>;
+
+template <typename A, typename B>
+using strcmp = strcmp_of<A, B>;
+
+// --- Math ---
+template <typename P>
+using sqrt = sqrt_of<P>;
+
+template <typename P>
+using log = log_of<P>;
+
+template <typename P>
+using log2 = log2_of<P>;
+
+template <typename P>
+using log10 = log10_of<P>;
+
+template <typename P>
+using exp = exp_of<P>;
+
+template <typename P>
+using sin = sin_of<P>;
+
+template <typename P>
+using cos = cos_of<P>;
+
+template <typename P>
+using tan = tan_of<P>;
+
+template <typename P>
+using degrees = degrees_of<P>;
+
+template <typename P>
+using radians = radians_of<P>;
+
+template <typename P>
+using sign = sign_of<P>;
+
+template <typename P, int D>
+using truncate = truncate_to<P, D>;
+
+// --- Date/Time ---
+template <typename P>
+using hour = hour_of<P>;
+
+template <typename P>
+using minute = minute_of<P>;
+
+template <typename P>
+using second = second_of<P>;
+
+template <typename P>
+using microsecond = microsecond_of<P>;
+
+template <typename P>
+using quarter = quarter_of<P>;
+
+template <typename P>
+using week = week_of<P>;
+
+template <typename P>
+using weekday = weekday_of<P>;
+
+template <typename P>
+using dayofweek = dayofweek_of<P>;
+
+template <typename P>
+using dayofyear = dayofyear_of<P>;
+
+template <typename P>
+using dayname = dayname_of<P>;
+
+template <typename P>
+using monthname = monthname_of<P>;
+
+template <typename P>
+using last_day = last_day_of<P>;
+
+template <typename P, fixed_string Fmt>
+using str_to_date = str_to_date_of<P, Fmt>;
+
+template <typename P>
+using from_unixtime = from_unixtime_of<P>;
+
+template <typename P>
+using unix_timestamp = unix_timestamp_of<P>;
+
+template <typename P, fixed_string FromTZ, fixed_string ToTZ>
+using convert_tz = convert_tz_of<P, FromTZ, ToTZ>;
+
+template <typename A, typename B>
+using addtime = addtime_of<A, B>;
+
+template <typename A, typename B>
+using subtime = subtime_of<A, B>;
+
+template <typename A, typename B>
+using timediff = timediff_of<A, B>;
+
+// --- JSON ---
+template <typename P, fixed_string Path>
+using json_extract = json_extract_of<P, Path>;
+
+template <typename... Ps>
+using json_object = json_object_of<Ps...>;
+
+template <typename... Ps>
+using json_array = json_array_of<Ps...>;
+
+template <typename P, fixed_string Val>
+using json_contains = json_contains_of<P, Val>;
+
+template <typename P>
+using json_length = json_length_of<P>;
+
+template <typename P>
+using json_unquote = json_unquote_of<P>;
 
 // Convenience aliases for bitwise aggregate names that shadow std:: functors.
 template <ColumnDescriptor Col>
@@ -1254,6 +1613,512 @@ struct projection_traits<convert_as<P, Type>> {
     static std::string sql_expr() {
         return "CONVERT(" + std::string(projection_traits<P>::sql_expr()) + ", " +
                std::string(sql_cast_type_traits<Type>::sql_name()) + ")";
+    }
+};
+
+// ===================================================================
+// Conditional scalar function traits
+// ===================================================================
+
+template <Projection A, Projection B>
+struct projection_traits<nullif_of<A, B>> {
+    using value_type = typename projection_traits<A>::value_type;
+    static std::string sql_expr() {
+        return "NULLIF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection... Ps>
+    requires(sizeof...(Ps) > 0)
+struct projection_traits<greatest_of<Ps...>> {
+    using value_type = typename projection_traits<std::tuple_element_t<0, std::tuple<Ps...>>>::value_type;
+    static std::string sql_expr() {
+        std::string s = "GREATEST(";
+        bool first = true;
+        (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
+        s += ")";
+        return s;
+    }
+};
+
+template <Projection... Ps>
+    requires(sizeof...(Ps) > 0)
+struct projection_traits<least_of<Ps...>> {
+    using value_type = typename projection_traits<std::tuple_element_t<0, std::tuple<Ps...>>>::value_type;
+    static std::string sql_expr() {
+        std::string s = "LEAST(";
+        bool first = true;
+        (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
+        s += ")";
+        return s;
+    }
+};
+
+template <fixed_string Cond, Projection Then, Projection Else>
+struct projection_traits<if_of<Cond, Then, Else>> {
+    using value_type = typename projection_traits<Then>::value_type;
+    static std::string sql_expr() {
+        return "IF(" + std::string(std::string_view{Cond}) + ", " +
+               std::string(projection_traits<Then>::sql_expr()) + ", " +
+               std::string(projection_traits<Else>::sql_expr()) + ")";
+    }
+};
+
+// ===================================================================
+// String scalar function traits
+// ===================================================================
+
+template <Projection P>
+struct projection_traits<char_length_of<P>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "CHAR_LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, std::size_t N>
+struct projection_traits<left_of<P, N>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "LEFT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
+    }
+};
+
+template <Projection P, std::size_t N>
+struct projection_traits<right_of<P, N>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "RIGHT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
+    }
+};
+
+template <Projection P, fixed_string From, fixed_string To>
+struct projection_traits<replace_of<P, From, To>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "REPLACE(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{From}) + "', '" +
+               sql_detail::escape_sql_string(std::string_view{To}) + "')";
+    }
+};
+
+template <Projection P, std::size_t Len, fixed_string PadStr>
+struct projection_traits<lpad_of<P, Len, PadStr>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "LPAD(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Len) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{PadStr}) + "')";
+    }
+};
+
+template <Projection P, std::size_t Len, fixed_string PadStr>
+struct projection_traits<rpad_of<P, Len, PadStr>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "RPAD(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Len) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{PadStr}) + "')";
+    }
+};
+
+template <Projection P, std::size_t N>
+struct projection_traits<repeat_of<P, N>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "REPEAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<reverse_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "REVERSE(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <fixed_string Substr, Projection P>
+struct projection_traits<locate_of<Substr, P>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "LOCATE('" + sql_detail::escape_sql_string(std::string_view{Substr}) + "', " +
+               std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, fixed_string Substr>
+struct projection_traits<instr_of<P, Substr>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "INSTR(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{Substr}) + "')";
+    }
+};
+
+template <Projection P>
+struct projection_traits<space_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "SPACE(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<strcmp_of<A, B>> {
+    using value_type = int32_t;
+    static std::string sql_expr() {
+        return "STRCMP(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+// ===================================================================
+// Math scalar function traits
+// ===================================================================
+
+template <Projection P>
+struct projection_traits<sqrt_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "SQRT(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<log_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "LOG(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<log2_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "LOG2(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<log10_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "LOG10(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<exp_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "EXP(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<sin_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "SIN(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<cos_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "COS(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<tan_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "TAN(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<degrees_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "DEGREES(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<radians_of<P>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "RADIANS(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<sign_of<P>> {
+    using value_type = int32_t;
+    static std::string sql_expr() {
+        return "SIGN(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, int D>
+struct projection_traits<truncate_to<P, D>> {
+    using value_type = double;
+    static std::string sql_expr() {
+        return "TRUNCATE(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(D) + ")";
+    }
+};
+
+template <>
+struct projection_traits<pi_val> {
+    using value_type = double;
+    static constexpr std::string_view sql_expr() {
+        return "PI()";
+    }
+};
+
+// ===================================================================
+// Date/Time scalar function traits
+// ===================================================================
+
+template <Projection P>
+struct projection_traits<hour_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "HOUR(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<minute_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "MINUTE(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<second_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "SECOND(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<microsecond_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "MICROSECOND(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<quarter_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "QUARTER(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<week_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "WEEK(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<weekday_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "WEEKDAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<dayofweek_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "DAYOFWEEK(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<dayofyear_of<P>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "DAYOFYEAR(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<dayname_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "DAYNAME(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<monthname_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "MONTHNAME(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<last_day_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "LAST_DAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, fixed_string Fmt>
+struct projection_traits<str_to_date_of<P, Fmt>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "STR_TO_DATE(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{Fmt}) + "')";
+    }
+};
+
+template <Projection P>
+struct projection_traits<from_unixtime_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "FROM_UNIXTIME(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<unix_timestamp_of<P>> {
+    using value_type = int64_t;
+    static std::string sql_expr() {
+        return "UNIX_TIMESTAMP(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P, fixed_string FromTZ, fixed_string ToTZ>
+struct projection_traits<convert_tz_of<P, FromTZ, ToTZ>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "CONVERT_TZ(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{FromTZ}) + "', '" +
+               sql_detail::escape_sql_string(std::string_view{ToTZ}) + "')";
+    }
+};
+
+template <>
+struct projection_traits<curtime_val> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_expr() {
+        return "CURTIME()";
+    }
+};
+
+template <>
+struct projection_traits<utc_timestamp_val> {
+    using value_type = std::string;
+    static constexpr std::string_view sql_expr() {
+        return "UTC_TIMESTAMP()";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<addtime_of<A, B>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "ADDTIME(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<subtime_of<A, B>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "SUBTIME(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+template <Projection A, Projection B>
+struct projection_traits<timediff_of<A, B>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "TIMEDIFF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
+               std::string(projection_traits<B>::sql_expr()) + ")";
+    }
+};
+
+// ===================================================================
+// JSON scalar function traits
+// ===================================================================
+
+template <Projection P, fixed_string Path>
+struct projection_traits<json_extract_of<P, Path>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "JSON_EXTRACT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{Path}) + "')";
+    }
+};
+
+template <Projection... Ps>
+    requires(sizeof...(Ps) > 0)
+struct projection_traits<json_object_of<Ps...>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        std::string s = "JSON_OBJECT(";
+        bool first = true;
+        (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
+        s += ")";
+        return s;
+    }
+};
+
+template <Projection... Ps>
+    requires(sizeof...(Ps) > 0)
+struct projection_traits<json_array_of<Ps...>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        std::string s = "JSON_ARRAY(";
+        bool first = true;
+        (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
+        s += ")";
+        return s;
+    }
+};
+
+template <Projection P, fixed_string Val>
+struct projection_traits<json_contains_of<P, Val>> {
+    using value_type = uint32_t;
+    static std::string sql_expr() {
+        return "JSON_CONTAINS(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(std::string_view{Val}) + "')";
+    }
+};
+
+template <Projection P>
+struct projection_traits<json_length_of<P>> {
+    using value_type = uint64_t;
+    static std::string sql_expr() {
+        return "JSON_LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
+    }
+};
+
+template <Projection P>
+struct projection_traits<json_unquote_of<P>> {
+    using value_type = std::string;
+    static std::string sql_expr() {
+        return "JSON_UNQUOTE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
 

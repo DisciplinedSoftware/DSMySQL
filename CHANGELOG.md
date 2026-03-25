@@ -25,6 +25,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `first_value_over<Col, PartitionCol, OrderCol>` — `FIRST_VALUE(col) OVER (...)`
 - `last_value_over<Col, PartitionCol, OrderCol>` — `LAST_VALUE(col) OVER (...)`
 - `nth_value_over<Col, N, PartitionCol, OrderCol>` — `NTH_VALUE(col, N) OVER (...)`
+- **Conditional scalar functions**: `nullif_of<A,B>`, `greatest_of<Ps...>`, `least_of<Ps...>`, `if_of<"cond",Then,Else>` with short aliases `nullif`, `greatest`, `least`, `sql_if`
+- **String scalar functions**: `char_length_of<P>`, `left_of<P,N>`, `right_of<P,N>`, `replace_of<P,"from","to">`, `lpad_of<P,N,"pad">`, `rpad_of<P,N,"pad">`, `repeat_of<P,N>`, `reverse_of<P>`, `locate_of<"sub",P>`, `instr_of<P,"sub">`, `space_of<P>`, `strcmp_of<A,B>` with matching short aliases
+- **Math scalar functions**: `sqrt_of<P>`, `log_of<P>`, `log2_of<P>`, `log10_of<P>`, `exp_of<P>`, `sin_of<P>`, `cos_of<P>`, `tan_of<P>`, `degrees_of<P>`, `radians_of<P>`, `sign_of<P>`, `truncate_to<P,D>`, `pi_val` with matching short aliases
+- **Extended date/time scalar functions**: `hour_of<P>`, `minute_of<P>`, `second_of<P>`, `microsecond_of<P>`, `quarter_of<P>`, `week_of<P>`, `weekday_of<P>`, `dayofweek_of<P>`, `dayofyear_of<P>`, `dayname_of<P>`, `monthname_of<P>`, `last_day_of<P>`, `str_to_date_of<P,"fmt">`, `from_unixtime_of<P>`, `unix_timestamp_of<P>`, `convert_tz_of<P,"from","to">`, `curtime_val`, `utc_timestamp_val`, `addtime_of<A,B>`, `subtime_of<A,B>`, `timediff_of<A,B>` with matching short aliases
+- **JSON scalar functions**: `json_extract_of<P,"$.path">`, `json_object_of<Ps...>`, `json_array_of<Ps...>`, `json_contains_of<P,"val">`, `json_length_of<P>`, `json_unquote_of<P>` with matching short aliases
 - `stddev<Col>` — `STDDEV(col)` → `double`
 - `std_of<Col>` — `STD(col)` → `double` (MySQL synonym for `STDDEV`)
 - `stddev_pop<Col>` — `STDDEV_POP(col)` → `double`
