@@ -238,7 +238,7 @@ template <ColumnDescriptor... Cols>
 
 namespace ddl_detail {
 
-inline std::string escape_sql_single_quotes(std::string_view value) {
+[[nodiscard]] inline std::string escape_sql_single_quotes(std::string_view value) {
     std::string out;
     out.reserve(value.size());
     for (const char ch : value) {
@@ -251,7 +251,7 @@ inline std::string escape_sql_single_quotes(std::string_view value) {
     return out;
 }
 
-inline std::string quote_sql_string(std::string_view value) {
+[[nodiscard]] inline std::string quote_sql_string(std::string_view value) {
     std::string out;
     out.reserve(value.size() + 2);
     out += '\'';
@@ -260,7 +260,7 @@ inline std::string quote_sql_string(std::string_view value) {
     return out;
 }
 
-inline std::string to_sql_engine(Engine value) {
+[[nodiscard]] inline std::string to_sql_engine(Engine value) {
     switch (value) {
         case Engine::InnoDB:
             return "InnoDB";
@@ -284,7 +284,7 @@ inline std::string to_sql_engine(Engine value) {
     return "InnoDB";
 }
 
-inline std::string to_sql_charset(Charset value) {
+[[nodiscard]] inline std::string to_sql_charset(Charset value) {
     switch (value) {
         case Charset::utf8mb4:
             return "utf8mb4";
@@ -304,7 +304,7 @@ inline std::string to_sql_charset(Charset value) {
     return "utf8mb4";
 }
 
-inline std::string to_sql_row_format(RowFormat value) {
+[[nodiscard]] inline std::string to_sql_row_format(RowFormat value) {
     switch (value) {
         case RowFormat::Default:
             return "DEFAULT";
@@ -322,7 +322,7 @@ inline std::string to_sql_row_format(RowFormat value) {
     return "DEFAULT";
 }
 
-inline std::string to_sql_insert_method(InsertMethod value) {
+[[nodiscard]] inline std::string to_sql_insert_method(InsertMethod value) {
     switch (value) {
         case InsertMethod::No:
             return "NO";
@@ -334,7 +334,7 @@ inline std::string to_sql_insert_method(InsertMethod value) {
     return "NO";
 }
 
-inline std::string to_sql_pack_keys(PackKeys value) {
+[[nodiscard]] inline std::string to_sql_pack_keys(PackKeys value) {
     switch (value) {
         case PackKeys::Default:
             return "DEFAULT";
@@ -346,7 +346,7 @@ inline std::string to_sql_pack_keys(PackKeys value) {
     return "DEFAULT";
 }
 
-inline std::string to_sql_stats_policy(StatsPolicy value) {
+[[nodiscard]] inline std::string to_sql_stats_policy(StatsPolicy value) {
     switch (value) {
         case StatsPolicy::Default:
             return "DEFAULT";
@@ -358,7 +358,7 @@ inline std::string to_sql_stats_policy(StatsPolicy value) {
     return "DEFAULT";
 }
 
-inline std::string to_sql_compression(Compression value) {
+[[nodiscard]] inline std::string to_sql_compression(Compression value) {
     switch (value) {
         case Compression::None:
             return "NONE";
@@ -370,7 +370,7 @@ inline std::string to_sql_compression(Compression value) {
     return "NONE";
 }
 
-inline std::string to_sql_encryption(Encryption value) {
+[[nodiscard]] inline std::string to_sql_encryption(Encryption value) {
     switch (value) {
         case Encryption::Y:
             return "Y";
@@ -906,7 +906,7 @@ protected:
     }
 
 private:
-    Derived& derived() {
+    [[nodiscard]] Derived& derived() {
         return static_cast<Derived&>(*this);
     }
 };
@@ -999,14 +999,14 @@ protected:
     create_database_option options_;
 
 private:
-    Derived& derived() {
+    [[nodiscard]] Derived& derived() {
         return static_cast<Derived&>(*this);
     }
 };
 
 template <typename T>
 struct database_attributes {
-    static create_database_option get() {
+    [[nodiscard]] static create_database_option get() {
         return {};  // Empty by default
     }
 };
@@ -1102,7 +1102,7 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
 }
 
 template <typename T>
-std::string make_column_defs() {
+[[nodiscard]] std::string make_column_defs() {
     std::string sql;
     append_column_defs<T>(sql, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
     return sql;
@@ -1132,7 +1132,7 @@ void append_create_table_sql(std::string& sql, bool if_not_exists, std::string_v
 }
 
 template <Database DB, bool IfNotExists, std::size_t... Is>
-std::string build_create_all_tables_sql_impl(std::string prior_sql, std::index_sequence<Is...>) {
+[[nodiscard]] std::string build_create_all_tables_sql_impl(std::string prior_sql, std::index_sequence<Is...>) {
     using tables_tuple = typename database_tables<DB>::type;
     const auto db_name = database_name_for<DB>::value();
     (append_create_table_sql<std::tuple_element_t<Is, tables_tuple>>(prior_sql, IfNotExists, db_name), ...);
@@ -1140,7 +1140,7 @@ std::string build_create_all_tables_sql_impl(std::string prior_sql, std::index_s
 }
 
 template <Database DB, bool IfNotExists>
-std::string build_create_all_tables_sql(std::string prior_sql) {
+[[nodiscard]] std::string build_create_all_tables_sql(std::string prior_sql) {
     using tables_tuple = typename database_tables<DB>::type;
     return build_create_all_tables_sql_impl<DB, IfNotExists>(
         std::move(prior_sql), std::make_index_sequence<std::tuple_size_v<tables_tuple>>{});
@@ -1177,7 +1177,8 @@ class create_all_tables_builder;
 template <Database DB>
 class create_all_tables_cond_builder;
 template <typename T>
-class use_builder;  // defined below in ddl_detail namespace
+class use_builder;
+class use_name_builder;  // defined below in ddl_detail namespace
 
 // ---------------------------------------------------------------
 // ddl_continuation — returned by .then(), allows chaining
@@ -1202,16 +1203,18 @@ public:
     template <Database T>
     [[nodiscard]] create_database_builder<T> create_database() const;
 
-    [[nodiscard]] create_database_named_builder create_database(database_name const& name) const;
+    [[nodiscard]] create_database_named_builder create_database(database_name name) const;
 
     template <Database T>
     [[nodiscard]] drop_database_builder<T> drop_database() const;
 
-    [[nodiscard]] drop_database_named_builder drop_database(database_name const& name) const;
+    [[nodiscard]] drop_database_named_builder drop_database(database_name name) const;
 
     // USE <database> — sets default database for the session.
     template <Database T>
     [[nodiscard]] use_builder<T> use() const;
+
+    [[nodiscard]] use_name_builder use(database_name name) const;
 
     template <typename T>
     [[nodiscard]] auto create_view() const;
@@ -2083,8 +2086,8 @@ template <Database T>
     return create_database_builder<T>{sql_};
 }
 
-inline create_database_named_builder ddl_continuation::create_database(database_name const& name) const {
-    return create_database_named_builder{name, sql_};
+[[nodiscard]] inline create_database_named_builder ddl_continuation::create_database(database_name name) const {
+    return create_database_named_builder{std::move(name), sql_};
 }
 
 template <Database T>
@@ -2092,27 +2095,27 @@ template <Database T>
     return drop_database_builder<T>{sql_};
 }
 
-inline drop_database_named_builder ddl_continuation::drop_database(database_name const& name) const {
-    return drop_database_named_builder{name, sql_};
+[[nodiscard]] inline drop_database_named_builder ddl_continuation::drop_database(database_name name) const {
+    return drop_database_named_builder{std::move(name), sql_};
 }
 
 template <typename T>
-auto ddl_continuation::create_view() const {
+[[nodiscard]] auto ddl_continuation::create_view() const {
     return create_view_builder<T>{sql_};
 }
 
 template <typename T>
-auto ddl_continuation::drop_view() const {
+[[nodiscard]] auto ddl_continuation::drop_view() const {
     return drop_view_builder<T>{sql_};
 }
 
 template <typename From, typename To>
-auto ddl_continuation::rename_table() const {
+[[nodiscard]] auto ddl_continuation::rename_table() const {
     return rename_table_builder<From, To>{sql_};
 }
 
 template <Database DB>
-create_all_tables_builder<DB> ddl_continuation::create_all_tables() const {
+[[nodiscard]] create_all_tables_builder<DB> ddl_continuation::create_all_tables() const {
     return create_all_tables_builder<DB>{sql_};
 }
 
@@ -2243,8 +2246,8 @@ template <Database T>
     return ddl_detail::create_database_builder<T>{};
 }
 
-[[nodiscard]] inline ddl_detail::create_database_named_builder create_database(database_name const& name) {
-    return ddl_detail::create_database_named_builder{name};
+[[nodiscard]] inline ddl_detail::create_database_named_builder create_database(database_name name) {
+    return ddl_detail::create_database_named_builder{std::move(name)};
 }
 
 /**
@@ -2259,8 +2262,8 @@ template <Database T>
     return ddl_detail::drop_database_builder<T>{};
 }
 
-[[nodiscard]] inline ddl_detail::drop_database_named_builder drop_database(database_name const& name) {
-    return ddl_detail::drop_database_named_builder{name};
+[[nodiscard]] inline ddl_detail::drop_database_named_builder drop_database(database_name name) {
+    return ddl_detail::drop_database_named_builder{std::move(name)};
 }
 
 /**
@@ -2333,10 +2336,66 @@ template <Database T>
  *                  .then().use<my_db>());
  */
 template <Database T>
-[[nodiscard]] ddl_detail::use_builder<T> use() {
+[[nodiscard]] constexpr ddl_detail::use_builder<T> use() {
     using _ = typename database_tables<T>::type;
     (void)sizeof(_);
     return ddl_detail::use_builder<T>{};
+}
+
+namespace ddl_detail {
+
+// ---------------------------------------------------------------
+// use_builder — USE <database>
+// ---------------------------------------------------------------
+class use_name_builder {
+public:
+    using ddl_tag_type = void;
+
+    use_name_builder(database_name db_name, std::string prior = {})
+        : db_name_(std::move(db_name)), prior_sql_(std::move(prior)) {
+    }
+
+    [[nodiscard]] ddl_continuation then() const {
+        return ddl_continuation{build_sql()};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto db_name = db_name_.to_string();
+        std::string s;
+        s.reserve(prior_sql_.size() + 4 + db_name.size() + 2);
+        s += prior_sql_;
+        s += "USE ";
+        s += db_name;
+        s += ";\n";
+        return s;
+    }
+
+private:
+    database_name db_name_;
+    std::string prior_sql_;
+};
+
+// Out-of-line definition for ddl_continuation::use(database_name)
+// (declared in ddl_continuation; defined here after use_name_builder is complete)
+[[nodiscard]] inline use_name_builder ddl_continuation::use(database_name name) const {
+    return ddl_detail::use_name_builder{std::move(name), sql_};
+}
+
+}  // namespace ddl_detail
+
+/**
+ * use(database) — USE <database>.
+ *
+ * Sets the default database for the session.
+ * DB must inherit from database_schema.
+ *
+ * Example:
+ *   db.execute(use("my_db"));
+ *   db.execute(create_database<my_db>().if_not_exists()
+ *                  .then().use("my_db"));
+ */
+[[nodiscard]] inline ddl_detail::use_name_builder use(database_name name) {
+    return ddl_detail::use_name_builder{std::move(name)};
 }
 
 }  // namespace ds_mysql
