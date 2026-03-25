@@ -10,6 +10,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause
+- `inner_join_using<T, Cols...>()`, `left_join_using<T, Cols...>()`, `right_join_using<T, Cols...>()`, `full_join_using<T, Cols...>()` — `JOIN ... USING (col1, col2, ...)` with one or more column descriptors
+- `lateral_join(sql, alias)`, `left_lateral_join(sql, alias)` — `[LEFT] JOIN LATERAL (subquery) AS alias` (MySQL 8.0+)
+- `lateral_join_on(sql, alias, cond)`, `left_lateral_join_on(sql, alias, cond)` — lateral join variants with an explicit `ON` condition
+- `straight_join<T, LeftCol, RightCol>()`, `straight_join_on<T>(cond)` — `STRAIGHT_JOIN` MySQL optimizer hint forcing left-to-right join evaluation order
 - `not_regexp<Col>(pattern)` — `col NOT REGEXP 'pattern'`
 - `rlike<Col>(pattern)` — `col RLIKE 'pattern'` (MySQL synonym for `REGEXP`)
 - `not_rlike<Col>(pattern)` — `col NOT RLIKE 'pattern'`

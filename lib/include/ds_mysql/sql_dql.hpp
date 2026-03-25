@@ -3179,6 +3179,165 @@ struct select_query_builder {
                                             std::move(on_cond));
     }
 
+    // natural_join — NATURAL JOIN (implicit column matching, no ON/USING clause)
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_join() const& {
+        auto copy = *this;
+        copy.joins_ += " NATURAL JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return copy;
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_join() && {
+        joins_ += " NATURAL JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return std::move(*this);
+    }
+
+    // natural_left_join — NATURAL LEFT JOIN
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_left_join() const& {
+        auto copy = *this;
+        copy.joins_ += " NATURAL LEFT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return copy;
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_left_join() && {
+        joins_ += " NATURAL LEFT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return std::move(*this);
+    }
+
+    // natural_right_join — NATURAL RIGHT JOIN
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_right_join() const& {
+        auto copy = *this;
+        copy.joins_ += " NATURAL RIGHT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return copy;
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder natural_right_join() && {
+        joins_ += " NATURAL RIGHT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
+        return std::move(*this);
+    }
+
+    // join_using — JOIN ... USING (col1, col2, ...) variants
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder inner_join_using() const& {
+        return add_join_using("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                              build_using_cols_string<UsingCols...>());
+    }
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder inner_join_using() && {
+        return std::move(*this).add_join_using("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                               build_using_cols_string<UsingCols...>());
+    }
+
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder left_join_using() const& {
+        return add_join_using("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                              build_using_cols_string<UsingCols...>());
+    }
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder left_join_using() && {
+        return std::move(*this).add_join_using("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                               build_using_cols_string<UsingCols...>());
+    }
+
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder right_join_using() const& {
+        return add_join_using("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                              build_using_cols_string<UsingCols...>());
+    }
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder right_join_using() && {
+        return std::move(*this).add_join_using("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                               build_using_cols_string<UsingCols...>());
+    }
+
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder full_join_using() const& {
+        return add_join_using("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                              build_using_cols_string<UsingCols...>());
+    }
+    template <typename RightTable, ColumnDescriptor... UsingCols>
+    [[nodiscard]] select_query_builder full_join_using() && {
+        return std::move(*this).add_join_using("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                               build_using_cols_string<UsingCols...>());
+    }
+
+    // lateral_join — JOIN LATERAL (subquery) AS alias (MySQL 8.0+)
+    // Pass a pre-built SQL string as the subquery (e.g. inner_query.build_sql()).
+    [[nodiscard]] select_query_builder lateral_join(std::string subquery_sql, std::string_view alias) const& {
+        auto copy = *this;
+        copy.joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        return copy;
+    }
+    [[nodiscard]] select_query_builder lateral_join(std::string subquery_sql, std::string_view alias) && {
+        joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        return std::move(*this);
+    }
+
+    // left_lateral_join — LEFT JOIN LATERAL (subquery) AS alias (MySQL 8.0+)
+    [[nodiscard]] select_query_builder left_lateral_join(std::string subquery_sql, std::string_view alias) const& {
+        auto copy = *this;
+        copy.joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        return copy;
+    }
+    [[nodiscard]] select_query_builder left_lateral_join(std::string subquery_sql, std::string_view alias) && {
+        joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        return std::move(*this);
+    }
+
+    // lateral_join_on — JOIN LATERAL (subquery) AS alias ON condition
+    [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
+                                                       where_condition on_cond) const& {
+        auto copy = *this;
+        copy.joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
+                       on_cond.build_sql();
+        return copy;
+    }
+    [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
+                                                       where_condition on_cond) && {
+        joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
+                  on_cond.build_sql();
+        return std::move(*this);
+    }
+
+    // left_lateral_join_on — LEFT JOIN LATERAL (subquery) AS alias ON condition
+    [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
+                                                            where_condition on_cond) const& {
+        auto copy = *this;
+        copy.joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
+                       on_cond.build_sql();
+        return copy;
+    }
+    [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
+                                                            where_condition on_cond) && {
+        joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
+                  on_cond.build_sql();
+        return std::move(*this);
+    }
+
+    // straight_join — STRAIGHT_JOIN (MySQL optimizer hint: forces left-to-right join order)
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder straight_join() const& {
+        return add_join("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
+                        qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
+    [[nodiscard]] select_query_builder straight_join() && {
+        return std::move(*this).add_join("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder straight_join_on(where_condition on_cond) const& {
+        return add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder straight_join_on(where_condition on_cond) && {
+        return std::move(*this).add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
+
     // ---- Terminal ----
 
     [[nodiscard]] std::string build_sql() const {
@@ -3302,6 +3461,28 @@ struct select_query_builder {
                                                    where_condition on_cond) && {
         joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + on_cond.build_sql();
         return std::move(*this);
+    }
+
+    [[nodiscard]] select_query_builder add_join_using(std::string_view join_type, std::string_view right_table,
+                                                      std::string using_cols) const& {
+        auto copy = *this;
+        copy.joins_ +=
+            " " + std::string(join_type) + " " + std::string(right_table) + " USING (" + std::move(using_cols) + ")";
+        return copy;
+    }
+    [[nodiscard]] select_query_builder add_join_using(std::string_view join_type, std::string_view right_table,
+                                                      std::string using_cols) && {
+        joins_ +=
+            " " + std::string(join_type) + " " + std::string(right_table) + " USING (" + std::move(using_cols) + ")";
+        return std::move(*this);
+    }
+
+    template <ColumnDescriptor... UsingCols>
+    static std::string build_using_cols_string() {
+        std::string s;
+        bool first = true;
+        ((s += (first ? "" : ", "), s += std::string(column_traits<UsingCols>::column_name()), first = false), ...);
+        return s;
     }
 
     // Private helper: builds a comma-separated GROUP BY column name string.

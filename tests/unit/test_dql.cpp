@@ -2332,6 +2332,166 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
 };
 
 // ===================================================================
+// NATURAL JOIN / JOIN USING / LATERAL JOIN / STRAIGHT_JOIN
+// ===================================================================
+
+suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
+    // ---- NATURAL JOIN ----
+
+    "natural_join — generates NATURAL JOIN"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .natural_join<ext_category>()
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM ext_product NATURAL JOIN ext_category"s) << sql;
+    };
+
+    "natural_left_join — generates NATURAL LEFT JOIN"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .natural_left_join<ext_category>()
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM ext_product NATURAL LEFT JOIN ext_category"s) << sql;
+    };
+
+    "natural_right_join — generates NATURAL RIGHT JOIN"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .natural_right_join<ext_category>()
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM ext_product NATURAL RIGHT JOIN ext_category"s) << sql;
+    };
+
+    "natural_join chained with WHERE — natural join composes with WHERE"_test = [] {
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .natural_join<ext_category>()
+                             .where(is_not_null<ext_product::name>())
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product NATURAL JOIN ext_category WHERE name IS NOT NULL"s) << sql;
+    };
+
+    // ---- JOIN ... USING ----
+
+    "inner_join_using single col — generates INNER JOIN ... USING (col)"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .inner_join_using<ext_category, ext_product::category_id>()
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM ext_product INNER JOIN ext_category USING (category_id)"s) << sql;
+    };
+
+    "left_join_using — generates LEFT JOIN ... USING (col)"_test = [] {
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .left_join_using<ext_category, ext_product::category_id>()
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product LEFT JOIN ext_category USING (category_id)"s) << sql;
+    };
+
+    "right_join_using — generates RIGHT JOIN ... USING (col)"_test = [] {
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .right_join_using<ext_category, ext_product::category_id>()
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product RIGHT JOIN ext_category USING (category_id)"s) << sql;
+    };
+
+    "full_join_using — generates FULL OUTER JOIN ... USING (col)"_test = [] {
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .full_join_using<ext_category, ext_product::category_id>()
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product FULL OUTER JOIN ext_category USING (category_id)"s) << sql;
+    };
+
+    "inner_join_using multiple cols — generates INNER JOIN ... USING (col1, col2)"_test = [] {
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .inner_join_using<ext_category, ext_product::category_id, ext_product::id>()
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product INNER JOIN ext_category USING (category_id, id)"s) << sql;
+    };
+
+    // ---- LATERAL JOIN ----
+
+    "lateral_join — generates JOIN LATERAL (subquery) AS alias"_test = [] {
+        auto const sub = select<ext_product::sku>().from<ext_product>().build_sql();
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .lateral_join(sub, "lat")
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s)
+            << sql;
+    };
+
+    "left_lateral_join — generates LEFT JOIN LATERAL (subquery) AS alias"_test = [] {
+        auto const sub = select<ext_product::sku>().from<ext_product>().build_sql();
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .left_lateral_join(sub, "lat")
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s)
+            << sql;
+    };
+
+    "lateral_join_on — generates JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
+        auto const sub = select<ext_product::sku>().from<ext_product>().build_sql();
+        auto const on = col_ref<ext_product::id> == 1u;
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .lateral_join_on(sub, "lat", std::move(on))
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 1"s)
+            << sql;
+    };
+
+    "left_lateral_join_on — generates LEFT JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
+        auto const sub = select<ext_product::sku>().from<ext_product>().build_sql();
+        auto const on = col_ref<ext_product::id> == 2u;
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .left_lateral_join_on(sub, "lat", std::move(on))
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 2"s)
+            << sql;
+    };
+
+    // ---- STRAIGHT_JOIN ----
+
+    "straight_join — generates STRAIGHT_JOIN ... ON col1 = col2"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .straight_join<ext_category, ext_product::category_id, ext_category::id>()
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON category_id = id"s) << sql;
+    };
+
+    "straight_join with qualified col descriptors — generates table-qualified ON"_test = [] {
+        auto const sql = select<ext_product::sku, ext_category::label>()
+                             .from<joined<ext_product>>()
+                             .straight_join<ext_category, col<ext_product, 1>, col<ext_category, 0>>()
+                             .build_sql();
+        expect(sql ==
+               "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON ext_product.category_id = ext_category.id"s)
+            << sql;
+    };
+
+    "straight_join_on — generates STRAIGHT_JOIN ... ON compound condition"_test = [] {
+        auto const on = col_ref<ext_product::category_id> == 5u;
+        auto const sql = select<ext_product::sku>()
+                             .from<joined<ext_product>>()
+                             .straight_join_on<ext_category>(std::move(on))
+                             .build_sql();
+        expect(sql == "SELECT sku FROM ext_product STRAIGHT_JOIN ext_category ON category_id = 5"s) << sql;
+    };
+};
+
+// ===================================================================
 // Derived table (subquery in FROM)
 // ===================================================================
 
