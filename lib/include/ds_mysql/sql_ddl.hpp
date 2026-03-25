@@ -1502,6 +1502,83 @@ public:
         return copy;
     }
 
+    // CHANGE COLUMN old_name new_name new_type [NOT NULL]
+    // Atomically renames and retypes a column.
+    template <ColumnDescriptor OldCol>
+    [[nodiscard]] alter_table_builder change_column(std::string new_name, std::string sql_type,
+                                                     bool not_null = true) const {
+        auto copy = *this;
+        std::string act = "CHANGE COLUMN " + std::string(column_traits<OldCol>::column_name()) + " " + new_name +
+                          " " + std::move(sql_type);
+        if (not_null) {
+            act += " NOT NULL";
+        }
+        copy.actions_.push_back(std::move(act));
+        return copy;
+    }
+
+    // ADD INDEX name (col1, col2, ...)
+    template <ColumnDescriptor... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] alter_table_builder add_index(std::string name) const {
+        auto copy = *this;
+        copy.actions_.push_back("ADD INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        return copy;
+    }
+
+    // ADD UNIQUE INDEX name (col1, col2, ...)
+    template <ColumnDescriptor... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] alter_table_builder add_unique_index(std::string name) const {
+        auto copy = *this;
+        copy.actions_.push_back("ADD UNIQUE INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        return copy;
+    }
+
+    // ADD FULLTEXT INDEX name (col1, col2, ...)
+    template <ColumnDescriptor... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] alter_table_builder add_fulltext_index(std::string name) const {
+        auto copy = *this;
+        copy.actions_.push_back("ADD FULLTEXT INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        return copy;
+    }
+
+    // ENABLE KEYS — re-enable non-unique index updates (MyISAM)
+    [[nodiscard]] alter_table_builder enable_keys() const {
+        auto copy = *this;
+        copy.actions_.push_back("ENABLE KEYS");
+        return copy;
+    }
+
+    // DISABLE KEYS — disable non-unique index updates (MyISAM)
+    [[nodiscard]] alter_table_builder disable_keys() const {
+        auto copy = *this;
+        copy.actions_.push_back("DISABLE KEYS");
+        return copy;
+    }
+
+    // CONVERT TO CHARACTER SET charset
+    [[nodiscard]] alter_table_builder convert_to_charset(Charset charset) const {
+        auto copy = *this;
+        copy.actions_.push_back("CONVERT TO CHARACTER SET " + to_sql_charset(charset));
+        return copy;
+    }
+
+    // ENGINE = new_engine
+    [[nodiscard]] alter_table_builder set_engine(Engine engine) const {
+        auto copy = *this;
+        copy.actions_.push_back("ENGINE = " + to_sql_engine(engine));
+        return copy;
+    }
+
+    // AUTO_INCREMENT = n
+    [[nodiscard]] alter_table_builder set_auto_increment(std::size_t n) const {
+        auto copy = *this;
+        copy.actions_.push_back("AUTO_INCREMENT = " + std::to_string(n));
+        return copy;
+    }
+
     [[nodiscard]] ddl_continuation then() const {
         return ddl_continuation{build_sql()};
     }

@@ -10,6 +10,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `alter_table<T>().change_column<OldCol>(new_name, sql_type [, not_null])` — `CHANGE COLUMN old new type [NOT NULL]` (rename + retype atomically)
+- `alter_table<T>().add_index<Cols...>(name)` — `ADD INDEX name (col1, ...)`
+- `alter_table<T>().add_unique_index<Cols...>(name)` — `ADD UNIQUE INDEX name (col1, ...)`
+- `alter_table<T>().add_fulltext_index<Cols...>(name)` — `ADD FULLTEXT INDEX name (col1, ...)`
+- `alter_table<T>().enable_keys()` / `.disable_keys()` — `ENABLE KEYS` / `DISABLE KEYS`
+- `alter_table<T>().convert_to_charset(Charset)` — `CONVERT TO CHARACTER SET charset`
+- `alter_table<T>().set_engine(Engine)` — `ENGINE = engine`
+- `alter_table<T>().set_auto_increment(n)` — `AUTO_INCREMENT = n`
+
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause
 - `inner_join_using<T, Cols...>()`, `left_join_using<T, Cols...>()`, `right_join_using<T, Cols...>()`, `full_join_using<T, Cols...>()` — `JOIN ... USING (col1, col2, ...)` with one or more column descriptors
 - `lateral_join(sql, alias)`, `left_lateral_join(sql, alias)` — `[LEFT] JOIN LATERAL (subquery) AS alias` (MySQL 8.0+)

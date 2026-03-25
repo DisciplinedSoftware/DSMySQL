@@ -1125,6 +1125,81 @@ suite<"DDL Features"> ddl_features_suite = [] {
     };
 };
 
+// ===================================================================
+// DDL — ALTER TABLE extended actions
+// ===================================================================
+
+suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
+    "alter_table.change_column - renames and retypes a column"_test = [] {
+        auto const sql =
+            alter_table<test_table>().change_column<test_table::name>("display_name", "VARCHAR(512)").build_sql();
+        expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512) NOT NULL;\n"s) << sql;
+    };
+
+    "alter_table.change_column nullable - omits NOT NULL"_test = [] {
+        auto const sql =
+            alter_table<test_table>()
+                .change_column<test_table::name>("display_name", "VARCHAR(512)", /*not_null=*/false)
+                .build_sql();
+        expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512);\n"s) << sql;
+    };
+
+    "alter_table.add_index - generates ADD INDEX"_test = [] {
+        auto const sql = alter_table<test_table>().add_index<test_table::name>("idx_test_table_name").build_sql();
+        expect(sql == "ALTER TABLE test_table ADD INDEX idx_test_table_name (name);\n"s) << sql;
+    };
+
+    "alter_table.add_unique_index - generates ADD UNIQUE INDEX"_test = [] {
+        auto const sql =
+            alter_table<test_table>().add_unique_index<test_table::name>("uq_test_table_name").build_sql();
+        expect(sql == "ALTER TABLE test_table ADD UNIQUE INDEX uq_test_table_name (name);\n"s) << sql;
+    };
+
+    "alter_table.add_fulltext_index - generates ADD FULLTEXT INDEX"_test = [] {
+        auto const sql =
+            alter_table<test_table>().add_fulltext_index<test_table::name>("ft_test_table_name").build_sql();
+        expect(sql == "ALTER TABLE test_table ADD FULLTEXT INDEX ft_test_table_name (name);\n"s) << sql;
+    };
+
+    "alter_table.enable_keys - generates ENABLE KEYS"_test = [] {
+        auto const sql = alter_table<test_table>().enable_keys().build_sql();
+        expect(sql == "ALTER TABLE test_table ENABLE KEYS;\n"s) << sql;
+    };
+
+    "alter_table.disable_keys - generates DISABLE KEYS"_test = [] {
+        auto const sql = alter_table<test_table>().disable_keys().build_sql();
+        expect(sql == "ALTER TABLE test_table DISABLE KEYS;\n"s) << sql;
+    };
+
+    "alter_table.convert_to_charset - generates CONVERT TO CHARACTER SET"_test = [] {
+        auto const sql = alter_table<test_table>().convert_to_charset(Charset::utf8mb4).build_sql();
+        expect(sql == "ALTER TABLE test_table CONVERT TO CHARACTER SET utf8mb4;\n"s) << sql;
+    };
+
+    "alter_table.set_engine - generates ENGINE = ..."_test = [] {
+        auto const sql = alter_table<test_table>().set_engine(Engine::InnoDB).build_sql();
+        expect(sql == "ALTER TABLE test_table ENGINE = InnoDB;\n"s) << sql;
+    };
+
+    "alter_table.set_auto_increment - generates AUTO_INCREMENT = n"_test = [] {
+        auto const sql = alter_table<test_table>().set_auto_increment(1000).build_sql();
+        expect(sql == "ALTER TABLE test_table AUTO_INCREMENT = 1000;\n"s) << sql;
+    };
+
+    "alter_table - combines multiple new actions"_test = [] {
+        auto const sql = alter_table<test_table>()
+                             .change_column<test_table::name>("label", "TEXT")
+                             .add_index<test_table::name>("idx_label")
+                             .set_engine(Engine::MyISAM)
+                             .set_auto_increment(500)
+                             .build_sql();
+        expect(sql ==
+               "ALTER TABLE test_table CHANGE COLUMN name label TEXT NOT NULL, ADD INDEX idx_label (name), "
+               "ENGINE = MyISAM, AUTO_INCREMENT = 500;\n"s)
+            << sql;
+    };
+};
+
 static_assert(SqlStatement<ddl_detail::create_database_builder<test_db>>,
               "create_database_builder must satisfy SqlStatement");
 static_assert(SqlStatement<ddl_detail::create_view_as_builder<new_table>>,
