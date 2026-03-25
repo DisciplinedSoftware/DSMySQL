@@ -2473,4 +2473,344 @@ private:
     return ddl_detail::use_name_builder{std::move(name)};
 }
 
+// ===================================================================
+// SHOW Statements
+//
+// Entry points (all queryable via db.query()):
+//   show_databases()                 — SHOW DATABASES
+//   show_tables()                    — SHOW TABLES (current database)
+//   show_columns<T>()                — SHOW COLUMNS FROM table
+//   show_create_table<T>()           — SHOW CREATE TABLE table
+// ===================================================================
+
+namespace ddl_detail {
+
+class show_databases_builder {
+public:
+    using result_row_type = std::tuple<std::string>;
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SHOW DATABASES";
+    }
+};
+
+class show_tables_builder {
+public:
+    using result_row_type = std::tuple<std::string>;
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SHOW TABLES";
+    }
+};
+
+template <typename T>
+class show_columns_builder {
+public:
+    // Field, Type, Null, Key, Default (nullable), Extra
+    using result_row_type =
+        std::tuple<std::string, std::string, std::string, std::string, std::optional<std::string>, std::string>;
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SHOW COLUMNS FROM " + std::string(table_name_for<T>::value().to_string_view());
+    }
+};
+
+template <typename T>
+class show_create_table_builder {
+public:
+    // Table name, CREATE TABLE statement
+    using result_row_type = std::tuple<std::string, std::string>;
+
+    [[nodiscard]] std::string build_sql() const {
+        return "SHOW CREATE TABLE " + std::string(table_name_for<T>::value().to_string_view());
+    }
+};
+
+}  // namespace ddl_detail
+
+[[nodiscard]] inline ddl_detail::show_databases_builder show_databases() {
+    return {};
+}
+
+[[nodiscard]] inline ddl_detail::show_tables_builder show_tables() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::show_columns_builder<T> show_columns() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::show_create_table_builder<T> show_create_table() {
+    return {};
+}
+
+// ===================================================================
+// Stored Procedures
+//
+// Entry points (executeable via db.execute()):
+//   create_procedure(name, params, body)   — CREATE PROCEDURE name(params) BEGIN body END
+//   drop_procedure(name)                   — DROP PROCEDURE name
+//   drop_procedure(name).if_exists()       — DROP PROCEDURE IF EXISTS name
+//   call_procedure(name)                   — CALL name()
+//   call_procedure(name, args)             — CALL name(args)
+// ===================================================================
+
+namespace ddl_detail {
+
+class drop_procedure_if_exists_builder {
+public:
+    explicit drop_procedure_if_exists_builder(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP PROCEDURE IF EXISTS " + name_;
+    }
+
+private:
+    std::string name_;
+};
+
+class drop_procedure_builder {
+public:
+    explicit drop_procedure_builder(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] drop_procedure_if_exists_builder if_exists() const {
+        return drop_procedure_if_exists_builder{name_};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP PROCEDURE " + name_;
+    }
+
+private:
+    std::string name_;
+};
+
+class create_procedure_builder {
+public:
+    create_procedure_builder(std::string name, std::string params, std::string body)
+        : name_(std::move(name)), params_(std::move(params)), body_(std::move(body)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "CREATE PROCEDURE " + name_ + "(" + params_ + ")\nBEGIN\n" + body_ + "\nEND";
+    }
+
+private:
+    std::string name_;
+    std::string params_;
+    std::string body_;
+};
+
+class call_builder {
+public:
+    explicit call_builder(std::string name, std::string args = {})
+        : name_(std::move(name)), args_(std::move(args)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "CALL " + name_ + "(" + args_ + ")";
+    }
+
+private:
+    std::string name_;
+    std::string args_;
+};
+
+}  // namespace ddl_detail
+
+[[nodiscard]] inline ddl_detail::create_procedure_builder create_procedure(std::string name, std::string params,
+                                                                            std::string body) {
+    return {std::move(name), std::move(params), std::move(body)};
+}
+
+[[nodiscard]] inline ddl_detail::drop_procedure_builder drop_procedure(std::string name) {
+    return ddl_detail::drop_procedure_builder{std::move(name)};
+}
+
+[[nodiscard]] inline ddl_detail::call_builder call_procedure(std::string name, std::string args = {}) {
+    return ddl_detail::call_builder{std::move(name), std::move(args)};
+}
+
+// ===================================================================
+// Triggers
+//
+// Entry points (executeable via db.execute()):
+//   create_trigger<T>(name, timing, event, body)  — CREATE TRIGGER name timing event ON table FOR EACH ROW body
+//   drop_trigger<T>(name)                          — DROP TRIGGER name
+//   drop_trigger<T>(name).if_exists()              — DROP TRIGGER IF EXISTS name
+// ===================================================================
+
+enum class TriggerTiming {
+    Before,
+    After,
+};
+
+enum class TriggerEvent {
+    Insert,
+    Update,
+    Delete,
+};
+
+namespace ddl_detail {
+
+[[nodiscard]] inline std::string to_sql_trigger_timing(TriggerTiming timing) {
+    return timing == TriggerTiming::Before ? "BEFORE" : "AFTER";
+}
+
+[[nodiscard]] inline std::string to_sql_trigger_event(TriggerEvent event) {
+    switch (event) {
+        case TriggerEvent::Insert:
+            return "INSERT";
+        case TriggerEvent::Update:
+            return "UPDATE";
+        case TriggerEvent::Delete:
+            return "DELETE";
+    }
+    return "INSERT";
+}
+
+template <typename T>
+class drop_trigger_if_exists_builder {
+public:
+    explicit drop_trigger_if_exists_builder(std::string trigger_name) : trigger_name_(std::move(trigger_name)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP TRIGGER IF EXISTS " + trigger_name_;
+    }
+
+private:
+    std::string trigger_name_;
+};
+
+template <typename T>
+class drop_trigger_builder {
+public:
+    explicit drop_trigger_builder(std::string trigger_name) : trigger_name_(std::move(trigger_name)) {
+    }
+
+    [[nodiscard]] drop_trigger_if_exists_builder<T> if_exists() const {
+        return drop_trigger_if_exists_builder<T>{trigger_name_};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP TRIGGER " + trigger_name_;
+    }
+
+private:
+    std::string trigger_name_;
+};
+
+template <typename T>
+class create_trigger_builder {
+public:
+    create_trigger_builder(std::string trigger_name, TriggerTiming timing, TriggerEvent event, std::string body)
+        : trigger_name_(std::move(trigger_name)), timing_(timing), event_(event), body_(std::move(body)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        return "CREATE TRIGGER " + trigger_name_ + " " + to_sql_trigger_timing(timing_) + " " +
+               to_sql_trigger_event(event_) + " ON " + std::string(table_name) + " FOR EACH ROW\n" + body_;
+    }
+
+private:
+    std::string trigger_name_;
+    TriggerTiming timing_;
+    TriggerEvent event_;
+    std::string body_;
+};
+
+}  // namespace ddl_detail
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::create_trigger_builder<T> create_trigger(std::string name, TriggerTiming timing,
+                                                                    TriggerEvent event, std::string body) {
+    return {std::move(name), timing, event, std::move(body)};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_trigger_builder<T> drop_trigger(std::string name) {
+    return ddl_detail::drop_trigger_builder<T>{std::move(name)};
+}
+
+// ===================================================================
+// GRANT / REVOKE
+//
+// Entry points (executeable via db.execute()):
+//   grant(privileges, object, grantee)             — GRANT privileges ON object TO grantee
+//   grant(privileges, object, grantee).with_grant_option() — ... WITH GRANT OPTION
+//   revoke(privileges, object, grantee)            — REVOKE privileges ON object FROM grantee
+// ===================================================================
+
+namespace ddl_detail {
+
+class grant_with_option_builder {
+public:
+    grant_with_option_builder(std::string privileges, std::string object, std::string grantee)
+        : privileges_(std::move(privileges)), object_(std::move(object)), grantee_(std::move(grantee)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "GRANT " + privileges_ + " ON " + object_ + " TO " + grantee_ + " WITH GRANT OPTION";
+    }
+
+private:
+    std::string privileges_;
+    std::string object_;
+    std::string grantee_;
+};
+
+class grant_builder {
+public:
+    grant_builder(std::string privileges, std::string object, std::string grantee)
+        : privileges_(std::move(privileges)), object_(std::move(object)), grantee_(std::move(grantee)) {
+    }
+
+    [[nodiscard]] grant_with_option_builder with_grant_option() const {
+        return {privileges_, object_, grantee_};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "GRANT " + privileges_ + " ON " + object_ + " TO " + grantee_;
+    }
+
+private:
+    std::string privileges_;
+    std::string object_;
+    std::string grantee_;
+};
+
+class revoke_builder {
+public:
+    revoke_builder(std::string privileges, std::string object, std::string grantee)
+        : privileges_(std::move(privileges)), object_(std::move(object)), grantee_(std::move(grantee)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "REVOKE " + privileges_ + " ON " + object_ + " FROM " + grantee_;
+    }
+
+private:
+    std::string privileges_;
+    std::string object_;
+    std::string grantee_;
+};
+
+}  // namespace ddl_detail
+
+[[nodiscard]] inline ddl_detail::grant_builder grant(std::string privileges, std::string object,
+                                                      std::string grantee) {
+    return {std::move(privileges), std::move(object), std::move(grantee)};
+}
+
+[[nodiscard]] inline ddl_detail::revoke_builder revoke(std::string privileges, std::string object,
+                                                        std::string grantee) {
+    return {std::move(privileges), std::move(object), std::move(grantee)};
+}
+
 }  // namespace ds_mysql

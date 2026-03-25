@@ -1309,3 +1309,124 @@ suite<"DDL USE"> ddl_use_suite = [] {
 };
 
 static_assert(SqlStatement<ddl_detail::use_builder<test_db>>, "use_builder must satisfy SqlStatement");
+
+// ===================================================================
+// DDL — SHOW statements
+// ===================================================================
+
+suite<"DDL SHOW"> ddl_show_suite = [] {
+    "show_databases - generates SHOW DATABASES"_test = [] {
+        auto const sql = show_databases().build_sql();
+        expect(sql == "SHOW DATABASES"s) << sql;
+    };
+
+    "show_tables - generates SHOW TABLES"_test = [] {
+        auto const sql = show_tables().build_sql();
+        expect(sql == "SHOW TABLES"s) << sql;
+    };
+
+    "show_columns - generates SHOW COLUMNS FROM table"_test = [] {
+        auto const sql = show_columns<test_table>().build_sql();
+        expect(sql == "SHOW COLUMNS FROM test_table"s) << sql;
+    };
+
+    "show_create_table - generates SHOW CREATE TABLE"_test = [] {
+        auto const sql = show_create_table<test_table>().build_sql();
+        expect(sql == "SHOW CREATE TABLE test_table"s) << sql;
+    };
+};
+
+// ===================================================================
+// DDL — Stored Procedures
+// ===================================================================
+
+suite<"DDL procedures"> ddl_procedure_suite = [] {
+    "create_procedure - generates CREATE PROCEDURE"_test = [] {
+        auto const sql = create_procedure("usp_hello", "", "SELECT 1;").build_sql();
+        expect(sql == "CREATE PROCEDURE usp_hello()\nBEGIN\nSELECT 1;\nEND"s) << sql;
+    };
+
+    "create_procedure with params - includes params"_test = [] {
+        auto const sql = create_procedure("usp_add", "IN a INT, IN b INT", "SELECT a + b;").build_sql();
+        expect(sql == "CREATE PROCEDURE usp_add(IN a INT, IN b INT)\nBEGIN\nSELECT a + b;\nEND"s) << sql;
+    };
+
+    "drop_procedure - generates DROP PROCEDURE"_test = [] {
+        auto const sql = drop_procedure("usp_hello").build_sql();
+        expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
+    };
+
+    "drop_procedure.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
+        auto const sql = drop_procedure("usp_hello").if_exists().build_sql();
+        expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
+    };
+
+    "call_procedure no args - generates CALL name()"_test = [] {
+        auto const sql = call_procedure("usp_hello").build_sql();
+        expect(sql == "CALL usp_hello()"s) << sql;
+    };
+
+    "call_procedure with args - generates CALL name(args)"_test = [] {
+        auto const sql = call_procedure("usp_add", "1, 2").build_sql();
+        expect(sql == "CALL usp_add(1, 2)"s) << sql;
+    };
+};
+
+// ===================================================================
+// DDL — Triggers
+// ===================================================================
+
+suite<"DDL triggers"> ddl_trigger_suite = [] {
+    "create_trigger BEFORE INSERT - generates correct SQL"_test = [] {
+        auto const sql =
+            create_trigger<test_table>("trg_before_insert", TriggerTiming::Before, TriggerEvent::Insert,
+                                       "SET NEW.name = UPPER(NEW.name);")
+                .build_sql();
+        expect(sql ==
+               "CREATE TRIGGER trg_before_insert BEFORE INSERT ON test_table FOR EACH ROW\n"
+               "SET NEW.name = UPPER(NEW.name);"s)
+            << sql;
+    };
+
+    "create_trigger AFTER UPDATE - generates correct SQL"_test = [] {
+        auto const sql =
+            create_trigger<test_table>("trg_after_update", TriggerTiming::After, TriggerEvent::Update,
+                                       "INSERT INTO audit_log VALUES (OLD.id, NOW());")
+                .build_sql();
+        expect(sql ==
+               "CREATE TRIGGER trg_after_update AFTER UPDATE ON test_table FOR EACH ROW\n"
+               "INSERT INTO audit_log VALUES (OLD.id, NOW());"s)
+            << sql;
+    };
+
+    "drop_trigger - generates DROP TRIGGER"_test = [] {
+        auto const sql = drop_trigger<test_table>("trg_before_insert").build_sql();
+        expect(sql == "DROP TRIGGER trg_before_insert"s) << sql;
+    };
+
+    "drop_trigger.if_exists - generates DROP TRIGGER IF EXISTS"_test = [] {
+        auto const sql = drop_trigger<test_table>("trg_before_insert").if_exists().build_sql();
+        expect(sql == "DROP TRIGGER IF EXISTS trg_before_insert"s) << sql;
+    };
+};
+
+// ===================================================================
+// DDL — GRANT / REVOKE
+// ===================================================================
+
+suite<"DDL grant_revoke"> ddl_grant_revoke_suite = [] {
+    "grant - generates GRANT ... ON ... TO ..."_test = [] {
+        auto const sql = grant("SELECT, INSERT", "mydb.*", "'user'@'localhost'").build_sql();
+        expect(sql == "GRANT SELECT, INSERT ON mydb.* TO 'user'@'localhost'"s) << sql;
+    };
+
+    "grant.with_grant_option - appends WITH GRANT OPTION"_test = [] {
+        auto const sql = grant("ALL PRIVILEGES", "*.*", "'admin'@'%'").with_grant_option().build_sql();
+        expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%' WITH GRANT OPTION"s) << sql;
+    };
+
+    "revoke - generates REVOKE ... ON ... FROM ..."_test = [] {
+        auto const sql = revoke("SELECT", "mydb.*", "'user'@'localhost'").build_sql();
+        expect(sql == "REVOKE SELECT ON mydb.* FROM 'user'@'localhost'"s) << sql;
+    };
+};

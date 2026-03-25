@@ -22,6 +22,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `release_savepoint(name)` — `RELEASE SAVEPOINT name`
 - `rollback_to_savepoint(name)` — `ROLLBACK TO SAVEPOINT name`
 - `set_transaction_isolation_level(IsolationLevel)` — `SET TRANSACTION ISOLATION LEVEL ...` with `IsolationLevel::{ReadUncommitted, ReadCommitted, RepeatableRead, Serializable}`
+- `show_databases()` — `SHOW DATABASES` (queryable, result is `std::tuple<std::string>` per row)
+- `show_tables()` — `SHOW TABLES` (queryable, result is `std::tuple<std::string>` per row)
+- `show_columns<T>()` — `SHOW COLUMNS FROM table` (queryable, same row type as `describe<T>()`)
+- `show_create_table<T>()` — `SHOW CREATE TABLE table` (queryable, result is `std::tuple<std::string, std::string>`)
+- `create_procedure(name, params, body)` — `CREATE PROCEDURE name(params) BEGIN body END`
+- `drop_procedure(name)` / `.if_exists()` — `DROP PROCEDURE [IF EXISTS] name`
+- `call_procedure(name [, args])` — `CALL name([args])`
+- `create_trigger<T>(name, TriggerTiming, TriggerEvent, body)` — `CREATE TRIGGER ... ON table FOR EACH ROW body`; `TriggerTiming::{Before, After}`, `TriggerEvent::{Insert, Update, Delete}`
+- `drop_trigger<T>(name)` / `.if_exists()` — `DROP TRIGGER [IF EXISTS] name`
+- `grant(privileges, object, grantee)` / `.with_grant_option()` — `GRANT ... ON ... TO ... [WITH GRANT OPTION]`
+- `revoke(privileges, object, grantee)` — `REVOKE ... ON ... FROM ...`
 
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause
 - `inner_join_using<T, Cols...>()`, `left_join_using<T, Cols...>()`, `right_join_using<T, Cols...>()`, `full_join_using<T, Cols...>()` — `JOIN ... USING (col1, col2, ...)` with one or more column descriptors
