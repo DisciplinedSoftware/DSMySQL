@@ -1543,23 +1543,14 @@ public:
 
     // CHANGE COLUMN old_name new_name new_type [NOT NULL]
     // OldCol: existing column (provides the current name).
-    // NewType: new SQL type; wrap in std::optional<> to make the column nullable.
-    template <ColumnDescriptor OldCol, typename NewType>
-    [[nodiscard]] alter_table_builder change_column(std::string new_name) const {
+    // NewCol: ColumnDescriptor providing the new column name and type; use std::optional<T> in NewCol's
+    //         value type to make the column nullable.
+    template <ColumnDescriptor OldCol, ColumnDescriptor NewCol>
+    [[nodiscard]] alter_table_builder change_column() const {
         auto copy = *this;
         std::string act = "CHANGE COLUMN " + std::string(column_traits<OldCol>::column_name()) + " " +
-                          std::move(new_name) + " " + sql_type_name<NewType>::value();
-        // Determine nullability: optional_type → nullable; ColumnFieldType → check value_type; else → NOT NULL.
-        constexpr bool nullable = [] {
-            if constexpr (is_optional_v<NewType>) {
-                return true;
-            } else if constexpr (ColumnFieldType<NewType>) {
-                return is_optional_v<typename NewType::value_type>;
-            } else {
-                return false;
-            }
-        }();
-        if (!nullable) {
+                          std::string(column_traits<NewCol>::column_name()) + " " + sql_type_name<NewCol>::value();
+        if (!is_field_nullable_v<NewCol>) {
             act += " NOT NULL";
         }
         copy.actions_.push_back(std::move(act));

@@ -12,7 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `check_id` — strong type for CHECK constraint names; prevents confusion with the expression string
 - `table_constraint::check(where_condition, check_id)` — typed overload that accepts any WHERE-style predicate (`equal`, `greater_than`, `&`, `|`, `!`, …) and a `check_id` constraint name; the old `check(string_view, string_view)` overload has been removed
-- `alter_table<T>().change_column<OldCol, NewType>(new_name)` — `CHANGE COLUMN old new type [NOT NULL]`; use `std::optional<NewType>` to make the result nullable
+- `alter_table<T>().change_column<OldCol, NewCol>()` — `CHANGE COLUMN old new type [NOT NULL]`; `NewCol` is a `ColumnDescriptor` (e.g. `column_field<"new_name", T>`) providing the new column name and type; use `std::optional<T>` to make the column nullable
 - `alter_table<T>().add_column<Col>()` and `.modify_column<Col>()` now infer SQL type and nullability from the column descriptor — no more string type or bool parameter
 - `alter_table<T>().add_index<Cols...>(name)` — `ADD INDEX name (col1, ...)`
 - `alter_table<T>().add_unique_index<Cols...>(name)` — `ADD UNIQUE INDEX name (col1, ...)`
