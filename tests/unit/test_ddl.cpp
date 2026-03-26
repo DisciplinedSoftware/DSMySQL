@@ -1444,23 +1444,3 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 };
 
-// ===================================================================
-// DDL — GRANT / REVOKE
-// ===================================================================
-
-suite<"DDL grant_revoke"> ddl_grant_revoke_suite = [] {
-    "grant - generates GRANT ... ON ... TO ..."_test = [] {
-        auto const sql = grant("SELECT, INSERT", "mydb.*", "'user'@'localhost'").build_sql();
-        expect(sql == "GRANT SELECT, INSERT ON mydb.* TO 'user'@'localhost'"s) << sql;
-    };
-
-    "grant.with_grant_option - appends WITH GRANT OPTION"_test = [] {
-        auto const sql = grant("ALL PRIVILEGES", "*.*", "'admin'@'%'").with_grant_option().build_sql();
-        expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%' WITH GRANT OPTION"s) << sql;
-    };
-
-    "revoke - generates REVOKE ... ON ... FROM ..."_test = [] {
-        auto const sql = revoke("SELECT", "mydb.*", "'user'@'localhost'").build_sql();
-        expect(sql == "REVOKE SELECT ON mydb.* FROM 'user'@'localhost'"s) << sql;
-    };
-};

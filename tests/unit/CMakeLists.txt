@@ -16,6 +16,7 @@ endif()
 
 add_executable(tests_unit_ds_mysql
     main.cpp
+    test_dcl.cpp
     test_ddl.cpp
     test_dml.cpp
     test_dql.cpp

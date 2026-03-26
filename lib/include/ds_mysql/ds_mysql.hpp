@@ -15,6 +15,7 @@
 
 #include "ds_mysql/metadata.hpp"
 #include "ds_mysql/mysql_connection.hpp"
+#include "ds_mysql/sql_dcl.hpp"
 #include "ds_mysql/sql_ddl.hpp"
 #include "ds_mysql/sql_dml.hpp"
 #include "ds_mysql/sql_dql.hpp"

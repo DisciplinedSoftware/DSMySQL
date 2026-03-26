@@ -38,8 +38,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `trigger_id<"name">` — compile-time trigger name type (satisfies `NamedIdType`)
 - `create_trigger<trigger_id<"name">, T>(TriggerTiming, TriggerEvent, body)` — `CREATE TRIGGER ... ON table FOR EACH ROW body`; `TriggerTiming::{Before, After}`, `TriggerEvent::{Insert, Update, Delete}`
 - `drop_trigger<trigger_id<"name">, T>()` / `.if_exists()` — `DROP TRIGGER [IF EXISTS] name`
-- `grant(privileges, object, grantee)` / `.with_grant_option()` — `GRANT ... ON ... TO ... [WITH GRANT OPTION]`
-- `revoke(privileges, object, grantee)` — `REVOKE ... ON ... FROM ...`
+- `sql_dcl.hpp` — new dedicated header for DCL (GRANT / REVOKE); included automatically by `ds_mysql.hpp`
+- `privilege` enum — all MySQL privilege types: `select`, `insert`, `update`, `delete_`, `create`, `drop`, `references`, `index`, `alter`, `create_view`, `show_view`, `create_routine`, `alter_routine`, `execute`, `trigger`, `event`, `create_temporary_tables`, `lock_tables`, `reload`, `shutdown`, `process`, `file`, `show_databases`, `super`, `replication_slave`, `replication_client`, `create_user`, `create_tablespace`, `all`
+- `privilege_list` — composable runtime privilege set via rvalue-chained fluent builder: `privileges().select().insert()`
+- `on::global()` — grant target for `*.*` (all databases)
+- `on::schema(database_name)` — grant target for `db.*`
+- `on::table<T>(database_name)` — grant target for `db.table`; table name derived at compile time from `ValidTable` type via `table_name_for<T>`
+- `on::table<DB, T>()` — grant target for `db.table`; both database and table names derived at compile time from their types via `database_name_for<DB>` and `table_name_for<T>`
+- `user(user_name).at(host_name)` / `.at_any_host()` / `.at_localhost()` — compose a MySQL account (`'user'@'host'`) as a strongly-typed `grant_user`
+- `grant(privilege_list, grant_target, grant_user)` / `.with_grant_option()` — `GRANT ... ON ... TO ... [WITH GRANT OPTION]`
+- `grant<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `grant`
+- `revoke(privilege_list, grant_target, grant_user)` — `REVOKE ... ON ... FROM ...`
+- `revoke<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `revoke`
+
+### Changed
+
+- **Breaking:** `grant` and `revoke` now require strongly-typed `privilege_list`, `grant_target`, and `grant_user` arguments instead of plain strings; the old string-based overloads have been removed
 
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause
 - `inner_join_using<T, Cols...>()`, `left_join_using<T, Cols...>()`, `right_join_using<T, Cols...>()`, `full_join_using<T, Cols...>()` — `JOIN ... USING (col1, col2, ...)` with one or more column descriptors
