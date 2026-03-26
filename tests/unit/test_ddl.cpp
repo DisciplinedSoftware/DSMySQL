@@ -751,7 +751,7 @@ suite<"DDL"> ddl_suite = [] {
     "table_constraint::check - typed predicate with check_id"_test = [] {
         // Simple comparison predicate
         auto const sql =
-            table_constraint::check(greater_than<test_table::id>(0u), check_id<"chk_positive_id">{});
+            table_constraint::check<check_id<"chk_positive_id">>(greater_than<test_table::id>(0u));
         expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
     };
 
@@ -761,15 +761,14 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
-        auto const sql = table_constraint::check(
-            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u),
-            check_id<"chk_id_range">{});
+        auto const sql = table_constraint::check<check_id<"chk_id_range">>(
+            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u));
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 
     "table_constraint::check - nullable column predicate"_test = [] {
         // Using a nullable column (std::optional<varchar_type<64>>)
-        auto const sql = table_constraint::check(is_not_null<test_table::tag>(), check_id<"chk_tag_present">{});
+        auto const sql = table_constraint::check<check_id<"chk_tag_present">>(is_not_null<test_table::tag>());
         expect(sql == "CONSTRAINT chk_tag_present CHECK (tag IS NOT NULL)"s) << sql;
     };
 
@@ -1131,7 +1130,7 @@ suite<"DDL Features"> ddl_features_suite = [] {
         auto const sql = alter_table<test_table>()
                              .add_column<test_table::name>()
                              .modify_column<test_table::name>()
-                             .rename_column<test_table::name>("display_name")
+                             .rename_column<test_table::name, column_field<"display_name", varchar_type<255>>>()
                              .drop_column<test_table::name>()
                              .rename_to<renamed_table>()
                              .build_sql();

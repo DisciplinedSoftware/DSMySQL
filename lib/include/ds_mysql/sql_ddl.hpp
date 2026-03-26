@@ -197,15 +197,15 @@ template <ColumnDescriptor... Cols>
 //   table_constraint::check(greater_than<my_table::price>(0.0))
 //   // → CHECK (price > 0)
 //
-// With constraint name via check_id<N>:
-//   table_constraint::check(greater_than<my_table::price>(0.0), check_id<"chk_positive_price">{})
+// With constraint name as template parameter:
+//   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
 [[nodiscard]] inline std::string check(where_condition const& expr) {
     return "CHECK (" + expr.build_sql() + ')';
 }
 
 template <NamedIdType CId>
-[[nodiscard]] inline std::string check(where_condition const& expr, CId) {
+[[nodiscard]] inline std::string check(where_condition const& expr) {
     return "CONSTRAINT " + std::string(CId::name()) + " CHECK (" + expr.build_sql() + ')';
 }
 
@@ -1461,11 +1461,14 @@ public:
         return copy;
     }
 
-    template <ColumnDescriptor Col>
-    [[nodiscard]] alter_table_builder rename_column(std::string new_name) const {
+    // RENAME COLUMN old_name TO new_name
+    // NewCol must be a ColumnDescriptor with the same value_type as OldCol.
+    template <ColumnDescriptor OldCol, ColumnDescriptor NewCol>
+        requires std::same_as<typename OldCol::value_type, typename NewCol::value_type>
+    [[nodiscard]] alter_table_builder rename_column() const {
         auto copy = *this;
-        copy.actions_.push_back("RENAME COLUMN " + std::string(column_traits<Col>::column_name()) + " TO " +
-                                std::move(new_name));
+        copy.actions_.push_back("RENAME COLUMN " + std::string(column_traits<OldCol>::column_name()) + " TO " +
+                                std::string(column_traits<NewCol>::column_name()));
         return copy;
     }
 
