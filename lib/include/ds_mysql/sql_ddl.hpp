@@ -216,19 +216,6 @@ template <ColumnDescriptor... Cols>
     return s;
 }
 
-[[nodiscard]] inline std::string check(std::string_view expression, std::string_view constraint_name = {}) {
-    std::string s;
-    if (!constraint_name.empty()) {
-        s += "CONSTRAINT ";
-        s += constraint_name;
-        s += ' ';
-    }
-    s += "CHECK (";
-    s += expression;
-    s += ')';
-    return s;
-}
-
 // Typed overload: accepts a WHERE-style predicate (where_condition) and a check_id constraint name.
 // Nullability, column name, and value are all derived from the typed predicate.
 //

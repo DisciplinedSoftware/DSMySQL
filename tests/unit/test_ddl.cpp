@@ -743,25 +743,22 @@ suite<"DDL"> ddl_suite = [] {
         expect(table_constraint::unique_key<test_table::name>("uq_test_name") == "UNIQUE KEY uq_test_name (name)"s);
         expect(table_constraint::fulltext_key<test_table::name>("ft_test_name") == "FULLTEXT KEY ft_test_name (name)"s);
         expect(table_constraint::spatial_key<test_table::id>("sp_test_id") == "SPATIAL KEY sp_test_id (id)"s);
-        expect(table_constraint::check("id > 0", "chk_positive_id") == "CONSTRAINT chk_positive_id CHECK (id > 0)"s);
     };
 
     "table_constraint::check - typed predicate with check_id"_test = [] {
         // Simple comparison predicate
-        auto const sql =
-            table_constraint::check(greater_than(test_table::id{0u}), check_id{"chk_positive_id"});
+        auto const sql = table_constraint::check(greater_than<test_table::id>(0u), check_id{"chk_positive_id"});
         expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
     };
 
     "table_constraint::check - typed predicate without constraint name"_test = [] {
-        auto const sql = table_constraint::check(greater_than(test_table::id{0u}));
+        auto const sql = table_constraint::check(greater_than<test_table::id>(0u));
         expect(sql == "CHECK (id > 0)"s) << sql;
     };
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
         auto const sql = table_constraint::check(
-            greater_than(test_table::id{0u}) & less_than_or_equal(test_table::id{100u}),
-            check_id{"chk_id_range"});
+            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u), check_id{"chk_id_range"});
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 

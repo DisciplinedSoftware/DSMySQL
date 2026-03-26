@@ -91,10 +91,12 @@ struct ds_mysql::table_constraints<order_detail> {
             ds_mysql::table_constraint::unique_key<order_detail::order_id, order_detail::line_number>("uq_order_line"),
 
             // Define CHECK constraint: quantity > 0
-            ds_mysql::table_constraint::check("quantity > 0", "chk_positive_quantity"),
+            ds_mysql::table_constraint::check(ds_mysql::greater_than<order_detail::quantity>(0u),
+                ds_mysql::check_id{"chk_positive_quantity"}),
 
             // Define CHECK constraint: unit_price >= 0
-            ds_mysql::table_constraint::check("unit_price >= 0", "chk_non_negative_price"),
+            ds_mysql::table_constraint::check(ds_mysql::greater_than_or_equal<order_detail::unit_price>(0.0),
+                ds_mysql::check_id{"chk_non_negative_price"}),
         };
     }
 };
