@@ -275,18 +275,18 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - set only - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set(asset::ticker{"MSFT"}).build_sql();
+        auto const sql = update<asset>().set<asset::ticker>("MSFT").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT'"s) << sql;
     };
 
     "update - set with where - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set(asset::ticker{"MSFT"}).where(equal<asset::id>(1u)).build_sql();
+        auto const sql = update<asset>().set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE id = 1"s) << sql;
     };
 
     "update - set with complex where - generates correct SQL"_test = [] {
         auto const sql = update<asset>()
-                             .set(asset::name{"Apple Inc"})
+                             .set<asset::name>("Apple Inc")
                              .where(and_(equal<asset::ticker>(asset::ticker{"AAPL"}), equal<asset::exchange_id>(2u)))
                              .build_sql();
         expect(sql == "UPDATE asset SET name = 'Apple Inc' WHERE (ticker = 'AAPL' AND exchange_id = 2)"s) << sql;
@@ -294,13 +294,13 @@ suite<"DML"> dml_suite = [] {
 
     "update - order_by + limit - generates correct SQL"_test = [] {
         auto const sql =
-            update<asset>().set(asset::ticker{"MSFT"}).order_by<asset::id, sort_order::desc>().limit(1).build_sql();
+            update<asset>().set<asset::ticker>("MSFT").order_by<asset::id, sort_order::desc>().limit(1).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' ORDER BY id DESC LIMIT 1"s) << sql;
     };
 
     "update - where + order_by + limit - generates correct SQL"_test = [] {
         auto const sql = update<asset>()
-                             .set(asset::ticker{"MSFT"})
+                             .set<asset::ticker>("MSFT")
                              .where(is_not_null<asset::sector>())
                              .order_by<asset::id>()
                              .limit(3)
@@ -361,7 +361,7 @@ suite<"DML"> dml_suite = [] {
     };
 
     // -------------------------------------------------------------------
-    // Typed where_condition predicates
+    // Typed sql_predicate predicates
     // -------------------------------------------------------------------
 
     "equal - varchar column - generates correct SQL"_test = [] {
@@ -435,7 +435,7 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - typed where with equal - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set(asset::ticker{"MSFT"}).where(equal<asset::id>(1u)).build_sql();
+        auto const sql = update<asset>().set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE id = 1"s) << sql;
     };
 
@@ -529,15 +529,49 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - set multiple columns - generates comma-separated SET"_test = [] {
-        auto const sql = update<asset>().set(asset::ticker{"MSFT"}, asset::instrument{"Software"}).build_sql();
+        auto const sql = update<asset>().set<asset::ticker, asset::instrument>("MSFT", "Software").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 
     "update - set three columns - generates all columns in SET"_test = [] {
         auto const sql = update<asset>()
-                             .set(asset::ticker{"AMZN"}, asset::instrument{"E-Commerce"}, asset::currency{"USD"})
+                             .set<asset::ticker, asset::instrument, asset::currency>("AMZN", "E-Commerce", "USD")
                              .build_sql();
         expect(sql == "UPDATE asset SET ticker = 'AMZN', instrument = 'E-Commerce', currency = 'USD'"s) << sql;
+    };
+
+    // -------------------------------------------------------------------
+    // update<T> chained set
+    // -------------------------------------------------------------------
+
+    "update - chained set (template form) - generates same SQL as single set call"_test = [] {
+        auto const sql =
+            update<asset>().set<asset::ticker>("MSFT").set<asset::instrument>("Software").build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
+    };
+
+    "update - chained set (instance form) - generates same SQL as single set call"_test = [] {
+        auto const sql =
+            update<asset>().set(asset::ticker{"MSFT"}).set(asset::instrument{"Software"}).build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
+    };
+
+    "update - three chained set calls - accumulates all columns"_test = [] {
+        auto const sql = update<asset>()
+                             .set<asset::ticker>("AMZN")
+                             .set<asset::instrument>("E-Commerce")
+                             .set<asset::currency>("USD")
+                             .build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'AMZN', instrument = 'E-Commerce', currency = 'USD'"s) << sql;
+    };
+
+    "update - chained set then where - generates correct SQL"_test = [] {
+        auto const sql = update<asset>()
+                             .set<asset::ticker>("MSFT")
+                             .set<asset::instrument>("Software")
+                             .where(equal<asset::id>(1u))
+                             .build_sql();
+        expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software' WHERE id = 1"s) << sql;
     };
 };
 

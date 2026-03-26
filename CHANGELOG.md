@@ -13,7 +13,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `check_id<"name">` — compile-time CHECK constraint name type; pass as second argument to `table_constraint::check` to emit a named constraint
 - `index_id<"name">` — compile-time index name type; used as the first template parameter wherever an index name is required (`create_index_on`, `drop_index_on`, `add_index`, `add_unique_index`, `add_fulltext_index`, `table_constraint::key`, `unique_key`, `fulltext_key`, `spatial_key`)
 - `NamedIdType` concept — satisfied by `check_id<N>`, `index_id<N>`, and any user-defined type providing a static `name()` → `std::string_view`
-- `table_constraint::check(where_condition)` / `check<check_id<"name">>(where_condition)` — typed CHECK constraint from any WHERE-style predicate; constraint name is a template parameter, not a function argument; the old `check(string_view, string_view)` overload has been removed
+- `table_constraint::check(check_expr)` / `check<check_id<"name">>(check_expr)` — typed CHECK constraint from a check-safe predicate; constraint name is a template parameter, not a function argument; the old `check(string_view, string_view)` overload has been removed
+- `check_expr` — new predicate type for expressions valid in MySQL CHECK constraints (column-ref comparisons, `BETWEEN`, `IN` with literal lists, `LIKE`, `REGEXP`, logical `&`/`|`/`!`); produced by all column-ref predicate factories; implicitly converts to `sql_predicate` so it can be used everywhere a WHERE predicate is accepted
 - `alter_table<T>().change_column<OldCol, NewCol>()` — `CHANGE COLUMN old new type [NOT NULL]`; `NewCol` is a `ColumnDescriptor` (e.g. `column_field<"new_name", T>`) providing the new column name and type; use `std::optional<T>` to make the column nullable
 - `alter_table<T>().rename_column<OldCol, NewCol>()` — `RENAME COLUMN old TO new`; `NewCol` must share the same `value_type` as `OldCol` (enforced at compile time)
 - `alter_table<T>().add_column<Col>()` and `.modify_column<Col>()` now infer SQL type and nullability from the column descriptor — no more string type or bool parameter
@@ -52,6 +53,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `revoke<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `revoke`
 
 ### Changed
+
+- **Breaking:** `where_condition` renamed to `sql_predicate`; update any code that names the type explicitly
+- **Breaking:** `table_constraint::check()` now accepts `check_expr` instead of `sql_predicate`; subquery predicates (`in_subquery`, `exists`, etc.) and `match_against` do not produce `check_expr` and will no longer compile in a CHECK context
+- Simple column-ref predicate factories (`equal`, `greater_than`, `like`, `between`, `in`, etc.) now return `check_expr` instead of `sql_predicate`; `check_expr` implicitly converts to `sql_predicate` so existing WHERE/HAVING/JOIN ON usage is unaffected
+- Subquery predicate factories (`in_subquery`, `not_in_subquery`, `exists`, `not_exists`) and `match_against` return `sql_predicate` directly (not check-safe)
 
 - **Breaking:** `grant` and `revoke` now require strongly-typed `privilege_list`, `grant_target`, and `grant_user` arguments instead of plain strings; the old string-based overloads have been removed
 

@@ -694,16 +694,16 @@ struct arith_div {};
 template <SqlValue ValueType>
 class case_when_builder {
 public:
-    case_when_builder(where_condition cond, ValueType then_val) {
+    case_when_builder(sql_predicate cond, ValueType then_val) {
         branches_.emplace_back(std::move(cond), std::move(then_val));
     }
 
-    [[nodiscard]] case_when_builder when(where_condition cond, ValueType then_val) && {
+    [[nodiscard]] case_when_builder when(sql_predicate cond, ValueType then_val) && {
         branches_.emplace_back(std::move(cond), std::move(then_val));
         return std::move(*this);
     }
 
-    [[nodiscard]] case_when_builder when(where_condition cond, ValueType then_val) const& {
+    [[nodiscard]] case_when_builder when(sql_predicate cond, ValueType then_val) const& {
         auto copy = *this;
         copy.branches_.emplace_back(std::move(cond), std::move(then_val));
         return copy;
@@ -740,12 +740,12 @@ public:
     using value_type = ValueType;
 
 private:
-    std::vector<std::pair<where_condition, ValueType>> branches_;
+    std::vector<std::pair<sql_predicate, ValueType>> branches_;
     std::optional<ValueType> else_val_;
 };
 
 template <SqlValue ValueType>
-[[nodiscard]] case_when_builder<ValueType> case_when(where_condition cond, ValueType then_val) {
+[[nodiscard]] case_when_builder<ValueType> case_when(sql_predicate cond, ValueType then_val) {
     return case_when_builder<ValueType>{std::move(cond), std::move(then_val)};
 }
 
@@ -2258,7 +2258,7 @@ struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Fra
 // agg_expr<Agg> — natural operator and method syntax for HAVING predicates
 //
 // Wraps an aggregate projection type and exposes comparison operators and
-// named methods, each returning a where_condition suitable for .having().
+// named methods, each returning a sql_predicate suitable for .having().
 //
 // Operators (mirror the col_expr<Col> API):
 //   count() == 0                → COUNT(*) = 0
@@ -2285,7 +2285,7 @@ struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Fra
 //   sum<Col>() > 100.0       — SUM(col) > 100.000000
 //   avg<Col>() >= 4.0        — AVG(col) >= 4.000000
 //
-// The resulting where_condition composes with &, |, ! operators.
+// The resulting sql_predicate composes with &, |, ! operators.
 // ===================================================================
 
 template <typename Agg>
@@ -2294,42 +2294,42 @@ struct agg_expr {
 
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator==(V const& val) const {
+    [[nodiscard]] sql_predicate operator==(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " = " + sql_detail::to_sql_value(value_type{val})};
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator!=(V const& val) const {
+    [[nodiscard]] sql_predicate operator!=(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " != " + sql_detail::to_sql_value(value_type{val})};
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator<(V const& val) const {
+    [[nodiscard]] sql_predicate operator<(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " < " + sql_detail::to_sql_value(value_type{val})};
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator>(V const& val) const {
+    [[nodiscard]] sql_predicate operator>(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " > " + sql_detail::to_sql_value(value_type{val})};
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator<=(V const& val) const {
+    [[nodiscard]] sql_predicate operator<=(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " <= " + sql_detail::to_sql_value(value_type{val})};
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition operator>=(V const& val) const {
+    [[nodiscard]] sql_predicate operator>=(V const& val) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " >= " + sql_detail::to_sql_value(value_type{val})};
@@ -2338,45 +2338,45 @@ struct agg_expr {
     // Named method equivalents
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition equal_to(V const& val) const {
+    [[nodiscard]] sql_predicate equal_to(V const& val) const {
         return *this == val;
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition not_equal_to(V const& val) const {
+    [[nodiscard]] sql_predicate not_equal_to(V const& val) const {
         return *this != val;
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition less_than(V const& val) const {
+    [[nodiscard]] sql_predicate less_than(V const& val) const {
         return *this < val;
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition greater_than(V const& val) const {
+    [[nodiscard]] sql_predicate greater_than(V const& val) const {
         return *this > val;
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition less_than_or_equal(V const& val) const {
+    [[nodiscard]] sql_predicate less_than_or_equal(V const& val) const {
         return *this <= val;
     }
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition greater_than_or_equal(V const& val) const {
+    [[nodiscard]] sql_predicate greater_than_or_equal(V const& val) const {
         return *this >= val;
     }
 
     template <typename V>
         requires std::constructible_from<value_type, V const&>
-    [[nodiscard]] where_condition between(V const& low, V const& high) const {
+    [[nodiscard]] sql_predicate between(V const& low, V const& high) const {
         return {{},
                 {},
                 std::string(projection_traits<Agg>::sql_expr()) + " BETWEEN " +
                     sql_detail::to_sql_value(value_type{low}) + " AND " + sql_detail::to_sql_value(value_type{high})};
     }
 
-    [[nodiscard]] where_condition in(std::initializer_list<value_type> vals) const {
+    [[nodiscard]] sql_predicate in(std::initializer_list<value_type> vals) const {
         std::string s;
         s += std::string(projection_traits<Agg>::sql_expr());
         s += " IN (";
@@ -2392,11 +2392,11 @@ struct agg_expr {
         return {{}, {}, std::move(s)};
     }
 
-    [[nodiscard]] where_condition is_null() const noexcept {
+    [[nodiscard]] sql_predicate is_null() const noexcept {
         return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " IS NULL"};
     }
 
-    [[nodiscard]] where_condition is_not_null() const noexcept {
+    [[nodiscard]] sql_predicate is_not_null() const noexcept {
         return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " IS NOT NULL"};
     }
 };
@@ -2422,47 +2422,47 @@ template <ColumnDescriptor Col>
 //   min_of<Col>() < n        → MIN(col) < n
 //   max_of<Col>() > n        → MAX(col) > n
 //
-// These compose with &, |, ! like any other where_condition.
+// These compose with &, |, ! like any other sql_predicate.
 // ===================================================================
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator==(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator==(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " = " + sql_detail::to_sql_value(vt{val})};
 }
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator!=(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator!=(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " != " + sql_detail::to_sql_value(vt{val})};
 }
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator<(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator<(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " < " + sql_detail::to_sql_value(vt{val})};
 }
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator>(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator>(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " > " + sql_detail::to_sql_value(vt{val})};
 }
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator<=(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator<=(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " <= " + sql_detail::to_sql_value(vt{val})};
 }
 
 template <AggregateProjection Agg, typename V>
     requires std::constructible_from<typename projection_traits<Agg>::value_type, V const&>
-[[nodiscard]] where_condition operator>=(Agg const&, V const& val) {
+[[nodiscard]] sql_predicate operator>=(Agg const&, V const& val) {
     using vt = typename projection_traits<Agg>::value_type;
     return {{}, {}, std::string(projection_traits<Agg>::sql_expr()) + " >= " + sql_detail::to_sql_value(vt{val})};
 }
@@ -2784,12 +2784,12 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    [[nodiscard]] select_query_builder where(where_condition cond) const& {
+    [[nodiscard]] select_query_builder where(sql_predicate cond) const& {
         auto copy = *this;
         copy.where_ = std::move(cond);
         return copy;
     }
-    [[nodiscard]] select_query_builder where(where_condition cond) && {
+    [[nodiscard]] select_query_builder where(sql_predicate cond) && {
         where_ = std::move(cond);
         return std::move(*this);
     }
@@ -2834,12 +2834,12 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    [[nodiscard]] select_query_builder having(where_condition cond) const& {
+    [[nodiscard]] select_query_builder having(sql_predicate cond) const& {
         auto copy = *this;
         copy.having_ = std::move(cond);
         return copy;
     }
-    [[nodiscard]] select_query_builder having(where_condition cond) && {
+    [[nodiscard]] select_query_builder having(sql_predicate cond) && {
         having_ = std::move(cond);
         return std::move(*this);
     }
@@ -3140,41 +3140,41 @@ struct select_query_builder {
 
     // join_on — JOIN with arbitrary ON condition (compound ON support)
     template <typename RightTable>
-    [[nodiscard]] select_query_builder inner_join_on(where_condition on_cond) const& {
+    [[nodiscard]] select_query_builder inner_join_on(sql_predicate on_cond) const& {
         return add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder inner_join_on(where_condition on_cond) && {
+    [[nodiscard]] select_query_builder inner_join_on(sql_predicate on_cond) && {
         return std::move(*this).add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
 
     template <typename RightTable>
-    [[nodiscard]] select_query_builder left_join_on(where_condition on_cond) const& {
+    [[nodiscard]] select_query_builder left_join_on(sql_predicate on_cond) const& {
         return add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder left_join_on(where_condition on_cond) && {
+    [[nodiscard]] select_query_builder left_join_on(sql_predicate on_cond) && {
         return std::move(*this).add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
 
     template <typename RightTable>
-    [[nodiscard]] select_query_builder right_join_on(where_condition on_cond) const& {
+    [[nodiscard]] select_query_builder right_join_on(sql_predicate on_cond) const& {
         return add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder right_join_on(where_condition on_cond) && {
+    [[nodiscard]] select_query_builder right_join_on(sql_predicate on_cond) && {
         return std::move(*this).add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
 
     template <typename RightTable>
-    [[nodiscard]] select_query_builder full_join_on(where_condition on_cond) const& {
+    [[nodiscard]] select_query_builder full_join_on(sql_predicate on_cond) const& {
         return add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder full_join_on(where_condition on_cond) && {
+    [[nodiscard]] select_query_builder full_join_on(sql_predicate on_cond) && {
         return std::move(*this).add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
@@ -3288,14 +3288,14 @@ struct select_query_builder {
 
     // lateral_join_on — JOIN LATERAL (subquery) AS alias ON condition
     [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
-                                                       where_condition on_cond) const& {
+                                                       sql_predicate on_cond) const& {
         auto copy = *this;
         copy.joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
                        on_cond.build_sql();
         return copy;
     }
     [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
-                                                       where_condition on_cond) && {
+                                                       sql_predicate on_cond) && {
         joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
                   on_cond.build_sql();
         return std::move(*this);
@@ -3303,14 +3303,14 @@ struct select_query_builder {
 
     // left_lateral_join_on — LEFT JOIN LATERAL (subquery) AS alias ON condition
     [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
-                                                            where_condition on_cond) const& {
+                                                            sql_predicate on_cond) const& {
         auto copy = *this;
         copy.joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
                        on_cond.build_sql();
         return copy;
     }
     [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
-                                                            where_condition on_cond) && {
+                                                            sql_predicate on_cond) && {
         joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
                   on_cond.build_sql();
         return std::move(*this);
@@ -3329,11 +3329,11 @@ struct select_query_builder {
     }
 
     template <typename RightTable>
-    [[nodiscard]] select_query_builder straight_join_on(where_condition on_cond) const& {
+    [[nodiscard]] select_query_builder straight_join_on(sql_predicate on_cond) const& {
         return add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder straight_join_on(where_condition on_cond) && {
+    [[nodiscard]] select_query_builder straight_join_on(sql_predicate on_cond) && {
         return std::move(*this).add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
@@ -3452,13 +3452,13 @@ struct select_query_builder {
     }
 
     [[nodiscard]] select_query_builder add_join_on(std::string_view join_type, std::string_view right_table,
-                                                   where_condition on_cond) const& {
+                                                   sql_predicate on_cond) const& {
         auto copy = *this;
         copy.joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + on_cond.build_sql();
         return copy;
     }
     [[nodiscard]] select_query_builder add_join_on(std::string_view join_type, std::string_view right_table,
-                                                   where_condition on_cond) && {
+                                                   sql_predicate on_cond) && {
         joins_ += " " + std::string(join_type) + " " + std::string(right_table) + " ON " + on_cond.build_sql();
         return std::move(*this);
     }
@@ -3500,11 +3500,11 @@ struct select_query_builder {
         return s;
     }
 
-    std::optional<where_condition> where_;
+    std::optional<sql_predicate> where_;
     std::string group_by_;
     bool with_rollup_ = false;
     group_by_mode group_by_mode_ = group_by_mode::standard;
-    std::optional<where_condition> having_;
+    std::optional<sql_predicate> having_;
     std::vector<order_by_item> order_by_clauses_;
     std::optional<std::size_t> limit_;
     std::optional<std::size_t> offset_;
@@ -4001,7 +4001,7 @@ public:
 template <typename T, typename... Cols>
 class update_join_set_where_builder {
 public:
-    update_join_set_where_builder(std::string join_clause, std::tuple<Cols...> assignments, where_condition where)
+    update_join_set_where_builder(std::string join_clause, std::tuple<Cols...> assignments, sql_predicate where)
         : join_clause_(std::move(join_clause)), assignments_(std::move(assignments)), where_(std::move(where)) {
     }
 
@@ -4028,7 +4028,7 @@ public:
 private:
     std::string join_clause_;
     std::tuple<Cols...> assignments_;
-    where_condition where_;
+    sql_predicate where_;
 };
 
 template <typename T, typename... Cols>
@@ -4038,7 +4038,7 @@ public:
         : join_clause_(std::move(join_clause)), assignments_(std::move(assignments)) {
     }
 
-    [[nodiscard]] update_join_set_where_builder<T, Cols...> where(where_condition condition) const {
+    [[nodiscard]] update_join_set_where_builder<T, Cols...> where(sql_predicate condition) const {
         return {join_clause_, assignments_, std::move(condition)};
     }
 
@@ -4130,27 +4130,27 @@ template <Projection P, sql_cast_type Type>
 using mysql_convert_as = convert_as<P, Type>;
 
 template <ColumnDescriptor Col, typename Value>
-[[nodiscard]] where_condition mysql_null_safe_equal(Value&& value) {
+[[nodiscard]] check_expr mysql_null_safe_equal(Value&& value) {
     return null_safe_equal<Col>(std::forward<Value>(value));
 }
 
 template <ColumnDescriptor Col>
-[[nodiscard]] where_condition mysql_regexp(std::string_view pattern) {
+[[nodiscard]] check_expr mysql_regexp(std::string_view pattern) {
     return regexp<Col>(pattern);
 }
 
 template <ColumnDescriptor Col>
-[[nodiscard]] where_condition mysql_not_regexp(std::string_view pattern) {
+[[nodiscard]] check_expr mysql_not_regexp(std::string_view pattern) {
     return not_regexp<Col>(pattern);
 }
 
 template <ColumnDescriptor Col>
-[[nodiscard]] where_condition mysql_rlike(std::string_view pattern) {
+[[nodiscard]] check_expr mysql_rlike(std::string_view pattern) {
     return rlike<Col>(pattern);
 }
 
 template <ColumnDescriptor Col>
-[[nodiscard]] where_condition mysql_not_rlike(std::string_view pattern) {
+[[nodiscard]] check_expr mysql_not_rlike(std::string_view pattern) {
     return not_rlike<Col>(pattern);
 }
 

@@ -253,27 +253,25 @@ concept SqlValue =
     is_text_type_v<T> || std::same_as<T, std::string>;
 
 // ===================================================================
-// where_condition — a typed SQL WHERE fragment
+// check_expr — a SQL predicate valid in CHECK constraint context.
 //
-// Stores the column name (as a compile-time std::string_view),
-// the operator literal (e.g. " = ", " IS NULL"), and the serialized
-// value — building the final SQL string lazily via build_sql().
+// Covers column-ref comparisons and their logical compositions (&, |, !).
+// Does NOT include subqueries, non-deterministic functions, or aggregate
+// expressions — those are sql_predicate-only constructs.
 //
-// Produced exclusively by the typed predicate free functions below.
-//
-//   .where(equal<symbol::ticker>("AAPL"))        ← typed predicate
-//   .having(count() > 5)                         ← aggregate predicate
+// Produced by the typed predicate free functions marked "check-safe" below.
+// Implicitly converts to sql_predicate, so check_expr values can be passed
+// anywhere sql_predicate is expected (WHERE, HAVING, JOIN ON, etc.).
 // ===================================================================
 
-struct where_condition {
-    std::string_view col_name;  // compile-time column name; empty for composed/raw conditions
+struct check_expr {
+    std::string_view col_name;  // compile-time column name; empty for composed conditions
     std::string_view op;        // operator literal (" = ", " IS NULL", etc.)
-    std::string value;          // serialized RHS value, or full SQL for composed/raw conditions
+    std::string value;          // serialized RHS value, or full SQL for composed conditions
 
-    where_condition() = default;
-    where_condition(std::string_view col_name_, std::string_view op_, std::string value_)
-        : col_name(col_name_), op(op_), value(std::move(value_)) {
-    }
+    check_expr() = default;
+    check_expr(std::string_view col_name_, std::string_view op_, std::string value_)
+        : col_name(col_name_), op(op_), value(std::move(value_)) {}
 
     [[nodiscard]] std::string build_sql() const {
         if (col_name.empty())
@@ -288,8 +286,46 @@ struct where_condition {
 };
 
 // ===================================================================
-// WHERE predicates
+// sql_predicate — a typed SQL predicate fragment.
 //
+// Used in WHERE, HAVING, JOIN ON, and CASE WHEN contexts.
+// Produced by typed predicate free functions below; check_expr
+// implicitly converts to sql_predicate so check-safe predicates
+// can be used everywhere a sql_predicate is required.
+//
+//   .where(equal<symbol::ticker>("AAPL"))        ← typed predicate
+//   .having(count() > 5)                         ← aggregate predicate
+// ===================================================================
+
+struct sql_predicate {
+    std::string_view col_name;  // compile-time column name; empty for composed/raw conditions
+    std::string_view op;        // operator literal (" = ", " IS NULL", etc.)
+    std::string value;          // serialized RHS value, or full SQL for composed/raw conditions
+
+    sql_predicate() = default;
+    sql_predicate(std::string_view col_name_, std::string_view op_, std::string value_)
+        : col_name(col_name_), op(op_), value(std::move(value_)) {}
+
+    // Every check_expr is a valid sql_predicate.
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    sql_predicate(check_expr e) : col_name(e.col_name), op(e.op), value(std::move(e.value)) {}
+
+    [[nodiscard]] std::string build_sql() const {
+        if (col_name.empty())
+            return value;
+        std::string s;
+        s.reserve(col_name.size() + op.size() + value.size());
+        s += col_name;
+        s += op;
+        s += value;
+        return s;
+    }
+};
+
+// ===================================================================
+// SQL predicates
+//
+// Check-safe (return check_expr — valid in WHERE, HAVING, and CHECK):
 //   equal<Col>(value)                    — col = val
 //   not_equal<Col>(value)                — col != val
 //   less_than<Col>(value)                — col < val
@@ -305,56 +341,67 @@ struct where_condition {
 //   rlike<Col>(pattern)                  — col RLIKE 'pattern'  (MySQL synonym for REGEXP)
 //   not_rlike<Col>(pattern)              — col NOT RLIKE 'pattern'
 //   sounds_like<Col>(word)               — col SOUNDS LIKE 'word'
+//   between<Col>(low, high)              — col BETWEEN low AND high
+//   in<Col>({v1, v2, ...})               — col IN (v1, v2, ...)
+//   not_in<Col>({v1, v2, ...})           — col NOT IN (v1, v2, ...)
+//
+// WHERE/HAVING only (return sql_predicate — not valid in CHECK):
 //   match_against<C1,C2,...>(expr)       — MATCH(c1,c2,...) AGAINST ('expr')
+//   in_subquery<Col>(query)              — col IN (SELECT ...)
+//   not_in_subquery<Col>(query)          — col NOT IN (SELECT ...)
+//   exists(query)                        — EXISTS (SELECT ...)
+//   not_exists(query)                    — NOT EXISTS (SELECT ...)
+//
+// Composition (return same type as inputs):
 //   and_(a, b)                           — (a AND b)
 //   or_(a, b)                            — (a OR b)
 //   not_(cond)                           — NOT (cond)
 // ===================================================================
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition equal(Col const& value) {
+[[nodiscard]] check_expr equal(Col const& value) {
     return {column_traits<Col>::column_name(), " = ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition not_equal(Col const& value) {
+[[nodiscard]] check_expr not_equal(Col const& value) {
     return {column_traits<Col>::column_name(), " != ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition less_than(Col const& value) {
+[[nodiscard]] check_expr less_than(Col const& value) {
     return {column_traits<Col>::column_name(), " < ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition greater_than(Col const& value) {
+[[nodiscard]] check_expr greater_than(Col const& value) {
     return {column_traits<Col>::column_name(), " > ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition less_than_or_equal(Col const& value) {
+[[nodiscard]] check_expr less_than_or_equal(Col const& value) {
     return {column_traits<Col>::column_name(), " <= ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition greater_than_or_equal(Col const& value) {
+[[nodiscard]] check_expr greater_than_or_equal(Col const& value) {
     return {column_traits<Col>::column_name(), " >= ", sql_detail::to_sql_value(value.value)};
 }
 
 template <ColumnFieldType Col>
     requires is_field_nullable_v<Col>
-[[nodiscard]] where_condition is_null() {
+[[nodiscard]] check_expr is_null() {
     return {column_traits<Col>::column_name(), " IS NULL", {}};
 }
 
 template <ColumnFieldType Col>
     requires is_field_nullable_v<Col>
-[[nodiscard]] where_condition is_not_null() {
+[[nodiscard]] check_expr is_not_null() {
     return {column_traits<Col>::column_name(), " IS NOT NULL", {}};
 }
 
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition like(std::string_view pattern) {
+[[nodiscard]] check_expr like(std::string_view pattern) {
     auto escaped = sql_detail::escape_sql_string(pattern);
     std::string rhs;
     rhs.reserve(2 + escaped.size());
@@ -364,7 +411,7 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " LIKE ", std::move(rhs)};
 }
 
-[[nodiscard]] inline where_condition and_(where_condition a, where_condition b) {
+[[nodiscard]] inline check_expr and_(check_expr a, check_expr b) {
     auto as = a.build_sql();
     auto bs = b.build_sql();
     std::string s;
@@ -377,7 +424,20 @@ template <ColumnFieldType Col>
     return {{}, {}, std::move(s)};
 }
 
-[[nodiscard]] inline where_condition or_(where_condition a, where_condition b) {
+[[nodiscard]] inline sql_predicate and_(sql_predicate a, sql_predicate b) {
+    auto as = a.build_sql();
+    auto bs = b.build_sql();
+    std::string s;
+    s.reserve(1 + as.size() + 5 + bs.size() + 1);
+    s += '(';
+    s += std::move(as);
+    s += " AND ";
+    s += std::move(bs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+[[nodiscard]] inline check_expr or_(check_expr a, check_expr b) {
     auto as = a.build_sql();
     auto bs = b.build_sql();
     std::string s;
@@ -390,7 +450,30 @@ template <ColumnFieldType Col>
     return {{}, {}, std::move(s)};
 }
 
-[[nodiscard]] inline where_condition not_(where_condition cond) {
+[[nodiscard]] inline sql_predicate or_(sql_predicate a, sql_predicate b) {
+    auto as = a.build_sql();
+    auto bs = b.build_sql();
+    std::string s;
+    s.reserve(1 + as.size() + 4 + bs.size() + 1);
+    s += '(';
+    s += std::move(as);
+    s += " OR ";
+    s += std::move(bs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+[[nodiscard]] inline check_expr not_(check_expr cond) {
+    auto cs = cond.build_sql();
+    std::string s;
+    s.reserve(5 + cs.size() + 1);
+    s += "NOT (";
+    s += std::move(cs);
+    s += ')';
+    return {{}, {}, std::move(s)};
+}
+
+[[nodiscard]] inline sql_predicate not_(sql_predicate cond) {
     auto cs = cond.build_sql();
     std::string s;
     s.reserve(5 + cs.size() + 1);
@@ -401,10 +484,11 @@ template <ColumnFieldType Col>
 }
 
 // ===================================================================
-// Operator overloads for natural WHERE composition
+// Operator overloads for natural predicate composition
 //
-// &, |, and ! can be overloaded safely for a DSL type like where_condition
-// because they carry no implicit short-circuit or sequencing expectations.
+// &, |, and ! can be overloaded safely for DSL types like check_expr and
+// sql_predicate because they carry no implicit short-circuit or sequencing
+// expectations.
 //
 // &&  and || are intentionally NOT overloaded: their overloaded forms lose
 // short-circuit evaluation (both operands are always evaluated), which
@@ -417,32 +501,34 @@ template <ColumnFieldType Col>
 //   a & b         → (a AND b)       — & binds tighter than |
 //   a | b         → (a OR b)
 //   (a | b) & c   → ((a OR b) AND c) — parentheses work naturally
+//
+// check_expr & check_expr → check_expr  (stays check-safe)
+// check_expr & sql_predicate → sql_predicate  (via implicit conversion)
 // ===================================================================
 
-[[nodiscard]] inline where_condition operator!(where_condition cond) {
+[[nodiscard]] inline check_expr operator!(check_expr cond) {
     return not_(std::move(cond));
 }
 
-[[nodiscard]] inline where_condition operator&(where_condition a, where_condition b) {
+[[nodiscard]] inline check_expr operator&(check_expr a, check_expr b) {
     return and_(std::move(a), std::move(b));
 }
 
-[[nodiscard]] inline where_condition operator|(where_condition a, where_condition b) {
+[[nodiscard]] inline check_expr operator|(check_expr a, check_expr b) {
     return or_(std::move(a), std::move(b));
 }
 
-// ===================================================================
-// WHERE predicates (continued)
-//
-//   in<Col>({v1, v2, ...})               — col IN (v1, v2, ...)
-//   not_in<Col>({v1, v2, ...})           — col NOT IN (v1, v2, ...)
-//   between<Col>(low, high)              — col BETWEEN low AND high
-//   not_like<Col>(pattern)               — col NOT LIKE 'pattern'
-//   in_subquery<Col>(query)              — col IN (SELECT ...)
-//   not_in_subquery<Col>(query)          — col NOT IN (SELECT ...)
-//   exists(query)                       — EXISTS (SELECT ...)
-//   not_exists(query)                   — NOT EXISTS (SELECT ...)
-// ===================================================================
+[[nodiscard]] inline sql_predicate operator!(sql_predicate cond) {
+    return not_(std::move(cond));
+}
+
+[[nodiscard]] inline sql_predicate operator&(sql_predicate a, sql_predicate b) {
+    return and_(std::move(a), std::move(b));
+}
+
+[[nodiscard]] inline sql_predicate operator|(sql_predicate a, sql_predicate b) {
+    return or_(std::move(a), std::move(b));
+}
 
 // Concept for any query that can produce SQL — used for subquery predicates.
 // Forward-declared here so subquery predicates can reference it before the full
@@ -452,8 +538,9 @@ concept AnySelectQuery = requires(Q const& q) {
     { q.build_sql() } -> std::convertible_to<std::string>;
 };
 
+// check-safe: literal value list
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition in(std::initializer_list<typename Col::value_type> values) {
+[[nodiscard]] check_expr in(std::initializer_list<typename Col::value_type> values) {
     std::string rhs;
     rhs.reserve(2 + values.size() * 4);
     rhs += '(';
@@ -469,8 +556,9 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " IN ", std::move(rhs)};
 }
 
+// check-safe: literal value list
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition not_in(std::initializer_list<typename Col::value_type> values) {
+[[nodiscard]] check_expr not_in(std::initializer_list<typename Col::value_type> values) {
     std::string rhs;
     rhs.reserve(2 + values.size() * 4);
     rhs += '(';
@@ -486,8 +574,9 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " NOT IN ", std::move(rhs)};
 }
 
+// check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition between(Col const& low, Col const& high) {
+[[nodiscard]] check_expr between(Col const& low, Col const& high) {
     auto low_val = sql_detail::to_sql_value(low.value);
     auto high_val = sql_detail::to_sql_value(high.value);
     std::string rhs;
@@ -498,8 +587,9 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " BETWEEN ", std::move(rhs)};
 }
 
+// check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition not_like(std::string_view pattern) {
+[[nodiscard]] check_expr not_like(std::string_view pattern) {
     auto escaped = sql_detail::escape_sql_string(pattern);
     std::string rhs;
     rhs.reserve(2 + escaped.size());
@@ -509,15 +599,15 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " NOT LIKE ", std::move(rhs)};
 }
 
-// null_safe_equal<Col>(value) — col <=> val (MySQL NULL-safe equality)
+// null_safe_equal<Col>(value) — col <=> val (MySQL NULL-safe equality) — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition null_safe_equal(Col const& value) {
+[[nodiscard]] check_expr null_safe_equal(Col const& value) {
     return {column_traits<Col>::column_name(), " <=> ", sql_detail::to_sql_value(value.value)};
 }
 
-// regexp<Col>(pattern) — col REGEXP 'pattern'
+// regexp<Col>(pattern) — col REGEXP 'pattern' — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition regexp(std::string_view pattern) {
+[[nodiscard]] check_expr regexp(std::string_view pattern) {
     auto escaped = sql_detail::escape_sql_string(pattern);
     std::string rhs;
     rhs.reserve(2 + escaped.size());
@@ -527,9 +617,9 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " REGEXP ", std::move(rhs)};
 }
 
-// not_regexp<Col>(pattern) — col NOT REGEXP 'pattern'
+// not_regexp<Col>(pattern) — col NOT REGEXP 'pattern' — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition not_regexp(std::string_view pattern) {
+[[nodiscard]] check_expr not_regexp(std::string_view pattern) {
     auto escaped = sql_detail::escape_sql_string(pattern);
     std::string rhs;
     rhs.reserve(2 + escaped.size());
@@ -539,21 +629,21 @@ template <ColumnFieldType Col>
     return {column_traits<Col>::column_name(), " NOT REGEXP ", std::move(rhs)};
 }
 
-// rlike<Col>(pattern) — col RLIKE 'pattern'  (MySQL synonym for REGEXP)
+// rlike<Col>(pattern) — col RLIKE 'pattern'  (MySQL synonym for REGEXP) — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition rlike(std::string_view pattern) {
+[[nodiscard]] check_expr rlike(std::string_view pattern) {
     return regexp<Col>(pattern);
 }
 
-// not_rlike<Col>(pattern) — col NOT RLIKE 'pattern'
+// not_rlike<Col>(pattern) — col NOT RLIKE 'pattern' — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition not_rlike(std::string_view pattern) {
+[[nodiscard]] check_expr not_rlike(std::string_view pattern) {
     return not_regexp<Col>(pattern);
 }
 
-// sounds_like<Col>(word) — col SOUNDS LIKE 'word'
+// sounds_like<Col>(word) — col SOUNDS LIKE 'word' — check-safe
 template <ColumnFieldType Col>
-[[nodiscard]] where_condition sounds_like(std::string_view word) {
+[[nodiscard]] check_expr sounds_like(std::string_view word) {
     auto escaped = sql_detail::escape_sql_string(word);
     std::string rhs;
     rhs.reserve(2 + escaped.size());
@@ -572,7 +662,7 @@ template <ColumnFieldType Col>
 //   match_search_modifier::natural_language_with_query_expansion   — IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION
 template <ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] where_condition match_against(std::string_view expr,
+[[nodiscard]] sql_predicate match_against(std::string_view expr,
                                             match_search_modifier modifier = match_search_modifier::natural_language) {
     std::string s;
     s.reserve(64 + expr.size());
@@ -606,7 +696,7 @@ template <ColumnFieldType... Cols>
 }
 
 template <ColumnFieldType Col, AnySelectQuery Query>
-[[nodiscard]] where_condition in_subquery(Query const& subquery) {
+[[nodiscard]] sql_predicate in_subquery(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string rhs;
     rhs.reserve(2 + sub.size());
@@ -617,7 +707,7 @@ template <ColumnFieldType Col, AnySelectQuery Query>
 }
 
 template <ColumnFieldType Col, AnySelectQuery Query>
-[[nodiscard]] where_condition not_in_subquery(Query const& subquery) {
+[[nodiscard]] sql_predicate not_in_subquery(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string rhs;
     rhs.reserve(2 + sub.size());
@@ -628,7 +718,7 @@ template <ColumnFieldType Col, AnySelectQuery Query>
 }
 
 template <AnySelectQuery Query>
-[[nodiscard]] where_condition exists(Query const& subquery) {
+[[nodiscard]] sql_predicate exists(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string s;
     s.reserve(8 + sub.size() + 1);
@@ -639,7 +729,7 @@ template <AnySelectQuery Query>
 }
 
 template <AnySelectQuery Query>
-[[nodiscard]] where_condition not_exists(Query const& subquery) {
+[[nodiscard]] sql_predicate not_exists(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string s;
     s.reserve(12 + sub.size() + 1);
@@ -650,13 +740,14 @@ template <AnySelectQuery Query>
 }
 
 // ===================================================================
-// col_expr<Col> / col_ref<Col> — natural operator syntax for WHERE clauses
+// col_expr<Col> / col_ref<Col> — natural operator syntax for predicates
 //
 // col_ref<Col> is an inline constexpr variable template that exposes
-// comparison and predicate operators, each returning a where_condition.
-// The resulting where_condition values compose with &, |, ! (see above).
+// comparison and predicate operators. Simple column-ref operators return
+// check_expr (usable in WHERE, HAVING, CHECK); subquery operators return
+// sql_predicate (WHERE/HAVING only). Results compose with &, |, ! (see above).
 //
-// Single-column predicates:
+// Single-column predicates (return check_expr):
 //   col_ref<trade::code> == "AAPL"             → equal<trade::code>("AAPL")
 //   col_ref<trade::id> != 0u                   → not_equal<trade::id>(0u)
 //   col_ref<trade::id> < 100u                  → less_than<trade::id>(100u)
@@ -694,84 +785,84 @@ struct col_expr {
 
     // Operators accept value_type directly; callers must construct explicitly
     // (e.g. col_ref<trade::code> == varchar_type<32>{"AAPL"}).
-    [[nodiscard]] where_condition operator==(value_type const& val) const {
+    [[nodiscard]] check_expr operator==(value_type const& val) const {
         return equal<Col>(Col{val});
     }
-    [[nodiscard]] where_condition operator!=(value_type const& val) const {
+    [[nodiscard]] check_expr operator!=(value_type const& val) const {
         return not_equal<Col>(Col{val});
     }
-    [[nodiscard]] where_condition operator<(value_type const& val) const {
+    [[nodiscard]] check_expr operator<(value_type const& val) const {
         return less_than<Col>(Col{val});
     }
-    [[nodiscard]] where_condition operator>(value_type const& val) const {
+    [[nodiscard]] check_expr operator>(value_type const& val) const {
         return greater_than<Col>(Col{val});
     }
-    [[nodiscard]] where_condition operator<=(value_type const& val) const {
+    [[nodiscard]] check_expr operator<=(value_type const& val) const {
         return less_than_or_equal<Col>(Col{val});
     }
-    [[nodiscard]] where_condition operator>=(value_type const& val) const {
+    [[nodiscard]] check_expr operator>=(value_type const& val) const {
         return greater_than_or_equal<Col>(Col{val});
     }
 
-    [[nodiscard]] where_condition is_null() const noexcept
+    [[nodiscard]] check_expr is_null() const noexcept
         requires is_field_nullable_v<Col>
     {
         return ds_mysql::is_null<Col>();
     }
-    [[nodiscard]] where_condition is_not_null() const noexcept
+    [[nodiscard]] check_expr is_not_null() const noexcept
         requires is_field_nullable_v<Col>
     {
         return ds_mysql::is_not_null<Col>();
     }
 
-    [[nodiscard]] where_condition like(std::string_view pattern) const {
+    [[nodiscard]] check_expr like(std::string_view pattern) const {
         return ds_mysql::like<Col>(pattern);
     }
-    [[nodiscard]] where_condition not_like(std::string_view pattern) const {
+    [[nodiscard]] check_expr not_like(std::string_view pattern) const {
         return ds_mysql::not_like<Col>(pattern);
     }
-    [[nodiscard]] where_condition between(value_type const& low, value_type const& high) const {
+    [[nodiscard]] check_expr between(value_type const& low, value_type const& high) const {
         return ds_mysql::between<Col>(Col{low}, Col{high});
     }
-    [[nodiscard]] where_condition in(std::initializer_list<value_type> vals) const {
+    [[nodiscard]] check_expr in(std::initializer_list<value_type> vals) const {
         return ds_mysql::in<Col>(vals);
     }
-    [[nodiscard]] where_condition not_in(std::initializer_list<value_type> vals) const {
+    [[nodiscard]] check_expr not_in(std::initializer_list<value_type> vals) const {
         return ds_mysql::not_in<Col>(vals);
     }
 
-    [[nodiscard]] where_condition regexp(std::string_view pattern) const {
+    [[nodiscard]] check_expr regexp(std::string_view pattern) const {
         return ds_mysql::regexp<Col>(pattern);
     }
-    [[nodiscard]] where_condition not_regexp(std::string_view pattern) const {
+    [[nodiscard]] check_expr not_regexp(std::string_view pattern) const {
         return ds_mysql::not_regexp<Col>(pattern);
     }
-    [[nodiscard]] where_condition rlike(std::string_view pattern) const {
+    [[nodiscard]] check_expr rlike(std::string_view pattern) const {
         return ds_mysql::rlike<Col>(pattern);
     }
-    [[nodiscard]] where_condition not_rlike(std::string_view pattern) const {
+    [[nodiscard]] check_expr not_rlike(std::string_view pattern) const {
         return ds_mysql::not_rlike<Col>(pattern);
     }
-    [[nodiscard]] where_condition sounds_like(std::string_view word) const {
+    [[nodiscard]] check_expr sounds_like(std::string_view word) const {
         return ds_mysql::sounds_like<Col>(word);
     }
 
-    [[nodiscard]] where_condition null_safe_equal(value_type const& val) const {
+    [[nodiscard]] check_expr null_safe_equal(value_type const& val) const {
         return ds_mysql::null_safe_equal<Col>(Col{val});
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition in_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate in_subquery(Query const& subquery) const {
         return ds_mysql::in_subquery<Col>(subquery);
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition not_in_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate not_in_subquery(Query const& subquery) const {
         return ds_mysql::not_in_subquery<Col>(subquery);
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition eq_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate eq_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());
@@ -782,7 +873,7 @@ struct col_expr {
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition ne_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate ne_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());
@@ -793,7 +884,7 @@ struct col_expr {
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition lt_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate lt_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());
@@ -804,7 +895,7 @@ struct col_expr {
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition gt_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate gt_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());
@@ -815,7 +906,7 @@ struct col_expr {
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition le_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate le_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());
@@ -826,7 +917,7 @@ struct col_expr {
     }
 
     template <AnySelectQuery Query>
-    [[nodiscard]] where_condition ge_subquery(Query const& subquery) const {
+    [[nodiscard]] sql_predicate ge_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
         rhs.reserve(2 + sub.size());

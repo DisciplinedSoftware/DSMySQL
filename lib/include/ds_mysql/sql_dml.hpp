@@ -20,7 +20,8 @@ namespace ds_mysql {
 //       → build_sql()                           — INSERT INTO T (...) VALUES (...), (...), ...
 //
 //   update<T>()
-//       .set(col1, col2, ...)
+//       .set(col1, col2, ...)                   — all columns in one call
+//       .set(col1).set(col2)                    — chained calls (equivalent)
 //       → build_sql()                           — UPDATE T SET ...
 //       .where(cond) → build_sql()              — UPDATE T SET ... WHERE cond
 //
@@ -191,7 +192,7 @@ template <typename... Cols>
 template <typename T, typename... Cols>
 class update_set_where_builder {
 public:
-    update_set_where_builder(std::tuple<Cols...> assignments, std::optional<where_condition> where)
+    update_set_where_builder(std::tuple<Cols...> assignments, std::optional<sql_predicate> where)
         : assignments_(std::move(assignments)), where_(std::move(where)) {
     }
 
@@ -242,7 +243,7 @@ public:
 
 private:
     std::tuple<Cols...> assignments_;
-    std::optional<where_condition> where_;
+    std::optional<sql_predicate> where_;
     std::vector<std::string> order_by_clauses_;
     std::optional<std::size_t> limit_;
 };
@@ -253,7 +254,14 @@ public:
     explicit update_set_builder(std::tuple<Cols...> assignments) : assignments_(std::move(assignments)) {
     }
 
-    [[nodiscard]] update_set_where_builder<T, Cols...> where(where_condition condition) const {
+    template <FieldOf<T>... NewCols>
+        requires(sizeof...(NewCols) > 0)
+    [[nodiscard]] update_set_builder<T, Cols..., NewCols...> set(NewCols const&... new_assignments) const {
+        return update_set_builder<T, Cols..., NewCols...>{
+            std::tuple_cat(assignments_, std::tuple<NewCols...>{new_assignments...})};
+    }
+
+    [[nodiscard]] update_set_where_builder<T, Cols...> where(sql_predicate condition) const {
         return {assignments_, std::move(condition)};
     }
 
@@ -298,7 +306,7 @@ public:
 template <typename T>
 class delete_from_where_builder {
 public:
-    explicit delete_from_where_builder(std::optional<where_condition> where) : where_(std::move(where)) {
+    explicit delete_from_where_builder(std::optional<sql_predicate> where) : where_(std::move(where)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -344,7 +352,7 @@ public:
     }
 
 private:
-    std::optional<where_condition> where_;
+    std::optional<sql_predicate> where_;
     std::vector<std::string> order_by_clauses_;
     std::optional<std::size_t> limit_;
 };
@@ -352,7 +360,7 @@ private:
 template <typename T>
 class delete_from_builder {
 public:
-    [[nodiscard]] delete_from_where_builder<T> where(where_condition condition) const {
+    [[nodiscard]] delete_from_where_builder<T> where(sql_predicate condition) const {
         return delete_from_where_builder<T>{std::move(condition)};
     }
 

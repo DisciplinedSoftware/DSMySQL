@@ -739,7 +739,7 @@ suite<"DDL"> ddl_suite = [] {
             << sql;
     };
 
-    "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL/CHECK"_test = [] {
+    "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL"_test = [] {
         expect(table_constraint::unique_key<index_id<"uq_test_name">, test_table::name>() ==
                "UNIQUE KEY uq_test_name (name)"s);
         expect(table_constraint::fulltext_key<index_id<"ft_test_name">, test_table::name>() ==
@@ -750,8 +750,7 @@ suite<"DDL"> ddl_suite = [] {
 
     "table_constraint::check - typed predicate with check_id"_test = [] {
         // Simple comparison predicate
-        auto const sql =
-            table_constraint::check<check_id<"chk_positive_id">>(greater_than<test_table::id>(0u));
+        auto const sql = table_constraint::check<check_id<"chk_positive_id">>(greater_than<test_table::id>(0u));
         expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
     };
 
@@ -761,8 +760,8 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
-        auto const sql = table_constraint::check<check_id<"chk_id_range">>(
-            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u));
+        auto const sql = table_constraint::check<check_id<"chk_id_range">>(greater_than<test_table::id>(0u) &
+                                                                           less_than_or_equal<test_table::id>(100u));
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 
@@ -1159,17 +1158,17 @@ suite<"DDL Features"> ddl_features_suite = [] {
 
 suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     "alter_table.change_column - renames and retypes a column"_test = [] {
-        auto const sql =
-            alter_table<test_table>()
-                .change_column<test_table::name, column_field<"display_name", varchar_type<512>>>()
-                .build_sql();
+        auto const sql = alter_table<test_table>()
+                             .change_column<test_table::name, column_field<"display_name", varchar_type<512>>>()
+                             .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512) NOT NULL;\n"s) << sql;
     };
 
     "alter_table.change_column nullable - std::optional makes column nullable"_test = [] {
-        auto const sql = alter_table<test_table>()
-                             .change_column<test_table::name, column_field<"display_name", std::optional<varchar_type<512>>>>()
-                             .build_sql();
+        auto const sql =
+            alter_table<test_table>()
+                .change_column<test_table::name, column_field<"display_name", std::optional<varchar_type<512>>>>()
+                .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512);\n"s) << sql;
     };
 
@@ -1181,17 +1180,14 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
 
     "alter_table.add_unique_index - generates ADD UNIQUE INDEX"_test = [] {
         auto const sql =
-            alter_table<test_table>()
-                .add_unique_index<index_id<"uq_test_table_name">, test_table::name>()
-                .build_sql();
+            alter_table<test_table>().add_unique_index<index_id<"uq_test_table_name">, test_table::name>().build_sql();
         expect(sql == "ALTER TABLE test_table ADD UNIQUE INDEX uq_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.add_fulltext_index - generates ADD FULLTEXT INDEX"_test = [] {
-        auto const sql =
-            alter_table<test_table>()
-                .add_fulltext_index<index_id<"ft_test_table_name">, test_table::name>()
-                .build_sql();
+        auto const sql = alter_table<test_table>()
+                             .add_fulltext_index<index_id<"ft_test_table_name">, test_table::name>()
+                             .build_sql();
         expect(sql == "ALTER TABLE test_table ADD FULLTEXT INDEX ft_test_table_name (name);\n"s) << sql;
     };
 
@@ -1412,10 +1408,9 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 
 suite<"DDL triggers"> ddl_trigger_suite = [] {
     "create_trigger BEFORE INSERT - generates correct SQL"_test = [] {
-        auto const sql =
-            create_trigger<trigger_id<"trg_before_insert">, test_table>(TriggerTiming::Before, TriggerEvent::Insert,
-                                                                        "SET NEW.name = UPPER(NEW.name);")
-                .build_sql();
+        auto const sql = create_trigger<trigger_id<"trg_before_insert">, test_table>(
+                             TriggerTiming::Before, TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
+                             .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_before_insert BEFORE INSERT ON test_table FOR EACH ROW\n"
                "SET NEW.name = UPPER(NEW.name);"s)
@@ -1443,4 +1438,3 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
         expect(sql == "DROP TRIGGER IF EXISTS trg_before_insert"s) << sql;
     };
 };
-

@@ -199,7 +199,7 @@ template <ColumnDescriptor... Cols>
     return s;
 }
 
-// Accepts a WHERE-style predicate (where_condition); column name, operator, and value are all
+// Accepts a check_expr predicate; column name, operator, and value are all
 // derived from the typed predicate.
 //
 // Without constraint name:
@@ -209,12 +209,12 @@ template <ColumnDescriptor... Cols>
 // With constraint name as template parameter:
 //   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
-[[nodiscard]] inline std::string check(where_condition const& expr) {
+[[nodiscard]] inline std::string check(check_expr const& expr) {
     return "CHECK (" + expr.build_sql() + ')';
 }
 
 template <NamedIdType CId>
-[[nodiscard]] inline std::string check(where_condition const& expr) {
+[[nodiscard]] inline std::string check(check_expr const& expr) {
     return "CONSTRAINT " + std::string(CId::name()) + " CHECK (" + expr.build_sql() + ')';
 }
 
