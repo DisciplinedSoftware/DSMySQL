@@ -10,7 +10,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `alter_table<T>().change_column<OldCol>(new_name, sql_type [, not_null])` — `CHANGE COLUMN old new type [NOT NULL]` (rename + retype atomically)
+- `alter_table<T>().change_column<OldCol, NewType>(new_name)` — `CHANGE COLUMN old new type [NOT NULL]`; use `std::optional<NewType>` to make the result nullable
+- `alter_table<T>().add_column<Col>()` and `.modify_column<Col>()` now infer SQL type and nullability from the column descriptor — no more string type or bool parameter
 - `alter_table<T>().add_index<Cols...>(name)` — `ADD INDEX name (col1, ...)`
 - `alter_table<T>().add_unique_index<Cols...>(name)` — `ADD UNIQUE INDEX name (col1, ...)`
 - `alter_table<T>().add_fulltext_index<Cols...>(name)` — `ADD FULLTEXT INDEX name (col1, ...)`

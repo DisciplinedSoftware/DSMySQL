@@ -1100,14 +1100,14 @@ suite<"DDL Features"> ddl_features_suite = [] {
 
     "alter_table - generates combined ALTER TABLE actions"_test = [] {
         auto const sql = alter_table<test_table>()
-                             .add_column<test_table::name>("VARCHAR(255)")
-                             .modify_column<test_table::name>("VARCHAR(512)")
+                             .add_column<test_table::name>()
+                             .modify_column<test_table::name>()
                              .rename_column<test_table::name>("display_name")
                              .drop_column<test_table::name>()
                              .rename_to<renamed_table>()
                              .build_sql();
         expect(sql ==
-               "ALTER TABLE test_table ADD COLUMN name VARCHAR(255) NOT NULL, MODIFY COLUMN name VARCHAR(512) NOT "
+               "ALTER TABLE test_table ADD COLUMN name VARCHAR(255) NOT NULL, MODIFY COLUMN name VARCHAR(255) NOT "
                "NULL, RENAME COLUMN name TO display_name, DROP COLUMN name, RENAME TO renamed_table;\n"s)
             << sql;
     };
@@ -1132,14 +1132,14 @@ suite<"DDL Features"> ddl_features_suite = [] {
 suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     "alter_table.change_column - renames and retypes a column"_test = [] {
         auto const sql =
-            alter_table<test_table>().change_column<test_table::name>("display_name", "VARCHAR(512)").build_sql();
+            alter_table<test_table>().change_column<test_table::name, varchar_type<512>>("display_name").build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512) NOT NULL;\n"s) << sql;
     };
 
-    "alter_table.change_column nullable - omits NOT NULL"_test = [] {
+    "alter_table.change_column nullable - std::optional makes column nullable"_test = [] {
         auto const sql =
             alter_table<test_table>()
-                .change_column<test_table::name>("display_name", "VARCHAR(512)", /*not_null=*/false)
+                .change_column<test_table::name, std::optional<varchar_type<512>>>("display_name")
                 .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512);\n"s) << sql;
     };
@@ -1188,7 +1188,7 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
 
     "alter_table - combines multiple new actions"_test = [] {
         auto const sql = alter_table<test_table>()
-                             .change_column<test_table::name>("label", "TEXT")
+                             .change_column<test_table::name, text_type<>>("label")
                              .add_index<test_table::name>("idx_label")
                              .set_engine(Engine::MyISAM)
                              .set_auto_increment(500)
