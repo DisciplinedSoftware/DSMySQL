@@ -1412,9 +1412,10 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 
 suite<"DDL triggers"> ddl_trigger_suite = [] {
     "create_trigger BEFORE INSERT - generates correct SQL"_test = [] {
-        auto const sql = create_trigger<test_table>("trg_before_insert", TriggerTiming::Before, TriggerEvent::Insert,
-                                                    "SET NEW.name = UPPER(NEW.name);")
-                             .build_sql();
+        auto const sql =
+            create_trigger<trigger_id<"trg_before_insert">, test_table>(TriggerTiming::Before, TriggerEvent::Insert,
+                                                                        "SET NEW.name = UPPER(NEW.name);")
+                .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_before_insert BEFORE INSERT ON test_table FOR EACH ROW\n"
                "SET NEW.name = UPPER(NEW.name);"s)
@@ -1422,9 +1423,10 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "create_trigger AFTER UPDATE - generates correct SQL"_test = [] {
-        auto const sql = create_trigger<test_table>("trg_after_update", TriggerTiming::After, TriggerEvent::Update,
-                                                    "INSERT INTO audit_log VALUES (OLD.id, NOW());")
-                             .build_sql();
+        auto const sql =
+            create_trigger<trigger_id<"trg_after_update">, test_table>(TriggerTiming::After, TriggerEvent::Update,
+                                                                       "INSERT INTO audit_log VALUES (OLD.id, NOW());")
+                .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_after_update AFTER UPDATE ON test_table FOR EACH ROW\n"
                "INSERT INTO audit_log VALUES (OLD.id, NOW());"s)
@@ -1432,12 +1434,12 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "drop_trigger - generates DROP TRIGGER"_test = [] {
-        auto const sql = drop_trigger<test_table>("trg_before_insert").build_sql();
+        auto const sql = drop_trigger<trigger_id<"trg_before_insert">, test_table>().build_sql();
         expect(sql == "DROP TRIGGER trg_before_insert"s) << sql;
     };
 
     "drop_trigger.if_exists - generates DROP TRIGGER IF EXISTS"_test = [] {
-        auto const sql = drop_trigger<test_table>("trg_before_insert").if_exists().build_sql();
+        auto const sql = drop_trigger<trigger_id<"trg_before_insert">, test_table>().if_exists().build_sql();
         expect(sql == "DROP TRIGGER IF EXISTS trg_before_insert"s) << sql;
     };
 };

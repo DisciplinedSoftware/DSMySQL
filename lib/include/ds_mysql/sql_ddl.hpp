@@ -65,18 +65,22 @@ enum class Encryption {
 };
 
 // ===================================================================
-// check_id<"name"> — compile-time CHECK constraint name type.
-// index_id<"name"> — compile-time index name type.
+// check_id<"name">   — compile-time CHECK constraint name type.
+// index_id<"name">   — compile-time index name type.
+// trigger_id<"name"> — compile-time trigger name type.
 //
-// Both satisfy NamedIdType: a static name() method returns the compile-time name.
+// All satisfy NamedIdType: a static name() method returns the compile-time name.
 // User-defined tagged types also satisfy NamedIdType if they provide name().
 //
 // Examples:
-//   table_constraint::check(greater_than<my_table::price>(0.0), check_id<"chk_positive_price">{})
+//   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
 //
 //   create_index_on<index_id<"idx_foo">, my_table, my_table::col>()
 //   // → CREATE INDEX idx_foo ON my_table (col);
+//
+//   create_trigger<trigger_id<"trg_before_insert">, my_table>(TriggerTiming::Before, ...)
+//   // → CREATE TRIGGER trg_before_insert BEFORE INSERT ON my_table FOR EACH ROW ...
 // ===================================================================
 
 template <fixed_string Name>
@@ -89,7 +93,12 @@ struct index_id {
     [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
 };
 
-// NamedIdType — satisfied by index_id<N>, check_id<N>, and any type with static name() → string_view.
+template <fixed_string Name>
+struct trigger_id {
+    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+};
+
+// NamedIdType — satisfied by check_id<N>, index_id<N>, trigger_id<N>, and any type with static name() → string_view.
 template <typename T>
 concept NamedIdType = requires {
     { T::name() } -> std::convertible_to<std::string_view>;
@@ -2744,15 +2753,15 @@ private:
 
 }  // namespace ddl_detail
 
-template <ValidTable T>
-[[nodiscard]] ddl_detail::create_trigger_builder<T> create_trigger(std::string name, TriggerTiming timing,
-                                                                    TriggerEvent event, std::string body) {
-    return {std::move(name), timing, event, std::move(body)};
+template <NamedIdType TrigId, ValidTable T>
+[[nodiscard]] ddl_detail::create_trigger_builder<T> create_trigger(TriggerTiming timing, TriggerEvent event,
+                                                                    std::string body) {
+    return {std::string(TrigId::name()), timing, event, std::move(body)};
 }
 
-template <ValidTable T>
-[[nodiscard]] ddl_detail::drop_trigger_builder<T> drop_trigger(std::string name) {
-    return ddl_detail::drop_trigger_builder<T>{std::move(name)};
+template <NamedIdType TrigId, ValidTable T>
+[[nodiscard]] ddl_detail::drop_trigger_builder<T> drop_trigger() {
+    return ddl_detail::drop_trigger_builder<T>{std::string(TrigId::name())};
 }
 
 // ===================================================================

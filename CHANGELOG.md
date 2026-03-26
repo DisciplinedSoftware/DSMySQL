@@ -35,8 +35,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `create_procedure(name, params, body)` — `CREATE PROCEDURE name(params) BEGIN body END`
 - `drop_procedure(name)` / `.if_exists()` — `DROP PROCEDURE [IF EXISTS] name`
 - `call_procedure(name [, args])` — `CALL name([args])`
-- `create_trigger<T>(name, TriggerTiming, TriggerEvent, body)` — `CREATE TRIGGER ... ON table FOR EACH ROW body`; `TriggerTiming::{Before, After}`, `TriggerEvent::{Insert, Update, Delete}`
-- `drop_trigger<T>(name)` / `.if_exists()` — `DROP TRIGGER [IF EXISTS] name`
+- `trigger_id<"name">` — compile-time trigger name type (satisfies `NamedIdType`)
+- `create_trigger<trigger_id<"name">, T>(TriggerTiming, TriggerEvent, body)` — `CREATE TRIGGER ... ON table FOR EACH ROW body`; `TriggerTiming::{Before, After}`, `TriggerEvent::{Insert, Update, Delete}`
+- `drop_trigger<trigger_id<"name">, T>()` / `.if_exists()` — `DROP TRIGGER [IF EXISTS] name`
 - `grant(privileges, object, grantee)` / `.with_grant_option()` — `GRANT ... ON ... TO ... [WITH GRANT OPTION]`
 - `revoke(privileges, object, grantee)` — `REVOKE ... ON ... FROM ...`
 
