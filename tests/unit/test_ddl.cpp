@@ -674,7 +674,7 @@ suite<"DDL"> ddl_suite = [] {
     "create_table.as(select).with_where - generates CREATE TABLE AS SELECT WHERE"_test = [] {
         auto const sql = create_table<new_table>()
                              .as(select<test_table::id, test_table::name>().from<test_table>().where(
-                                 equal<test_table::name>(test_table::name{"name"})))
+                                 equal<test_table::name>("name")))
                              .build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE name = 'name';\n"s) << sql;
     };
@@ -744,6 +744,31 @@ suite<"DDL"> ddl_suite = [] {
         expect(table_constraint::fulltext_key<test_table::name>("ft_test_name") == "FULLTEXT KEY ft_test_name (name)"s);
         expect(table_constraint::spatial_key<test_table::id>("sp_test_id") == "SPATIAL KEY sp_test_id (id)"s);
         expect(table_constraint::check("id > 0", "chk_positive_id") == "CONSTRAINT chk_positive_id CHECK (id > 0)"s);
+    };
+
+    "table_constraint::check - typed predicate with check_id"_test = [] {
+        // Simple comparison predicate
+        auto const sql =
+            table_constraint::check(greater_than(test_table::id{0u}), check_id{"chk_positive_id"});
+        expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
+    };
+
+    "table_constraint::check - typed predicate without constraint name"_test = [] {
+        auto const sql = table_constraint::check(greater_than(test_table::id{0u}));
+        expect(sql == "CHECK (id > 0)"s) << sql;
+    };
+
+    "table_constraint::check - compound predicate with & operator"_test = [] {
+        auto const sql = table_constraint::check(
+            greater_than(test_table::id{0u}) & less_than_or_equal(test_table::id{100u}),
+            check_id{"chk_id_range"});
+        expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
+    };
+
+    "table_constraint::check - nullable column predicate"_test = [] {
+        // Using a nullable column (std::optional<varchar_type<64>>)
+        auto const sql = table_constraint::check(is_not_null<test_table::tag>(), check_id{"chk_tag_present"});
+        expect(sql == "CONSTRAINT chk_tag_present CHECK (tag IS NOT NULL)"s) << sql;
     };
 
     "create_table with column_attributes - emits AUTO_INCREMENT, COMMENT, DEFAULT, ON UPDATE"_test = [] {
@@ -1137,10 +1162,9 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     };
 
     "alter_table.change_column nullable - std::optional makes column nullable"_test = [] {
-        auto const sql =
-            alter_table<test_table>()
-                .change_column<test_table::name, std::optional<varchar_type<512>>>("display_name")
-                .build_sql();
+        auto const sql = alter_table<test_table>()
+                             .change_column<test_table::name, std::optional<varchar_type<512>>>("display_name")
+                             .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512);\n"s) << sql;
     };
 
@@ -1150,8 +1174,7 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     };
 
     "alter_table.add_unique_index - generates ADD UNIQUE INDEX"_test = [] {
-        auto const sql =
-            alter_table<test_table>().add_unique_index<test_table::name>("uq_test_table_name").build_sql();
+        auto const sql = alter_table<test_table>().add_unique_index<test_table::name>("uq_test_table_name").build_sql();
         expect(sql == "ALTER TABLE test_table ADD UNIQUE INDEX uq_test_table_name (name);\n"s) << sql;
     };
 
@@ -1378,10 +1401,9 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 
 suite<"DDL triggers"> ddl_trigger_suite = [] {
     "create_trigger BEFORE INSERT - generates correct SQL"_test = [] {
-        auto const sql =
-            create_trigger<test_table>("trg_before_insert", TriggerTiming::Before, TriggerEvent::Insert,
-                                       "SET NEW.name = UPPER(NEW.name);")
-                .build_sql();
+        auto const sql = create_trigger<test_table>("trg_before_insert", TriggerTiming::Before, TriggerEvent::Insert,
+                                                    "SET NEW.name = UPPER(NEW.name);")
+                             .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_before_insert BEFORE INSERT ON test_table FOR EACH ROW\n"
                "SET NEW.name = UPPER(NEW.name);"s)
@@ -1389,10 +1411,9 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "create_trigger AFTER UPDATE - generates correct SQL"_test = [] {
-        auto const sql =
-            create_trigger<test_table>("trg_after_update", TriggerTiming::After, TriggerEvent::Update,
-                                       "INSERT INTO audit_log VALUES (OLD.id, NOW());")
-                .build_sql();
+        auto const sql = create_trigger<test_table>("trg_after_update", TriggerTiming::After, TriggerEvent::Update,
+                                                    "INSERT INTO audit_log VALUES (OLD.id, NOW());")
+                             .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_after_update AFTER UPDATE ON test_table FOR EACH ROW\n"
                "INSERT INTO audit_log VALUES (OLD.id, NOW());"s)

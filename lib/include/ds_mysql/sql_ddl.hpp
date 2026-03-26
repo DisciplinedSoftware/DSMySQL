@@ -65,6 +65,35 @@ enum class Encryption {
 };
 
 // ===================================================================
+// check_id — strong type for CHECK constraint names.
+//
+// Prevents confusion between the constraint name and the expression string.
+// Default-constructed to empty (no name emitted).
+//
+// Example:
+//   table_constraint::check(greater_than(my_table::price{0.0}), check_id{"chk_positive_price"})
+//   // → CONSTRAINT chk_positive_price CHECK (price > 0)
+// ===================================================================
+
+class check_id {
+public:
+    check_id() = default;
+    explicit check_id(std::string name) : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string const& to_string() const noexcept {
+        return name_;
+    }
+
+    [[nodiscard]] bool empty() const noexcept {
+        return name_.empty();
+    }
+
+private:
+    std::string name_;
+};
+
+// ===================================================================
 // CREATE TABLE constraint customization
 //
 // table_inline_primary_key<T>
@@ -196,6 +225,28 @@ template <ColumnDescriptor... Cols>
     }
     s += "CHECK (";
     s += expression;
+    s += ')';
+    return s;
+}
+
+// Typed overload: accepts a WHERE-style predicate (where_condition) and a check_id constraint name.
+// Nullability, column name, and value are all derived from the typed predicate.
+//
+// Example:
+//   table_constraint::check(greater_than(my_table::price{0.0}), check_id{"chk_positive_price"})
+//   // → CONSTRAINT chk_positive_price CHECK (price > 0)
+//
+//   table_constraint::check(greater_than(t::id{0}) & less_than(t::id{100}), check_id{"chk_id_range"})
+//   // → CONSTRAINT chk_id_range CHECK ((id > 0 AND id < 100))
+[[nodiscard]] inline std::string check(where_condition const& expr, check_id const& constraint_name = {}) {
+    std::string s;
+    if (!constraint_name.empty()) {
+        s += "CONSTRAINT ";
+        s += constraint_name.to_string();
+        s += ' ';
+    }
+    s += "CHECK (";
+    s += expr.build_sql();
     s += ')';
     return s;
 }
