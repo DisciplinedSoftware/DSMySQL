@@ -65,32 +65,34 @@ enum class Encryption {
 };
 
 // ===================================================================
-// check_id — strong type for CHECK constraint names.
+// check_id<"name"> — compile-time CHECK constraint name type.
+// index_id<"name"> — compile-time index name type.
 //
-// Prevents confusion between the constraint name and the expression string.
-// Default-constructed to empty (no name emitted).
+// Both satisfy NamedIdType: a static name() method returns the compile-time name.
+// User-defined tagged types also satisfy NamedIdType if they provide name().
 //
-// Example:
-//   table_constraint::check(greater_than(my_table::price{0.0}), check_id{"chk_positive_price"})
+// Examples:
+//   table_constraint::check(greater_than<my_table::price>(0.0), check_id<"chk_positive_price">{})
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
+//
+//   create_index_on<index_id<"idx_foo">, my_table, my_table::col>()
+//   // → CREATE INDEX idx_foo ON my_table (col);
 // ===================================================================
 
-class check_id {
-public:
-    check_id() = default;
-    explicit check_id(std::string name) : name_(std::move(name)) {
-    }
+template <fixed_string Name>
+struct check_id {
+    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+};
 
-    [[nodiscard]] std::string const& to_string() const noexcept {
-        return name_;
-    }
+template <fixed_string Name>
+struct index_id {
+    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+};
 
-    [[nodiscard]] bool empty() const noexcept {
-        return name_.empty();
-    }
-
-private:
-    std::string name_;
+// NamedIdType — satisfied by index_id<N>, check_id<N>, and any type with static name() → string_view.
+template <typename T>
+concept NamedIdType = requires {
+    { T::name() } -> std::convertible_to<std::string_view>;
 };
 
 // ===================================================================
@@ -133,60 +135,32 @@ template <ColumnDescriptor... Cols>
 
 template <ColumnDescriptor... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string primary_key(std::string_view constraint_name = {}) {
-    std::string s;
-    if (!constraint_name.empty()) {
-        s += "CONSTRAINT ";
-        s += constraint_name;
-        s += ' ';
-    }
-    s += "PRIMARY KEY ";
-    s += columns_sql<Cols...>();
-    return s;
+[[nodiscard]] inline std::string primary_key() {
+    return "PRIMARY KEY " + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
+template <NamedIdType IndexId, ColumnDescriptor... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string key(std::string_view index_name) {
-    std::string s;
-    s += "KEY ";
-    s += index_name;
-    s += ' ';
-    s += columns_sql<Cols...>();
-    return s;
+[[nodiscard]] inline std::string key() {
+    return "KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
+template <NamedIdType IndexId, ColumnDescriptor... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string unique_key(std::string_view index_name) {
-    std::string s;
-    s += "UNIQUE KEY ";
-    s += index_name;
-    s += ' ';
-    s += columns_sql<Cols...>();
-    return s;
+[[nodiscard]] inline std::string unique_key() {
+    return "UNIQUE KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
+template <NamedIdType IndexId, ColumnDescriptor... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string fulltext_key(std::string_view index_name) {
-    std::string s;
-    s += "FULLTEXT KEY ";
-    s += index_name;
-    s += ' ';
-    s += columns_sql<Cols...>();
-    return s;
+[[nodiscard]] inline std::string fulltext_key() {
+    return "FULLTEXT KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
+template <NamedIdType IndexId, ColumnDescriptor... Cols>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string spatial_key(std::string_view index_name) {
-    std::string s;
-    s += "SPATIAL KEY ";
-    s += index_name;
-    s += ' ';
-    s += columns_sql<Cols...>();
-    return s;
+[[nodiscard]] inline std::string spatial_key() {
+    return "SPATIAL KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
 }
 
 template <ColumnDescriptor... Cols>
@@ -216,26 +190,23 @@ template <ColumnDescriptor... Cols>
     return s;
 }
 
-// Typed overload: accepts a WHERE-style predicate (where_condition) and a check_id constraint name.
-// Nullability, column name, and value are all derived from the typed predicate.
+// Accepts a WHERE-style predicate (where_condition); column name, operator, and value are all
+// derived from the typed predicate.
 //
-// Example:
-//   table_constraint::check(greater_than(my_table::price{0.0}), check_id{"chk_positive_price"})
+// Without constraint name:
+//   table_constraint::check(greater_than<my_table::price>(0.0))
+//   // → CHECK (price > 0)
+//
+// With constraint name via check_id<N>:
+//   table_constraint::check(greater_than<my_table::price>(0.0), check_id<"chk_positive_price">{})
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
-//
-//   table_constraint::check(greater_than(t::id{0}) & less_than(t::id{100}), check_id{"chk_id_range"})
-//   // → CONSTRAINT chk_id_range CHECK ((id > 0 AND id < 100))
-[[nodiscard]] inline std::string check(where_condition const& expr, check_id const& constraint_name = {}) {
-    std::string s;
-    if (!constraint_name.empty()) {
-        s += "CONSTRAINT ";
-        s += constraint_name.to_string();
-        s += ' ';
-    }
-    s += "CHECK (";
-    s += expr.build_sql();
-    s += ')';
-    return s;
+[[nodiscard]] inline std::string check(where_condition const& expr) {
+    return "CHECK (" + expr.build_sql() + ')';
+}
+
+template <NamedIdType CId>
+[[nodiscard]] inline std::string check(where_condition const& expr, CId) {
+    return "CONSTRAINT " + std::string(CId::name()) + " CHECK (" + expr.build_sql() + ')';
 }
 
 [[nodiscard]] inline std::string raw(std::string sql_fragment) {
@@ -1558,29 +1529,32 @@ public:
     }
 
     // ADD INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols>
+    template <NamedIdType IndexId, ColumnDescriptor... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_index(std::string name) const {
+    [[nodiscard]] alter_table_builder add_index() const {
         auto copy = *this;
-        copy.actions_.push_back("ADD INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        copy.actions_.push_back("ADD INDEX " + std::string(IndexId::name()) + " " +
+                                table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
     // ADD UNIQUE INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols>
+    template <NamedIdType IndexId, ColumnDescriptor... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_unique_index(std::string name) const {
+    [[nodiscard]] alter_table_builder add_unique_index() const {
         auto copy = *this;
-        copy.actions_.push_back("ADD UNIQUE INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        copy.actions_.push_back("ADD UNIQUE INDEX " + std::string(IndexId::name()) + " " +
+                                table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
     // ADD FULLTEXT INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols>
+    template <NamedIdType IndexId, ColumnDescriptor... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_fulltext_index(std::string name) const {
+    [[nodiscard]] alter_table_builder add_fulltext_index() const {
         auto copy = *this;
-        copy.actions_.push_back("ADD FULLTEXT INDEX " + name + " " + table_constraint::columns_sql<Cols...>());
+        copy.actions_.push_back("ADD FULLTEXT INDEX " + std::string(IndexId::name()) + " " +
+                                table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
@@ -2327,14 +2301,14 @@ template <ValidTable From, ValidTable To>
     return ddl_detail::rename_table_builder<From, To>{};
 }
 
-template <ValidTable Table, ColumnDescriptor... Cols>
-[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(std::string name) {
-    return ddl_detail::create_index_builder<Table, Cols...>{std::move(name)};
+template <NamedIdType IndexId, ValidTable Table, ColumnDescriptor... Cols>
+[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on() {
+    return ddl_detail::create_index_builder<Table, Cols...>{std::string(IndexId::name())};
 }
 
-template <ValidTable Table>
-[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(std::string name) {
-    return ddl_detail::drop_index_builder<Table>{std::move(name)};
+template <NamedIdType IndexId, ValidTable Table>
+[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on() {
+    return ddl_detail::drop_index_builder<Table>{std::string(IndexId::name())};
 }
 
 template <ValidTable Table>

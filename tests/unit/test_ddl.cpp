@@ -242,7 +242,7 @@ struct ds_mysql::table_constraints<symbol_with_indexes> {
     static std::vector<std::string> get() {
         return {
             table_constraint::primary_key<symbol_with_indexes::id>(),
-            table_constraint::key<symbol_with_indexes::exchange_id>("index_exchange_id"),
+            table_constraint::key<index_id<"index_exchange_id">, symbol_with_indexes::exchange_id>(),
         };
     }
 };
@@ -740,14 +740,18 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL/CHECK"_test = [] {
-        expect(table_constraint::unique_key<test_table::name>("uq_test_name") == "UNIQUE KEY uq_test_name (name)"s);
-        expect(table_constraint::fulltext_key<test_table::name>("ft_test_name") == "FULLTEXT KEY ft_test_name (name)"s);
-        expect(table_constraint::spatial_key<test_table::id>("sp_test_id") == "SPATIAL KEY sp_test_id (id)"s);
+        expect(table_constraint::unique_key<index_id<"uq_test_name">, test_table::name>() ==
+               "UNIQUE KEY uq_test_name (name)"s);
+        expect(table_constraint::fulltext_key<index_id<"ft_test_name">, test_table::name>() ==
+               "FULLTEXT KEY ft_test_name (name)"s);
+        expect(table_constraint::spatial_key<index_id<"sp_test_id">, test_table::id>() ==
+               "SPATIAL KEY sp_test_id (id)"s);
     };
 
     "table_constraint::check - typed predicate with check_id"_test = [] {
         // Simple comparison predicate
-        auto const sql = table_constraint::check(greater_than<test_table::id>(0u), check_id{"chk_positive_id"});
+        auto const sql =
+            table_constraint::check(greater_than<test_table::id>(0u), check_id<"chk_positive_id">{});
         expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
     };
 
@@ -758,13 +762,14 @@ suite<"DDL"> ddl_suite = [] {
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
         auto const sql = table_constraint::check(
-            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u), check_id{"chk_id_range"});
+            greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u),
+            check_id<"chk_id_range">{});
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 
     "table_constraint::check - nullable column predicate"_test = [] {
         // Using a nullable column (std::optional<varchar_type<64>>)
-        auto const sql = table_constraint::check(is_not_null<test_table::tag>(), check_id{"chk_tag_present"});
+        auto const sql = table_constraint::check(is_not_null<test_table::tag>(), check_id<"chk_tag_present">{});
         expect(sql == "CONSTRAINT chk_tag_present CHECK (tag IS NOT NULL)"s) << sql;
     };
 
@@ -1106,17 +1111,19 @@ suite<"DDL Features"> ddl_features_suite = [] {
 
     "create_index_on - generates CREATE INDEX"_test = [] {
         auto const sql =
-            create_index_on<test_table, test_table::id, test_table::name>("idx_test_table_id_name").build_sql();
+            create_index_on<index_id<"idx_test_table_id_name">, test_table, test_table::id, test_table::name>()
+                .build_sql();
         expect(sql == "CREATE INDEX idx_test_table_id_name ON test_table (id, name);\n"s) << sql;
     };
 
     "create_index_on.unique - generates CREATE UNIQUE INDEX"_test = [] {
-        auto const sql = create_index_on<test_table, test_table::name>("uq_test_table_name").unique().build_sql();
+        auto const sql =
+            create_index_on<index_id<"uq_test_table_name">, test_table, test_table::name>().unique().build_sql();
         expect(sql == "CREATE UNIQUE INDEX uq_test_table_name ON test_table (name);\n"s) << sql;
     };
 
     "drop_index_on - generates DROP INDEX ON table"_test = [] {
-        auto const sql = drop_index_on<test_table>("idx_test_table_id_name").build_sql();
+        auto const sql = drop_index_on<index_id<"idx_test_table_id_name">, test_table>().build_sql();
         expect(sql == "DROP INDEX idx_test_table_id_name ON test_table;\n"s) << sql;
     };
 
@@ -1168,18 +1175,24 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     };
 
     "alter_table.add_index - generates ADD INDEX"_test = [] {
-        auto const sql = alter_table<test_table>().add_index<test_table::name>("idx_test_table_name").build_sql();
+        auto const sql =
+            alter_table<test_table>().add_index<index_id<"idx_test_table_name">, test_table::name>().build_sql();
         expect(sql == "ALTER TABLE test_table ADD INDEX idx_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.add_unique_index - generates ADD UNIQUE INDEX"_test = [] {
-        auto const sql = alter_table<test_table>().add_unique_index<test_table::name>("uq_test_table_name").build_sql();
+        auto const sql =
+            alter_table<test_table>()
+                .add_unique_index<index_id<"uq_test_table_name">, test_table::name>()
+                .build_sql();
         expect(sql == "ALTER TABLE test_table ADD UNIQUE INDEX uq_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.add_fulltext_index - generates ADD FULLTEXT INDEX"_test = [] {
         auto const sql =
-            alter_table<test_table>().add_fulltext_index<test_table::name>("ft_test_table_name").build_sql();
+            alter_table<test_table>()
+                .add_fulltext_index<index_id<"ft_test_table_name">, test_table::name>()
+                .build_sql();
         expect(sql == "ALTER TABLE test_table ADD FULLTEXT INDEX ft_test_table_name (name);\n"s) << sql;
     };
 
@@ -1211,7 +1224,7 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     "alter_table - combines multiple new actions"_test = [] {
         auto const sql = alter_table<test_table>()
                              .change_column<test_table::name, column_field<"label", text_type<>>>()
-                             .add_index<test_table::name>("idx_label")
+                             .add_index<index_id<"idx_label">, test_table::name>()
                              .set_engine(Engine::MyISAM)
                              .set_auto_increment(500)
                              .build_sql();

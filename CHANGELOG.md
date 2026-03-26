@@ -10,8 +10,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `check_id` — strong type for CHECK constraint names; prevents confusion with the expression string
-- `table_constraint::check(where_condition, check_id)` — typed overload that accepts any WHERE-style predicate (`equal`, `greater_than`, `&`, `|`, `!`, …) and a `check_id` constraint name; the old `check(string_view, string_view)` overload has been removed
+- `check_id<"name">` — compile-time CHECK constraint name type; pass as second argument to `table_constraint::check` to emit a named constraint
+- `index_id<"name">` — compile-time index name type; used as the first template parameter wherever an index name is required (`create_index_on`, `drop_index_on`, `add_index`, `add_unique_index`, `add_fulltext_index`, `table_constraint::key`, `unique_key`, `fulltext_key`, `spatial_key`)
+- `NamedIdType` concept — satisfied by `check_id<N>`, `index_id<N>`, and any user-defined type providing a static `name()` → `std::string_view`
+- `table_constraint::check(where_condition)` / `check(where_condition, check_id<"name">{})` — typed CHECK constraint from any WHERE-style predicate; the old `check(string_view, string_view)` overload has been removed
 - `alter_table<T>().change_column<OldCol, NewCol>()` — `CHANGE COLUMN old new type [NOT NULL]`; `NewCol` is a `ColumnDescriptor` (e.g. `column_field<"new_name", T>`) providing the new column name and type; use `std::optional<T>` to make the column nullable
 - `alter_table<T>().add_column<Col>()` and `.modify_column<Col>()` now infer SQL type and nullability from the column descriptor — no more string type or bool parameter
 - `alter_table<T>().add_index<Cols...>(name)` — `ADD INDEX name (col1, ...)`
