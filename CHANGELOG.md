@@ -51,6 +51,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `grant<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `grant`
 - `revoke(privilege_list, grant_target, grant_user)` — `REVOKE ... ON ... FROM ...`
 - `revoke<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `revoke`
+- `column_alias` — strongly-typed SQL alias identifier (wraps `std::string_view`); required as the second argument to `.with_alias()` in place of a plain `std::string`
 
 ### Changed
 
@@ -69,7 +70,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   | `.order_by<Col, sort_order::desc>()` | `.order_by(desc(Col{}))` |
   | `.order_by_alias<Proj>()` | `.order_by_alias(Proj{})` |
   | `.order_by_alias<Proj, sort_order::desc>()` | `.order_by_alias(desc(Proj{}))` |
-  | `.with_alias<Proj>("name")` | `.with_alias(Proj{}, "name")` |
+  | `.with_alias<Proj>("name")` | `.with_alias(Proj{}, column_alias{"name"})` |
   | `.inner_join<T, L, R>()` | `.inner_join(T{}, L{}, R{})` |
   | `.inner_join_on<T>(pred)` | `.inner_join(T{}, pred)` |
   | `.left_join<T, L, R>()` | `.left_join(T{}, L{}, R{})` |
@@ -105,6 +106,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Simple column-ref predicate factories (`equal`, `greater_than`, `like`, `between`, `in`, etc.) now return `check_expr` instead of `sql_predicate`; `check_expr` implicitly converts to `sql_predicate` so existing WHERE/HAVING/JOIN ON usage is unaffected
 - Subquery predicate factories (`in_subquery`, `not_in_subquery`, `exists`, `not_exists`) and `match_against` return `sql_predicate` directly (not check-safe)
 
+- **Breaking:** `.with_alias()` now requires a `column_alias` value as its second argument instead of a plain `std::string`; replace `.with_alias(Proj{}, "name")` with `.with_alias(Proj{}, column_alias{"name"})`
 - **Breaking:** `grant` and `revoke` now require strongly-typed `privilege_list`, `grant_target`, and `grant_user` arguments instead of plain strings; the old string-based overloads have been removed
 
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause

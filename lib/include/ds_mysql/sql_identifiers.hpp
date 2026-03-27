@@ -42,4 +42,17 @@ public:
     }
 };
 
+// Strong type for SQL column alias identifiers (used with AS).
+class column_alias {
+    std::string_view value_;
+
+public:
+    constexpr explicit column_alias(std::string_view sv) noexcept : value_(sv) {
+    }
+
+    [[nodiscard]] constexpr std::string_view to_string_view() const noexcept {
+        return value_;
+    }
+};
+
 }  // namespace ds_mysql

@@ -190,7 +190,7 @@ concept SqlInterval = requires(T const& t) {
 // aliased_projection — wraps any Projection with a SQL alias
 //
 // Uses a runtime string for the alias name, stored via a static helper.
-// For use with select builder's .with_alias<Index>("name") method.
+// For use with select builder's .with_alias(Proj{}, column_alias{"name"}) method.
 // ===================================================================
 
 // ===================================================================
@@ -2947,7 +2947,7 @@ std::string qualified_col_name() {
 // proj_index_in_pack<Proj, Projs...> — compile-time index of Proj in pack
 //
 // Returns the 0-based position of Proj within Projs...
-// Used by select_query_builder::with_alias<Proj>() to resolve the alias slot
+// Used by select_query_builder::with_alias() to resolve the alias slot
 // at compile time without requiring the caller to know numeric indices.
 // ===================================================================
 
@@ -3359,23 +3359,23 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    // with_alias<Proj>("name") — add AS alias to the projection matching type Proj
+    // with_alias(Proj{}, column_alias{"name"}) — add AS alias to the projection matching type Proj
     //
     // Proj must be one of the types in Projs...; a mismatch is a compile error.
-    // Example: .with_alias<sum<product::price_val>>("total")
+    // Example: .with_alias(sum<product::price_val>{}, column_alias{"total"})
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(Proj, std::string alias) const& {
+    [[nodiscard]] select_query_builder with_alias(Proj, column_alias alias) const& {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
-        copy.aliases_[Index] = std::move(alias);
+        copy.aliases_[Index] = std::string(alias.to_string_view());
         return copy;
     }
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(Proj, std::string alias) && {
+    [[nodiscard]] select_query_builder with_alias(Proj, column_alias alias) && {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
-        aliases_[Index] = std::move(alias);
+        aliases_[Index] = std::string(alias.to_string_view());
         return std::move(*this);
     }
 
