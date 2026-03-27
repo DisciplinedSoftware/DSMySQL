@@ -956,7 +956,7 @@ struct nth_value_over {};
 //   template <>
 //   struct projection_traits<my_agg> {
 //       using value_type = double;
-//       static std::string sql_expr() { return "MY_AGG(...)"; }
+//       [[nodiscard]] static std::string sql_expr() { return "MY_AGG(...)"; }
 //   };
 template <typename P>
 struct projection_traits;  // undefined — must be specialised
@@ -980,7 +980,7 @@ struct projection_traits<count_all> {
 template <ColumnDescriptor Col>
 struct projection_traits<count_col<Col>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "COUNT(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -988,7 +988,7 @@ struct projection_traits<count_col<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<sum<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SUM(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -996,7 +996,7 @@ struct projection_traits<sum<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<avg<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "AVG(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1004,7 +1004,7 @@ struct projection_traits<avg<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<min_of<Col>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MIN(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1012,7 +1012,7 @@ struct projection_traits<min_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<max_of<Col>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MAX(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1020,7 +1020,7 @@ struct projection_traits<max_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<count_distinct<Col>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "COUNT(DISTINCT " + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1028,7 +1028,7 @@ struct projection_traits<count_distinct<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<group_concat<Col>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "GROUP_CONCAT(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1036,7 +1036,7 @@ struct projection_traits<group_concat<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<stddev<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "STDDEV(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1044,7 +1044,7 @@ struct projection_traits<stddev<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<std_of<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "STD(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1052,7 +1052,7 @@ struct projection_traits<std_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<stddev_pop<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "STDDEV_POP(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1060,7 +1060,7 @@ struct projection_traits<stddev_pop<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<stddev_samp<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "STDDEV_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1068,7 +1068,7 @@ struct projection_traits<stddev_samp<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<variance<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "VARIANCE(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1076,7 +1076,7 @@ struct projection_traits<variance<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<var_pop<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "VAR_POP(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1084,7 +1084,7 @@ struct projection_traits<var_pop<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<var_samp<Col>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "VAR_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1092,7 +1092,7 @@ struct projection_traits<var_samp<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<bit_and_of<Col>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "BIT_AND(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1100,7 +1100,7 @@ struct projection_traits<bit_and_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<bit_or_of<Col>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "BIT_OR(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1108,7 +1108,7 @@ struct projection_traits<bit_or_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<bit_xor_of<Col>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "BIT_XOR(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1116,7 +1116,7 @@ struct projection_traits<bit_xor_of<Col>> {
 template <ColumnDescriptor Col>
 struct projection_traits<json_arrayagg<Col>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "JSON_ARRAYAGG(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1124,7 +1124,7 @@ struct projection_traits<json_arrayagg<Col>> {
 template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
 struct projection_traits<json_objectagg<KeyCol, ValCol>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "JSON_OBJECTAGG(" + std::string(column_traits<KeyCol>::column_name()) + ", " +
                std::string(column_traits<ValCol>::column_name()) + ")";
     }
@@ -1133,7 +1133,7 @@ struct projection_traits<json_objectagg<KeyCol, ValCol>> {
 template <ColumnDescriptor Col>
 struct projection_traits<any_value<Col>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "ANY_VALUE(" + std::string(column_traits<Col>::column_name()) + ")";
     }
 };
@@ -1149,7 +1149,7 @@ struct projection_traits<rand_val> {
 template <ColumnDescriptor Col1, ColumnDescriptor Col2>
 struct projection_traits<coalesce_of<Col1, Col2>> {
     using value_type = typename column_traits<Col1>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "COALESCE(" + std::string(column_traits<Col1>::column_name()) + ", " +
                std::string(column_traits<Col2>::column_name()) + ")";
     }
@@ -1158,7 +1158,7 @@ struct projection_traits<coalesce_of<Col1, Col2>> {
 template <ColumnDescriptor Col1, ColumnDescriptor Col2>
 struct projection_traits<ifnull_of<Col1, Col2>> {
     using value_type = typename column_traits<Col1>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "IFNULL(" + std::string(column_traits<Col1>::column_name()) + ", " +
                std::string(column_traits<Col2>::column_name()) + ")";
     }
@@ -1737,7 +1737,7 @@ concept FieldOrderBy = requires {
 template <Projection A, Projection B>
 struct projection_traits<arith_add<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "(" + std::string(projection_traits<A>::sql_expr()) + " + " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1746,7 +1746,7 @@ struct projection_traits<arith_add<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<arith_sub<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "(" + std::string(projection_traits<A>::sql_expr()) + " - " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1755,7 +1755,7 @@ struct projection_traits<arith_sub<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<arith_mul<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "(" + std::string(projection_traits<A>::sql_expr()) + " * " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1764,7 +1764,7 @@ struct projection_traits<arith_mul<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<arith_div<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "(" + std::string(projection_traits<A>::sql_expr()) + " / " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1773,7 +1773,7 @@ struct projection_traits<arith_div<A, B>> {
 template <Projection P>
 struct projection_traits<abs_of<P>> {
     using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "ABS(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1781,7 +1781,7 @@ struct projection_traits<abs_of<P>> {
 template <Projection P>
 struct projection_traits<floor_of<P>> {
     using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "FLOOR(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1789,7 +1789,7 @@ struct projection_traits<floor_of<P>> {
 template <Projection P>
 struct projection_traits<ceil_of<P>> {
     using value_type = sql_numeric_projection_value_t<typename projection_traits<P>::value_type>;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "CEIL(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1797,7 +1797,7 @@ struct projection_traits<ceil_of<P>> {
 template <Projection P>
 struct projection_traits<upper_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "UPPER(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1805,7 +1805,7 @@ struct projection_traits<upper_of<P>> {
 template <Projection P>
 struct projection_traits<lower_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LOWER(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1813,7 +1813,7 @@ struct projection_traits<lower_of<P>> {
 template <Projection P>
 struct projection_traits<trim_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "TRIM(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1821,7 +1821,7 @@ struct projection_traits<trim_of<P>> {
 template <Projection P>
 struct projection_traits<length_of<P>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1831,7 +1831,7 @@ struct projection_traits<length_of<P>> {
 template <Projection A, Projection B>
 struct projection_traits<mod_of<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MOD(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1840,7 +1840,7 @@ struct projection_traits<mod_of<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<power_of<A, B>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "POWER(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1850,7 +1850,7 @@ template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
 struct projection_traits<concat_of<Ps...>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         std::string s;
         s.reserve(8 + sizeof...(Ps) * 4);
         s += "CONCAT(";
@@ -1866,7 +1866,7 @@ struct projection_traits<concat_of<Ps...>> {
 template <sql_date_part Part, Projection P>
 struct projection_traits<extract_of<Part, P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "EXTRACT(" + std::string(sql_date_part_name<Part>()) + " FROM " +
                std::string(projection_traits<P>::sql_expr()) + ")";
     }
@@ -1875,7 +1875,7 @@ struct projection_traits<extract_of<Part, P>> {
 template <Projection P>
 struct projection_traits<date_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DATE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1883,7 +1883,7 @@ struct projection_traits<date_of<P>> {
 template <Projection P>
 struct projection_traits<time_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "TIME(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1891,7 +1891,7 @@ struct projection_traits<time_of<P>> {
 template <Projection P>
 struct projection_traits<year_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "YEAR(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1899,7 +1899,7 @@ struct projection_traits<year_of<P>> {
 template <Projection P>
 struct projection_traits<month_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MONTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1907,7 +1907,7 @@ struct projection_traits<month_of<P>> {
 template <Projection P>
 struct projection_traits<day_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -1915,7 +1915,7 @@ struct projection_traits<day_of<P>> {
 template <Projection A, Projection B>
 struct projection_traits<datediff_of<A, B>> {
     using value_type = int64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DATEDIFF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1926,7 +1926,7 @@ struct projection_traits<datediff_of<A, B>> {
 template <sql_date_part Part, Projection A, Projection B>
 struct projection_traits<timestampdiff_of<Part, A, B>> {
     using value_type = int64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "TIMESTAMPDIFF(" + std::string(sql_date_part_name<Part>()) + ", " +
                std::string(projection_traits<A>::sql_expr()) + ", " + std::string(projection_traits<B>::sql_expr()) +
                ")";
@@ -1936,7 +1936,7 @@ struct projection_traits<timestampdiff_of<Part, A, B>> {
 template <Projection P, sql_cast_type Type>
 struct projection_traits<cast_as<P, Type>> {
     using value_type = typename sql_cast_type_traits<Type>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "CAST(" + std::string(projection_traits<P>::sql_expr()) + " AS " +
                std::string(sql_cast_type_traits<Type>::sql_name()) + ")";
     }
@@ -1945,7 +1945,7 @@ struct projection_traits<cast_as<P, Type>> {
 template <Projection P, sql_cast_type Type>
 struct projection_traits<convert_as<P, Type>> {
     using value_type = typename sql_cast_type_traits<Type>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "CONVERT(" + std::string(projection_traits<P>::sql_expr()) + ", " +
                std::string(sql_cast_type_traits<Type>::sql_name()) + ")";
     }
@@ -1958,7 +1958,7 @@ struct projection_traits<convert_as<P, Type>> {
 template <Projection A, Projection B>
 struct projection_traits<nullif_of<A, B>> {
     using value_type = typename projection_traits<A>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "NULLIF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -1968,7 +1968,7 @@ template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
 struct projection_traits<greatest_of<Ps...>> {
     using value_type = typename projection_traits<std::tuple_element_t<0, std::tuple<Ps...>>>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         std::string s = "GREATEST(";
         bool first = true;
         (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
@@ -1981,7 +1981,7 @@ template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
 struct projection_traits<least_of<Ps...>> {
     using value_type = typename projection_traits<std::tuple_element_t<0, std::tuple<Ps...>>>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         std::string s = "LEAST(";
         bool first = true;
         (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
@@ -1999,7 +1999,7 @@ struct projection_traits<least_of<Ps...>> {
 template <Projection P>
 struct projection_traits<char_length_of<P>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "CHAR_LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2009,7 +2009,7 @@ struct projection_traits<char_length_of<P>> {
 template <Projection P>
 struct projection_traits<reverse_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "REVERSE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2019,7 +2019,7 @@ struct projection_traits<reverse_of<P>> {
 template <Projection P>
 struct projection_traits<space_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SPACE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2027,7 +2027,7 @@ struct projection_traits<space_of<P>> {
 template <Projection A, Projection B>
 struct projection_traits<strcmp_of<A, B>> {
     using value_type = int32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "STRCMP(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -2040,7 +2040,7 @@ struct projection_traits<strcmp_of<A, B>> {
 template <Projection P>
 struct projection_traits<sqrt_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SQRT(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2048,7 +2048,7 @@ struct projection_traits<sqrt_of<P>> {
 template <Projection P>
 struct projection_traits<log_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LOG(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2056,7 +2056,7 @@ struct projection_traits<log_of<P>> {
 template <Projection P>
 struct projection_traits<log2_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LOG2(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2064,7 +2064,7 @@ struct projection_traits<log2_of<P>> {
 template <Projection P>
 struct projection_traits<log10_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LOG10(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2072,7 +2072,7 @@ struct projection_traits<log10_of<P>> {
 template <Projection P>
 struct projection_traits<exp_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "EXP(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2080,7 +2080,7 @@ struct projection_traits<exp_of<P>> {
 template <Projection P>
 struct projection_traits<sin_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SIN(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2088,7 +2088,7 @@ struct projection_traits<sin_of<P>> {
 template <Projection P>
 struct projection_traits<cos_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "COS(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2096,7 +2096,7 @@ struct projection_traits<cos_of<P>> {
 template <Projection P>
 struct projection_traits<tan_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "TAN(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2104,7 +2104,7 @@ struct projection_traits<tan_of<P>> {
 template <Projection P>
 struct projection_traits<degrees_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DEGREES(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2112,7 +2112,7 @@ struct projection_traits<degrees_of<P>> {
 template <Projection P>
 struct projection_traits<radians_of<P>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "RADIANS(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2120,7 +2120,7 @@ struct projection_traits<radians_of<P>> {
 template <Projection P>
 struct projection_traits<sign_of<P>> {
     using value_type = int32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SIGN(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2142,7 +2142,7 @@ struct projection_traits<pi_val> {
 template <Projection P>
 struct projection_traits<hour_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "HOUR(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2150,7 +2150,7 @@ struct projection_traits<hour_of<P>> {
 template <Projection P>
 struct projection_traits<minute_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MINUTE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2158,7 +2158,7 @@ struct projection_traits<minute_of<P>> {
 template <Projection P>
 struct projection_traits<second_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SECOND(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2166,7 +2166,7 @@ struct projection_traits<second_of<P>> {
 template <Projection P>
 struct projection_traits<microsecond_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MICROSECOND(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2174,7 +2174,7 @@ struct projection_traits<microsecond_of<P>> {
 template <Projection P>
 struct projection_traits<quarter_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "QUARTER(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2182,7 +2182,7 @@ struct projection_traits<quarter_of<P>> {
 template <Projection P>
 struct projection_traits<week_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "WEEK(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2190,7 +2190,7 @@ struct projection_traits<week_of<P>> {
 template <Projection P>
 struct projection_traits<weekday_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "WEEKDAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2198,7 +2198,7 @@ struct projection_traits<weekday_of<P>> {
 template <Projection P>
 struct projection_traits<dayofweek_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DAYOFWEEK(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2206,7 +2206,7 @@ struct projection_traits<dayofweek_of<P>> {
 template <Projection P>
 struct projection_traits<dayofyear_of<P>> {
     using value_type = uint32_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DAYOFYEAR(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2214,7 +2214,7 @@ struct projection_traits<dayofyear_of<P>> {
 template <Projection P>
 struct projection_traits<dayname_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DAYNAME(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2222,7 +2222,7 @@ struct projection_traits<dayname_of<P>> {
 template <Projection P>
 struct projection_traits<monthname_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "MONTHNAME(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2230,7 +2230,7 @@ struct projection_traits<monthname_of<P>> {
 template <Projection P>
 struct projection_traits<last_day_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LAST_DAY(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2240,7 +2240,7 @@ struct projection_traits<last_day_of<P>> {
 template <Projection P>
 struct projection_traits<from_unixtime_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "FROM_UNIXTIME(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2248,7 +2248,7 @@ struct projection_traits<from_unixtime_of<P>> {
 template <Projection P>
 struct projection_traits<unix_timestamp_of<P>> {
     using value_type = int64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "UNIX_TIMESTAMP(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2274,7 +2274,7 @@ struct projection_traits<utc_timestamp_val> {
 template <Projection A, Projection B>
 struct projection_traits<addtime_of<A, B>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "ADDTIME(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -2283,7 +2283,7 @@ struct projection_traits<addtime_of<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<subtime_of<A, B>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "SUBTIME(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -2292,7 +2292,7 @@ struct projection_traits<subtime_of<A, B>> {
 template <Projection A, Projection B>
 struct projection_traits<timediff_of<A, B>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "TIMEDIFF(" + std::string(projection_traits<A>::sql_expr()) + ", " +
                std::string(projection_traits<B>::sql_expr()) + ")";
     }
@@ -2308,7 +2308,7 @@ template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
 struct projection_traits<json_object_of<Ps...>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         std::string s = "JSON_OBJECT(";
         bool first = true;
         (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
@@ -2321,7 +2321,7 @@ template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
 struct projection_traits<json_array_of<Ps...>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         std::string s = "JSON_ARRAY(";
         bool first = true;
         (((s += (first ? "" : ", "), s += projection_traits<Ps>::sql_expr(), first = false)), ...);
@@ -2335,7 +2335,7 @@ struct projection_traits<json_array_of<Ps...>> {
 template <Projection P>
 struct projection_traits<json_length_of<P>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "JSON_LENGTH(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2343,7 +2343,7 @@ struct projection_traits<json_length_of<P>> {
 template <Projection P>
 struct projection_traits<json_unquote_of<P>> {
     using value_type = std::string;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "JSON_UNQUOTE(" + std::string(projection_traits<P>::sql_expr()) + ")";
     }
 };
@@ -2351,7 +2351,7 @@ struct projection_traits<json_unquote_of<P>> {
 template <Projection Agg, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<window_func<Agg, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename projection_traits<Agg>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return std::string(projection_traits<Agg>::sql_expr()) + " OVER (PARTITION BY " +
                std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2362,7 +2362,7 @@ struct projection_traits<window_func<Agg, PartitionCol, OrderCol, Dir, Frame>> {
 template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "ROW_NUMBER() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
                " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
                (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
@@ -2372,7 +2372,7 @@ struct projection_traits<row_number_over<PartitionCol, OrderCol, Dir, Frame>> {
 template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
                sql_window_frame_clause<Frame>() + ")";
@@ -2382,7 +2382,7 @@ struct projection_traits<rank_over<PartitionCol, OrderCol, Dir, Frame>> {
 template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<dense_rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "DENSE_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
                " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
                (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
@@ -2393,7 +2393,7 @@ template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor 
           sort_order Dir, typename Frame>
 struct projection_traits<lag_over<Col, PartitionCol, OrderCol, Offset, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LAG(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2405,7 +2405,7 @@ template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor 
           sort_order Dir, typename Frame>
 struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LEAD(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(Offset) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2416,7 +2416,7 @@ struct projection_traits<lead_over<Col, PartitionCol, OrderCol, Offset, Dir, Fra
 template <std::size_t N, ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<ntile_over<N, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = uint64_t;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "NTILE(" + std::to_string(N) + ") OVER (PARTITION BY " +
                std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2427,7 +2427,7 @@ struct projection_traits<ntile_over<N, PartitionCol, OrderCol, Dir, Frame>> {
 template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<percent_rank_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "PERCENT_RANK() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
                " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
                (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
@@ -2437,7 +2437,7 @@ struct projection_traits<percent_rank_over<PartitionCol, OrderCol, Dir, Frame>> 
 template <ColumnDescriptor PartitionCol, ColumnDescriptor OrderCol, sort_order Dir, typename Frame>
 struct projection_traits<cume_dist_over<PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = double;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "CUME_DIST() OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) +
                " ORDER BY " + std::string(column_traits<OrderCol>::column_name()) +
                (Dir == sort_order::asc ? " ASC" : " DESC") + sql_window_frame_clause<Frame>() + ")";
@@ -2448,7 +2448,7 @@ template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor 
           typename Frame>
 struct projection_traits<first_value_over<Col, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "FIRST_VALUE(" + std::string(column_traits<Col>::column_name()) + ") OVER (PARTITION BY " +
                std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2460,7 +2460,7 @@ template <ColumnDescriptor Col, ColumnDescriptor PartitionCol, ColumnDescriptor 
           typename Frame>
 struct projection_traits<last_value_over<Col, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "LAST_VALUE(" + std::string(column_traits<Col>::column_name()) + ") OVER (PARTITION BY " +
                std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +
@@ -2472,7 +2472,7 @@ template <ColumnDescriptor Col, std::size_t N, ColumnDescriptor PartitionCol, Co
           typename Frame>
 struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Frame>> {
     using value_type = typename column_traits<Col>::value_type;
-    static std::string sql_expr() {
+    [[nodiscard]] static std::string sql_expr() {
         return "NTH_VALUE(" + std::string(column_traits<Col>::column_name()) + ", " + std::to_string(N) +
                ") OVER (PARTITION BY " + std::string(column_traits<PartitionCol>::column_name()) + " ORDER BY " +
                std::string(column_traits<OrderCol>::column_name()) + (Dir == sort_order::asc ? " ASC" : " DESC") +

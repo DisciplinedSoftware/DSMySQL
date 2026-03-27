@@ -149,7 +149,7 @@ namespace sql_detail {
     return precision <= 6U ? precision : 6U;
 }
 
-inline std::string escape_sql_string(std::string_view s) {
+[[nodiscard]] inline std::string escape_sql_string(std::string_view s) {
     std::string result;
     result.reserve(s.size());
     for (char const c : s) {
@@ -161,7 +161,7 @@ inline std::string escape_sql_string(std::string_view s) {
     return result;
 }
 
-inline std::string format_datetime(std::chrono::system_clock::time_point tp, uint32_t fractional_second_precision = 0) {
+[[nodiscard]] inline std::string format_datetime(std::chrono::system_clock::time_point tp, uint32_t fractional_second_precision = 0) {
     auto const precision = normalize_fractional_second_precision(fractional_second_precision);
     auto const micros = std::chrono::floor<std::chrono::microseconds>(tp);
     auto const secs = std::chrono::floor<std::chrono::seconds>(micros);
@@ -176,7 +176,7 @@ inline std::string format_datetime(std::chrono::system_clock::time_point tp, uin
     return std::format("'{:%Y-%m-%d %H:%M:%S}.{:0{}d}'", secs, scaled_fraction, precision);
 }
 
-inline std::string format_time(std::chrono::microseconds dur, uint32_t fractional_second_precision = 0) {
+[[nodiscard]] inline std::string format_time(std::chrono::microseconds dur, uint32_t fractional_second_precision = 0) {
     auto const precision = normalize_fractional_second_precision(fractional_second_precision);
     bool const negative = dur.count() < 0;
     auto const abs_dur = negative ? -dur : dur;
@@ -204,7 +204,7 @@ inline std::string format_time(std::chrono::microseconds dur, uint32_t fractiona
  * std::chrono::system_clock::time_point.
  */
 template <typename T>
-std::string to_sql_value(T const& v) {
+[[nodiscard]] std::string to_sql_value(T const& v) {
     if constexpr (ColumnFieldType<T>) {
         return to_sql_value(v.value);
     } else if constexpr (is_optional_v<T>) {

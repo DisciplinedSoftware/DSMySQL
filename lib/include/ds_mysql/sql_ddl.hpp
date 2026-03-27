@@ -130,7 +130,7 @@ struct table_inline_primary_key {
 
 template <typename T>
 struct table_constraints {
-    static std::vector<std::string> get() {
+    [[nodiscard]] static std::vector<std::string> get() {
         return {};
     }
 };
@@ -1035,87 +1035,87 @@ struct database_attributes {
     }
 };
 
+template <typename T, std::size_t I>
+[[nodiscard]] std::string column_def_for() {
+    using field_type = boost::pfr::tuple_element_t<I, T>;
+    std::string_view field_name = field_schema<T, I>::name();
+    std::string sql_type_override = field_sql_type_override<T, I>();
+    std::string col = "    ";
+    col += field_name;
+    col += " ";
+    col += sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
+    if constexpr (!is_field_nullable_v<field_type>) {
+        col += " NOT NULL";
+    }
+    if constexpr (I == 0) {
+        if constexpr (table_inline_primary_key<T>::value) {
+            col += " PRIMARY KEY AUTO_INCREMENT";
+        }
+        // When inline PK is disabled, typed column attributes should handle AUTO_INCREMENT
+    }
+    if constexpr (requires { field_type::ddl_auto_increment; } && field_type::ddl_auto_increment) {
+        col += " AUTO_INCREMENT";
+    }
+    if constexpr (requires { field_type::ddl_unique; } && field_type::ddl_unique) {
+        col += " UNIQUE";
+    }
+    if constexpr (requires { field_type::ddl_default_current_timestamp; } &&
+                  field_type::ddl_default_current_timestamp) {
+        col += " DEFAULT CURRENT_TIMESTAMP";
+    }
+    if constexpr (requires { field_type::ddl_collate; } && !field_type::ddl_collate.empty()) {
+        col += " COLLATE ";
+        col += field_type::ddl_collate;
+    }
+    if constexpr (requires { field_type::ddl_on_update_current_timestamp; } &&
+                  field_type::ddl_on_update_current_timestamp) {
+        col += " ON UPDATE CURRENT_TIMESTAMP";
+    }
+    if constexpr (requires { field_type::ddl_comment; } && !field_type::ddl_comment.empty()) {
+        col += " COMMENT ";
+        col += quote_sql_string(field_type::ddl_comment);
+    }
+    return col;
+}
+
+template <typename T, std::size_t I>
+[[nodiscard]] std::string fk_clause_for() {
+    using field_type = boost::pfr::tuple_element_t<I, T>;
+    if constexpr (requires { field_type::ddl_has_fk; } && field_type::ddl_has_fk) {
+        std::string fk = ",\n    FOREIGN KEY (";
+        fk += field_schema<T, I>::name();
+        fk += ") REFERENCES ";
+        fk += table_name_for<typename field_type::ddl_fk_ref_table>::value().to_string_view();
+        fk += "(";
+        fk += field_type::ddl_fk_ref_column::column_name();
+        fk += ")";
+        if constexpr (!field_type::ddl_fk_on_delete.empty()) {
+            fk += " ON DELETE ";
+            fk += field_type::ddl_fk_on_delete;
+        }
+        if constexpr (!field_type::ddl_fk_on_update.empty()) {
+            fk += " ON UPDATE ";
+            fk += field_type::ddl_fk_on_update;
+        }
+        return fk;
+    } else {
+        return {};
+    }
+}
+
 template <typename T, std::size_t... Is>
 void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
-    std::size_t count = 0;
-    (
-        [&] {
-            using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            if (count > 0) {
-                sql += ",\n";
-            }
-            std::string_view field_name = field_schema<T, Is>::name();
-            std::string sql_type_override = field_sql_type_override<T, Is>();
-            std::string sql_type = sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
-            sql += "    ";
-            sql += field_name;
-            sql += " ";
-            sql += sql_type;
-            if constexpr (!is_field_nullable_v<field_type>) {
-                sql += " NOT NULL";
-            }
-            if constexpr (Is == 0) {
-                if constexpr (table_inline_primary_key<T>::value) {
-                    sql += " PRIMARY KEY AUTO_INCREMENT";
-                }
-                // When inline PK is disabled, typed column attributes should handle AUTO_INCREMENT
-            }
-            if constexpr (requires { field_type::ddl_auto_increment; } && field_type::ddl_auto_increment) {
-                sql += " ";
-                sql += "AUTO_INCREMENT";
-            }
-            if constexpr (requires { field_type::ddl_unique; } && field_type::ddl_unique) {
-                sql += " ";
-                sql += "UNIQUE";
-            }
-            if constexpr (requires { field_type::ddl_default_current_timestamp; } &&
-                          field_type::ddl_default_current_timestamp) {
-                sql += " ";
-                sql += "DEFAULT CURRENT_TIMESTAMP";
-            }
-            if constexpr (requires { field_type::ddl_collate; } && !field_type::ddl_collate.empty()) {
-                sql += " ";
-                sql += "COLLATE ";
-                sql += field_type::ddl_collate;
-            }
-            if constexpr (requires { field_type::ddl_on_update_current_timestamp; } &&
-                          field_type::ddl_on_update_current_timestamp) {
-                sql += " ";
-                sql += "ON UPDATE CURRENT_TIMESTAMP";
-            }
-            if constexpr (requires { field_type::ddl_comment; } && !field_type::ddl_comment.empty()) {
-                sql += " ";
-                sql += "COMMENT ";
-                sql += quote_sql_string(field_type::ddl_comment);
-            }
-            ++count;
-        }(),
-        ...);
-
-    // Emit FOREIGN KEY constraints for fields that have them declared.
-    (
-        [&] {
-            using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            if constexpr (requires { field_type::ddl_has_fk; } && field_type::ddl_has_fk) {
-                sql += ",\n    FOREIGN KEY (";
-                sql += field_schema<T, Is>::name();
-                sql += ") REFERENCES ";
-                sql += table_name_for<typename field_type::ddl_fk_ref_table>::value().to_string_view();
-                sql += "(";
-                sql += field_type::ddl_fk_ref_column::column_name();
-                sql += ")";
-                if constexpr (!field_type::ddl_fk_on_delete.empty()) {
-                    sql += " ON DELETE ";
-                    sql += field_type::ddl_fk_on_delete;
-                }
-                if constexpr (!field_type::ddl_fk_on_update.empty()) {
-                    sql += " ON UPDATE ";
-                    sql += field_type::ddl_fk_on_update;
-                }
-            }
-        }(),
-        ...);
-
+    if constexpr (sizeof...(Is) > 0) {
+        std::string col_defs[] = {column_def_for<T, Is>()...};
+        for (std::size_t i = 0; i < sizeof...(Is); ++i) {
+            if (i > 0) sql += ",\n";
+            sql += col_defs[i];
+        }
+        std::string fk_clauses[] = {fk_clause_for<T, Is>()...};
+        for (auto const& fk : fk_clauses) {
+            sql += fk;
+        }
+    }
     // Emit additional table-level constraints and index definitions.
     for (auto const& constraint_sql : table_constraints<T>::get()) {
         if (!constraint_sql.empty()) {
@@ -1698,7 +1698,7 @@ private:
 //       };
 template <typename T>
 struct table_attributes {
-    static create_table_option get() {
+    [[nodiscard]] static create_table_option get() {
         return {};  // Empty by default
     }
 };

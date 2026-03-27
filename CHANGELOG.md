@@ -54,6 +54,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Eliminated immediately invoked lambda expressions (IILEs) from fold expressions in `schema_generator.hpp`, `sql_ddl.hpp`, `sql_mutation_shared.hpp`, and `mysql_connection.hpp`; each per-element body is now a named helper function (`column_definition_for`, `column_def_for`, `fk_clause_for`, `validate_one_table`), and separator logic uses a plain index loop over a stack-allocated array
+- `[[nodiscard]]` added to all internal SQL-building helpers and trait `get()`/`value()`/`sql_expr()` static members: `sql_type_name::value`, `sql_type_for`, `field_sql_type_override`, `column_definition_for`, `generate_create_table_impl`, `generate_create_table`, `generate_values_impl`, `generate_values`, `generate_column_list_impl`, `generate_column_list`, `column_def_for`, `fk_clause_for`, `table_constraints::get`, `table_attributes::get`, `escape_sql_string`, `format_datetime`, `format_time`, `to_sql_value`, and all `projection_traits::sql_expr` static members in `sql_dql.hpp`
+
 - **Breaking:** Uniform value-argument API — all query builder methods previously requiring template parameters now accept value arguments instead. Every column descriptor, table type, and expression type is passed as a default-constructed instance. No runtime cost: these are empty structs or trivially constructed types that are fully elided by the optimizer at `-O1` or above.
 
   | Old (template params) | New (value args) |

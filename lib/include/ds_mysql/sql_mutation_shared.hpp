@@ -16,52 +16,39 @@ concept FieldOf =
     ColumnFieldType<Col> && is_field_of_impl<Col, T>(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
 
 template <typename T, std::size_t... Is>
-std::string generate_values_impl(T const& row, std::index_sequence<Is...>) {
+[[nodiscard]] std::string generate_values_impl(T const& row, std::index_sequence<Is...>) {
+    if constexpr (sizeof...(Is) == 0) return {};
+    std::string parts[] = {sql_detail::to_sql_value(boost::pfr::get<Is>(row))...};
     std::string values;
-    if constexpr (sizeof...(Is) > 0) {
-        values.reserve(sizeof...(Is) * 8);
+    values.reserve(sizeof...(Is) * 8);
+    for (std::size_t i = 0; i < sizeof...(Is); ++i) {
+        if (i > 0) values += ", ";
+        values += parts[i];
     }
-    std::size_t count = 0;
-    (
-        [&] {
-            if (count > 0) {
-                values += ", ";
-            }
-            values += sql_detail::to_sql_value(boost::pfr::get<Is>(row));
-            ++count;
-        }(),
-        ...);
     return values;
 }
 
 template <typename T>
-std::string generate_values(T const& row) {
+[[nodiscard]] std::string generate_values(T const& row) {
     return generate_values_impl(row, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
 }
 
 template <typename T, std::size_t... Is>
-std::string generate_column_list_impl(std::index_sequence<Is...>) {
-    constexpr std::size_t field_count = sizeof...(Is);
-    const std::size_t names_len = (std::size_t{} + ... + field_schema<T, Is>::name().size());
+[[nodiscard]] std::string generate_column_list_impl(std::index_sequence<Is...>) {
+    if constexpr (sizeof...(Is) == 0) return {};
+    constexpr std::size_t names_len = (std::size_t{} + ... + field_schema<T, Is>::name().size());
+    constexpr std::string_view parts[] = {field_schema<T, Is>::name()...};
     std::string columns;
-    if constexpr (field_count > 0) {
-        columns.reserve(names_len + (field_count - 1) * 2);
+    columns.reserve(names_len + (sizeof...(Is) - 1) * 2);
+    for (std::size_t i = 0; i < sizeof...(Is); ++i) {
+        if (i > 0) columns += ", ";
+        columns += parts[i];
     }
-    std::size_t count = 0;
-    (
-        [&] {
-            if (count > 0) {
-                columns += ", ";
-            }
-            columns += field_schema<T, Is>::name();
-            ++count;
-        }(),
-        ...);
     return columns;
 }
 
 template <typename T>
-std::string const& generate_column_list() {
+[[nodiscard]] std::string const& generate_column_list() {
     static const std::string cached =
         generate_column_list_impl<T>(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
     return cached;

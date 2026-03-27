@@ -5,7 +5,6 @@
 #include <concepts>
 #include <cstdint>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -52,7 +51,7 @@ constexpr bool is_field_nullable_v = is_optional_v<T> || (ColumnFieldType<T> && 
 
 template <typename T>
 struct sql_type_name {
-    static std::string value() {
+    [[nodiscard]] static std::string value() {
         // Unwrap column_field wrapper first, then proceed with the stored value type.
         if constexpr (ColumnFieldType<T>) {
             return sql_type_name<typename T::value_type>::value();
@@ -116,7 +115,7 @@ struct sql_type_name {
  * Maps C++ type to SQL type string
  */
 template <typename T>
-std::string sql_type_for() {
+[[nodiscard]] std::string sql_type_for() {
     return sql_type_name<T>::value();
 }
 
@@ -307,7 +306,7 @@ template <typename T, std::size_t Index>
 using field_name_extractor = field_schema<T, Index>;
 
 template <typename T, std::size_t Index>
-std::string field_sql_type_override() {
+[[nodiscard]] std::string field_sql_type_override() {
     if constexpr (requires {
                       { field_schema<T, Index>::sql_type() } -> std::convertible_to<std::string_view>;
                   }) {
@@ -458,45 +457,39 @@ struct database_tables<DB> {
 // Schema Generation
 // ===================================================================
 
+template <typename T, std::size_t I>
+[[nodiscard]] std::string column_definition_for() {
+    using field_type = boost::pfr::tuple_element_t<I, T>;
+    std::string_view field_name = field_schema<T, I>::name();
+    std::string sql_type_override = field_sql_type_override<T, I>();
+    std::string col = "    ";
+    col += field_name;
+    col += ' ';
+    col += sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
+    if constexpr (!is_optional_v<field_type>) {
+        col += " NOT NULL";
+    }
+    if constexpr (I == 0) {
+        col += " PRIMARY KEY AUTO_INCREMENT";
+    }
+    return col;
+}
+
 template <typename T, std::size_t... Is>
-std::string generate_create_table_impl(std::string_view table_name, std::index_sequence<Is...>) {
-    std::ostringstream sql;
-    sql << "CREATE TABLE " << table_name << " (\n";
-
-    std::size_t field_count = 0;
-    (
-        [&] {
-            using field_type = std::tuple_element_t<Is, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-
-            if (field_count > 0) {
-                sql << ",\n";
-            }
-
-            // Get field name
-            std::string_view field_name = field_schema<T, Is>::name();
-
-            // Get SQL type (use override if provided, otherwise infer from C++ type)
-            std::string sql_type_override = field_sql_type_override<T, Is>();
-            std::string sql_type = sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
-
-            sql << "    " << field_name << " " << sql_type;
-
-            // Handle nullable vs NOT NULL
-            if constexpr (!is_optional_v<field_type>) {
-                sql << " NOT NULL";
-            }
-
-            // Special handling for first field as PRIMARY KEY
-            if (Is == 0) {
-                sql << " PRIMARY KEY AUTO_INCREMENT";
-            }
-
-            ++field_count;
-        }(),
-        ...);
-
-    sql << "\n)";
-    return sql.str();
+[[nodiscard]] std::string generate_create_table_impl(std::string_view table_name, std::index_sequence<Is...>) {
+    if constexpr (sizeof...(Is) == 0) {
+        return std::string{"CREATE TABLE "}.append(table_name).append(" (\n)");
+    }
+    std::string col_defs[] = {column_definition_for<T, Is>()...};
+    std::string sql = "CREATE TABLE ";
+    sql += table_name;
+    sql += " (\n";
+    for (std::size_t i = 0; i < sizeof...(Is); ++i) {
+        if (i > 0) sql += ",\n";
+        sql += col_defs[i];
+    }
+    sql += "\n)";
+    return sql;
 }
 
 /**
@@ -510,7 +503,7 @@ std::string generate_create_table_impl(std::string_view table_name, std::index_s
  *   auto sql = generate_create_table<Symbol>("symbol");
  */
 template <typename T>
-std::string generate_create_table(std::string_view table_name) {
+[[nodiscard]] std::string generate_create_table(std::string_view table_name) {
     constexpr std::size_t field_count = boost::pfr::tuple_size_v<T>;
     return generate_create_table_impl<T>(table_name, std::make_index_sequence<field_count>{});
 }

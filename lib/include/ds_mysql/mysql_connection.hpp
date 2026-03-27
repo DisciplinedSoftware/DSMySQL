@@ -390,17 +390,17 @@ private:
         return RowType{deserialize_mysql_cell<std::tuple_element_t<Is, RowType>>(row[Is], lengths[Is])...};
     }
 
+    template <typename table_t>
+    void validate_one_table(std::string& errors) const {
+        auto const result = validate_table<table_t>();
+        if (!result) {
+            errors += result.error() + "\n";
+        }
+    }
+
     template <typename TablesTuple, std::size_t... Is>
     void validate_all_tables(std::string& errors, std::index_sequence<Is...>) const {
-        (
-            [&] {
-                using table_t = std::tuple_element_t<Is, TablesTuple>;
-                auto const result = validate_table<table_t>();
-                if (!result) {
-                    errors += result.error() + "\n";
-                }
-            }(),
-            ...);
+        (validate_one_table<std::tuple_element_t<Is, TablesTuple>>(errors), ...);
     }
 
     explicit mysql_connection(std::unique_ptr<MYSQL, decltype(&mysql_close)> connection)
