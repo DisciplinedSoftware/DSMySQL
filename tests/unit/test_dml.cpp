@@ -80,12 +80,12 @@ suite<"DML"> dml_suite = [] {
     };
 
     "explain(select) - prefixes EXPLAIN"_test = [] {
-        auto const sql = explain(select<asset::id>().from<asset>().where(equal<asset::id>(1u))).build_sql();
+        auto const sql = explain(select(asset::id{}).from(asset{}).where(equal<asset::id>(1u))).build_sql();
         expect(sql == "EXPLAIN SELECT id FROM asset WHERE id = 1"s) << sql;
     };
 
     "explain_analyze(select) - prefixes EXPLAIN ANALYZE"_test = [] {
-        auto const sql = explain_analyze(select<asset::id>().from<asset>().limit(5)).build_sql();
+        auto const sql = explain_analyze(select(asset::id{}).from(asset{}).limit(5)).build_sql();
         expect(sql == "EXPLAIN ANALYZE SELECT id FROM asset LIMIT 5"s) << sql;
     };
 
@@ -293,8 +293,7 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - order_by + limit - generates correct SQL"_test = [] {
-        auto const sql =
-            update<asset>().set<asset::ticker>("MSFT").order_by<asset::id, sort_order::desc>().limit(1).build_sql();
+        auto const sql = update<asset>().set<asset::ticker>("MSFT").order_by(desc(asset::id{})).limit(1).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' ORDER BY id DESC LIMIT 1"s) << sql;
     };
 
@@ -302,7 +301,7 @@ suite<"DML"> dml_suite = [] {
         auto const sql = update<asset>()
                              .set<asset::ticker>("MSFT")
                              .where(is_not_null<asset::sector>())
-                             .order_by<asset::id>()
+                             .order_by(asset::id{})
                              .limit(3)
                              .build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 3"s) << sql;
@@ -330,13 +329,13 @@ suite<"DML"> dml_suite = [] {
     };
 
     "delete from - order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().order_by<asset::id, sort_order::desc>().limit(2).build_sql();
+        auto const sql = delete_from<asset>().order_by(desc(asset::id{})).limit(2).build_sql();
         expect(sql == "DELETE FROM asset ORDER BY id DESC LIMIT 2"s) << sql;
     };
 
     "delete from - where + order_by + limit - generates correct SQL"_test = [] {
         auto const sql =
-            delete_from<asset>().where(is_not_null<asset::sector>()).order_by<asset::id>().limit(10).build_sql();
+            delete_from<asset>().where(is_not_null<asset::sector>()).order_by(asset::id{}).limit(10).build_sql();
         expect(sql == "DELETE FROM asset WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 10"s) << sql;
     };
 
@@ -545,14 +544,12 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - chained set (template form) - generates same SQL as single set call"_test = [] {
-        auto const sql =
-            update<asset>().set<asset::ticker>("MSFT").set<asset::instrument>("Software").build_sql();
+        auto const sql = update<asset>().set<asset::ticker>("MSFT").set<asset::instrument>("Software").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 
     "update - chained set (instance form) - generates same SQL as single set call"_test = [] {
-        auto const sql =
-            update<asset>().set(asset::ticker{"MSFT"}).set(asset::instrument{"Software"}).build_sql();
+        auto const sql = update<asset>().set(asset::ticker{"MSFT"}).set(asset::instrument{"Software"}).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 

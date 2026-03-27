@@ -121,6 +121,72 @@ struct any_value {};
 struct rand_val {};
 
 // ===================================================================
+// interval — typed INTERVAL values for DATE_ADD / DATE_SUB
+// ===================================================================
+namespace interval {
+struct day {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "DAY";
+    }
+};
+struct week {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "WEEK";
+    }
+};
+struct month {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "MONTH";
+    }
+};
+struct year {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "YEAR";
+    }
+};
+struct quarter {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "QUARTER";
+    }
+};
+struct hour {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "HOUR";
+    }
+};
+struct minute {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "MINUTE";
+    }
+};
+struct second {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "SECOND";
+    }
+};
+struct microsecond {
+    int amount;
+    static constexpr std::string_view part_name() {
+        return "MICROSECOND";
+    }
+};
+}  // namespace interval
+
+template <typename T>
+concept SqlInterval = requires(T const& t) {
+    { t.amount } -> std::convertible_to<int>;
+    { T::part_name() } -> std::convertible_to<std::string_view>;
+};
+
+// ===================================================================
 // aliased_projection — wraps any Projection with a SQL alias
 //
 // Uses a runtime string for the alias name, stored via a static helper.
@@ -161,11 +227,7 @@ struct trim_of {};
 template <typename P>
 struct length_of {};
 
-template <typename P, int Scale>
-struct round_to {};
-
-template <typename P, int Scale>
-struct format_to {};
+// round_to and format_to are now runtime classes defined after the Projection concept
 
 template <typename A, typename B>
 struct mod_of {};
@@ -176,11 +238,7 @@ struct power_of {};
 template <typename... Ps>
 struct concat_of {};
 
-template <typename P, std::size_t Start, std::size_t Length>
-struct substring_of {};
-
-template <typename P, fixed_string Format>
-struct date_format_of {};
+// substring_of and date_format_of are now runtime classes defined after the Projection concept
 
 template <sql_date_part Part, typename P>
 struct extract_of {};
@@ -203,11 +261,7 @@ struct day_of {};
 template <typename A, typename B>
 struct datediff_of {};
 
-template <typename P, int Amount, sql_date_part Part>
-struct date_add_of {};
-
-template <typename P, int Amount, sql_date_part Part>
-struct date_sub_of {};
+// date_add_of and date_sub_of are now runtime classes defined after the Projection concept
 
 template <sql_date_part Part, typename A, typename B>
 struct timestampdiff_of {};
@@ -231,9 +285,7 @@ struct greatest_of {};
 template <typename... Ps>
 struct least_of {};
 
-// IF(cond, then, else) — Cond is a compile-time SQL expression string
-template <fixed_string Cond, typename Then, typename Else>
-struct if_of {};
+// if_expr is now a runtime class defined after the Projection concept
 
 // ===================================================================
 // String scalar functions
@@ -242,34 +294,11 @@ struct if_of {};
 template <typename P>
 struct char_length_of {};
 
-template <typename P, std::size_t N>
-struct left_of {};
-
-template <typename P, std::size_t N>
-struct right_of {};
-
-template <typename P, fixed_string From, fixed_string To>
-struct replace_of {};
-
-template <typename P, std::size_t Len, fixed_string PadStr>
-struct lpad_of {};
-
-template <typename P, std::size_t Len, fixed_string PadStr>
-struct rpad_of {};
-
-template <typename P, std::size_t N>
-struct repeat_of {};
+// left_of, right_of, replace_of, lpad_of, rpad_of, repeat_of, locate_of, instr_of
+// are now runtime classes defined after the Projection concept
 
 template <typename P>
 struct reverse_of {};
-
-// LOCATE('substr', col) — first position of Substr in col (1-based), 0 if not found
-template <fixed_string Substr, typename P>
-struct locate_of {};
-
-// INSTR(col, 'substr') — first position of Substr in col (1-based), 0 if not found
-template <typename P, fixed_string Substr>
-struct instr_of {};
 
 // SPACE(col) — returns col spaces
 template <typename P>
@@ -315,8 +344,7 @@ struct radians_of {};
 template <typename P>
 struct sign_of {};
 
-template <typename P, int D>
-struct truncate_to {};
+// truncate_to is now a runtime class defined after the Projection concept
 
 struct pi_val {};
 
@@ -360,9 +388,7 @@ struct monthname_of {};
 template <typename P>
 struct last_day_of {};
 
-// STR_TO_DATE(col, 'fmt') — parse col string as a date using Fmt format
-template <typename P, fixed_string Fmt>
-struct str_to_date_of {};
+// str_to_date_of is now a runtime class defined after the Projection concept
 
 template <typename P>
 struct from_unixtime_of {};
@@ -370,9 +396,7 @@ struct from_unixtime_of {};
 template <typename P>
 struct unix_timestamp_of {};
 
-// CONVERT_TZ(col, 'from_tz', 'to_tz')
-template <typename P, fixed_string FromTZ, fixed_string ToTZ>
-struct convert_tz_of {};
+// convert_tz_of is now a runtime class defined after the Projection concept
 
 struct curtime_val {};
 
@@ -391,9 +415,7 @@ struct timediff_of {};
 // JSON scalar functions
 // ===================================================================
 
-// JSON_EXTRACT(col, 'path') — e.g. JSON_EXTRACT(data, '$.field')
-template <typename P, fixed_string Path>
-struct json_extract_of {};
+// json_extract_of is now a runtime class defined after the Projection concept
 
 // JSON_OBJECT(p1, p2, ...) — alternating key/value projections
 template <typename... Ps>
@@ -403,9 +425,7 @@ struct json_object_of {};
 template <typename... Ps>
 struct json_array_of {};
 
-// JSON_CONTAINS(col, '"val"') — val is a JSON-encoded string literal
-template <typename P, fixed_string Val>
-struct json_contains_of {};
+// json_contains_of is now a runtime class defined after the Projection concept
 
 template <typename P>
 struct json_length_of {};
@@ -441,11 +461,7 @@ using trim = trim_of<P>;
 template <typename P>
 using length = length_of<P>;
 
-template <typename P, int Scale>
-using round = round_to<P, Scale>;
-
-template <typename P, int Scale>
-using format = format_to<P, Scale>;
+// round and format aliases defined after the Projection concept
 
 template <typename A, typename B>
 using mod = mod_of<A, B>;
@@ -456,11 +472,7 @@ using power = power_of<A, B>;
 template <typename... Ps>
 using concat = concat_of<Ps...>;
 
-template <typename P, std::size_t Start, std::size_t Length>
-using substring = substring_of<P, Start, Length>;
-
-template <typename P, fixed_string Format>
-using date_format = date_format_of<P, Format>;
+// substring and date_format aliases defined after the Projection concept
 
 template <sql_date_part Part, typename P>
 using extract = extract_of<Part, P>;
@@ -468,11 +480,7 @@ using extract = extract_of<Part, P>;
 template <typename A, typename B>
 using datediff = datediff_of<A, B>;
 
-template <typename P, int Amount, sql_date_part Part>
-using date_add = date_add_of<P, Amount, Part>;
-
-template <typename P, int Amount, sql_date_part Part>
-using date_sub = date_sub_of<P, Amount, Part>;
+// date_add and date_sub aliases defined after the Projection concept
 
 template <sql_date_part Part, typename A, typename B>
 using timestampdiff = timestampdiff_of<Part, A, B>;
@@ -493,39 +501,18 @@ using greatest = greatest_of<Ps...>;
 template <typename... Ps>
 using least = least_of<Ps...>;
 
-template <fixed_string Cond, typename Then, typename Else>
-using sql_if = if_of<Cond, Then, Else>;
+// sql_if is now a function template (not a type alias)
 
 // --- String ---
 template <typename P>
 using char_length = char_length_of<P>;
 
-template <typename P, std::size_t N>
-using left = left_of<P, N>;
-
-template <typename P, std::size_t N>
-using right = right_of<P, N>;
-
-template <typename P, fixed_string From, fixed_string To>
-using replace = replace_of<P, From, To>;
-
-template <typename P, std::size_t Len, fixed_string PadStr>
-using lpad = lpad_of<P, Len, PadStr>;
-
-template <typename P, std::size_t Len, fixed_string PadStr>
-using rpad = rpad_of<P, Len, PadStr>;
-
-template <typename P, std::size_t N>
-using repeat = repeat_of<P, N>;
+// left, right, replace, lpad, rpad, repeat aliases defined after the Projection concept
 
 template <typename P>
 using reverse = reverse_of<P>;
 
-template <fixed_string Substr, typename P>
-using locate = locate_of<Substr, P>;
-
-template <typename P, fixed_string Substr>
-using instr = instr_of<P, Substr>;
+// locate and instr aliases defined after the Projection concept
 
 template <typename P>
 using space = space_of<P>;
@@ -567,8 +554,7 @@ using radians = radians_of<P>;
 template <typename P>
 using sign = sign_of<P>;
 
-template <typename P, int D>
-using truncate = truncate_to<P, D>;
+// truncate alias defined after the Projection concept
 
 // --- Date/Time ---
 template <typename P>
@@ -607,8 +593,7 @@ using monthname = monthname_of<P>;
 template <typename P>
 using last_day = last_day_of<P>;
 
-template <typename P, fixed_string Fmt>
-using str_to_date = str_to_date_of<P, Fmt>;
+// str_to_date alias defined after the Projection concept
 
 template <typename P>
 using from_unixtime = from_unixtime_of<P>;
@@ -616,8 +601,7 @@ using from_unixtime = from_unixtime_of<P>;
 template <typename P>
 using unix_timestamp = unix_timestamp_of<P>;
 
-template <typename P, fixed_string FromTZ, fixed_string ToTZ>
-using convert_tz = convert_tz_of<P, FromTZ, ToTZ>;
+// convert_tz alias defined after the Projection concept
 
 template <typename A, typename B>
 using addtime = addtime_of<A, B>;
@@ -629,8 +613,7 @@ template <typename A, typename B>
 using timediff = timediff_of<A, B>;
 
 // --- JSON ---
-template <typename P, fixed_string Path>
-using json_extract = json_extract_of<P, Path>;
+// json_extract alias defined after the Projection concept
 
 template <typename... Ps>
 using json_object = json_object_of<Ps...>;
@@ -638,8 +621,7 @@ using json_object = json_object_of<Ps...>;
 template <typename... Ps>
 using json_array = json_array_of<Ps...>;
 
-template <typename P, fixed_string Val>
-using json_contains = json_contains_of<P, Val>;
+// json_contains alias defined after the Projection concept
 
 template <typename P>
 using json_length = json_length_of<P>;
@@ -1342,6 +1324,405 @@ concept ColIndexWrapper = requires {
     { T::value } -> std::same_as<const std::size_t&>;
 };
 
+// InstanceProjection — runtime projection with pre-computed SQL, non-static sql_expr()
+template <typename P>
+concept InstanceProjection = requires(P const& p) {
+    typename P::value_type;
+    { p.sql_expr() } -> std::convertible_to<std::string>;
+} && !Projection<P>;
+
+// AnyProjection — satisfied by either Projection (static) or InstanceProjection (runtime)
+template <typename P>
+concept AnyProjection = Projection<P> || InstanceProjection<P>;
+
+// ===================================================================
+// Runtime projection classes (InstanceProjection)
+// These require the Projection concept, so are defined here.
+// ===================================================================
+
+// IF(cond, then, else) — typed predicate-based IF expression
+// Created via sql_if<Then, Else>(predicate).
+template <Projection Then, Projection Else>
+class if_expr {
+public:
+    using value_type = typename projection_traits<Then>::value_type;
+
+    explicit if_expr(sql_predicate cond)
+        : sql_("IF(" + cond.build_sql() + ", " + std::string(projection_traits<Then>::sql_expr()) + ", " +
+               std::string(projection_traits<Else>::sql_expr()) + ")") {
+    }
+
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection Then, Projection Else>
+[[nodiscard]] if_expr<Then, Else> sql_if(sql_predicate cond) {
+    return if_expr<Then, Else>{std::move(cond)};
+}
+
+template <Projection P>
+class left_of {
+public:
+    using value_type = std::string;
+    explicit left_of(std::size_t n)
+        : sql_("LEFT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(n) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class right_of {
+public:
+    using value_type = std::string;
+    explicit right_of(std::size_t n)
+        : sql_("RIGHT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(n) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class repeat_of {
+public:
+    using value_type = std::string;
+    explicit repeat_of(std::size_t n)
+        : sql_("REPEAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(n) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <ColumnDescriptor P>
+class replace_of {
+public:
+    using value_type = std::string;
+    replace_of(P from, P to)
+        : sql_("REPLACE(" + std::string(column_traits<P>::column_name()) + ", " + sql_detail::to_sql_value(from) +
+               ", " + sql_detail::to_sql_value(to) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <ColumnDescriptor P>
+class lpad_of {
+public:
+    using value_type = std::string;
+    lpad_of(std::size_t len, P pad)
+        : sql_("LPAD(" + std::string(column_traits<P>::column_name()) + ", " + std::to_string(len) + ", " +
+               sql_detail::to_sql_value(pad) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <ColumnDescriptor P>
+class rpad_of {
+public:
+    using value_type = std::string;
+    rpad_of(std::size_t len, P pad)
+        : sql_("RPAD(" + std::string(column_traits<P>::column_name()) + ", " + std::to_string(len) + ", " +
+               sql_detail::to_sql_value(pad) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <ColumnDescriptor P>
+class locate_of {
+public:
+    using value_type = uint64_t;
+    explicit locate_of(P substr)
+        : sql_("LOCATE(" + sql_detail::to_sql_value(substr) + ", " + std::string(column_traits<P>::column_name()) +
+               ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <ColumnDescriptor P>
+class instr_of {
+public:
+    using value_type = uint64_t;
+    explicit instr_of(P substr)
+        : sql_("INSTR(" + std::string(column_traits<P>::column_name()) + ", " + sql_detail::to_sql_value(substr) +
+               ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class substring_of {
+public:
+    using value_type = std::string;
+    substring_of(std::size_t start, std::size_t length)
+        : sql_("SUBSTRING(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(start) + ", " +
+               std::to_string(length) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class date_format_of {
+public:
+    using value_type = std::string;
+    explicit date_format_of(std::string_view fmt)
+        : sql_("DATE_FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(fmt) + "')") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class date_add_of {
+public:
+    using value_type = std::string;
+    template <SqlInterval Interval>
+    explicit date_add_of(Interval const& iv)
+        : sql_("DATE_ADD(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(iv.amount) +
+               " " + std::string(Interval::part_name()) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class date_sub_of {
+public:
+    using value_type = std::string;
+    template <SqlInterval Interval>
+    explicit date_sub_of(Interval const& iv)
+        : sql_("DATE_SUB(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(iv.amount) +
+               " " + std::string(Interval::part_name()) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class truncate_to {
+public:
+    using value_type = double;
+    explicit truncate_to(int d)
+        : sql_("TRUNCATE(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(d) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class round_to {
+public:
+    using value_type = double;
+    explicit round_to(int scale)
+        : sql_("ROUND(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(scale) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class format_to {
+public:
+    using value_type = std::string;
+    explicit format_to(int scale)
+        : sql_("FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(scale) + ")") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class str_to_date_of {
+public:
+    using value_type = std::string;
+    explicit str_to_date_of(std::string_view fmt)
+        : sql_("STR_TO_DATE(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(fmt) + "')") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class convert_tz_of {
+public:
+    using value_type = std::string;
+    convert_tz_of(std::string_view from_tz, std::string_view to_tz)
+        : sql_("CONVERT_TZ(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(from_tz) + "', '" + sql_detail::escape_sql_string(to_tz) + "')") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class json_extract_of {
+public:
+    using value_type = std::string;
+    explicit json_extract_of(std::string_view path)
+        : sql_("JSON_EXTRACT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(path) + "')") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+template <Projection P>
+class json_contains_of {
+public:
+    using value_type = uint32_t;
+    explicit json_contains_of(std::string_view val)
+        : sql_("JSON_CONTAINS(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
+               sql_detail::escape_sql_string(val) + "')") {
+    }
+    [[nodiscard]] std::string sql_expr() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
+};
+
+// Convenience aliases for the new runtime projection classes
+template <Projection P>
+using substring = substring_of<P>;
+
+template <Projection P>
+using date_format = date_format_of<P>;
+
+template <Projection P>
+using date_add = date_add_of<P>;
+
+template <Projection P>
+using date_sub = date_sub_of<P>;
+
+template <Projection P>
+using left = left_of<P>;
+
+template <Projection P>
+using right = right_of<P>;
+
+template <ColumnDescriptor P>
+using replace = replace_of<P>;
+
+template <ColumnDescriptor P>
+using lpad = lpad_of<P>;
+
+template <ColumnDescriptor P>
+using rpad = rpad_of<P>;
+
+template <Projection P>
+using repeat = repeat_of<P>;
+
+template <ColumnDescriptor P>
+using locate = locate_of<P>;
+
+template <ColumnDescriptor P>
+using instr = instr_of<P>;
+
+template <Projection P>
+using truncate = truncate_to<P>;
+
+template <Projection P>
+using round = round_to<P>;
+
+template <Projection P>
+using format = format_to<P>;
+
+template <Projection P>
+using str_to_date = str_to_date_of<P>;
+
+template <Projection P>
+using convert_tz = convert_tz_of<P>;
+
+template <Projection P>
+using json_extract = json_extract_of<P>;
+
+template <Projection P>
+using json_contains = json_contains_of<P>;
+
 // FieldOrderBy — satisfied by field<Col> where Col is a ColumnDescriptor.
 template <typename T>
 concept FieldOrderBy = requires {
@@ -1445,21 +1826,7 @@ struct projection_traits<length_of<P>> {
     }
 };
 
-template <Projection P, int Scale>
-struct projection_traits<round_to<P, Scale>> {
-    using value_type = double;
-    static std::string sql_expr() {
-        return "ROUND(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Scale) + ")";
-    }
-};
-
-template <Projection P, int Scale>
-struct projection_traits<format_to<P, Scale>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Scale) + ")";
-    }
-};
+// round_to and format_to are now runtime classes (InstanceProjection) — no projection_traits needed
 
 template <Projection A, Projection B>
 struct projection_traits<mod_of<A, B>> {
@@ -1494,23 +1861,7 @@ struct projection_traits<concat_of<Ps...>> {
     }
 };
 
-template <Projection P, std::size_t Start, std::size_t Length>
-struct projection_traits<substring_of<P, Start, Length>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "SUBSTRING(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Start) + ", " +
-               std::to_string(Length) + ")";
-    }
-};
-
-template <Projection P, fixed_string Format>
-struct projection_traits<date_format_of<P, Format>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "DATE_FORMAT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{Format}) + "')";
-    }
-};
+// substring_of and date_format_of are now runtime classes (InstanceProjection) — no projection_traits needed
 
 template <sql_date_part Part, Projection P>
 struct projection_traits<extract_of<Part, P>> {
@@ -1570,23 +1921,7 @@ struct projection_traits<datediff_of<A, B>> {
     }
 };
 
-template <Projection P, int Amount, sql_date_part Part>
-struct projection_traits<date_add_of<P, Amount, Part>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "DATE_ADD(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(Amount) +
-               " " + std::string(sql_date_part_name<Part>()) + ")";
-    }
-};
-
-template <Projection P, int Amount, sql_date_part Part>
-struct projection_traits<date_sub_of<P, Amount, Part>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "DATE_SUB(" + std::string(projection_traits<P>::sql_expr()) + ", INTERVAL " + std::to_string(Amount) +
-               " " + std::string(sql_date_part_name<Part>()) + ")";
-    }
-};
+// date_add_of and date_sub_of are now runtime classes (InstanceProjection) — no projection_traits needed
 
 template <sql_date_part Part, Projection A, Projection B>
 struct projection_traits<timestampdiff_of<Part, A, B>> {
@@ -1655,15 +1990,7 @@ struct projection_traits<least_of<Ps...>> {
     }
 };
 
-template <fixed_string Cond, Projection Then, Projection Else>
-struct projection_traits<if_of<Cond, Then, Else>> {
-    using value_type = typename projection_traits<Then>::value_type;
-    static std::string sql_expr() {
-        return "IF(" + std::string(std::string_view{Cond}) + ", " +
-               std::string(projection_traits<Then>::sql_expr()) + ", " +
-               std::string(projection_traits<Else>::sql_expr()) + ")";
-    }
-};
+// if_expr is now a runtime class (InstanceProjection) — no projection_traits needed
 
 // ===================================================================
 // String scalar function traits
@@ -1677,57 +2004,7 @@ struct projection_traits<char_length_of<P>> {
     }
 };
 
-template <Projection P, std::size_t N>
-struct projection_traits<left_of<P, N>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "LEFT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
-    }
-};
-
-template <Projection P, std::size_t N>
-struct projection_traits<right_of<P, N>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "RIGHT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
-    }
-};
-
-template <Projection P, fixed_string From, fixed_string To>
-struct projection_traits<replace_of<P, From, To>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "REPLACE(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{From}) + "', '" +
-               sql_detail::escape_sql_string(std::string_view{To}) + "')";
-    }
-};
-
-template <Projection P, std::size_t Len, fixed_string PadStr>
-struct projection_traits<lpad_of<P, Len, PadStr>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "LPAD(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Len) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{PadStr}) + "')";
-    }
-};
-
-template <Projection P, std::size_t Len, fixed_string PadStr>
-struct projection_traits<rpad_of<P, Len, PadStr>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "RPAD(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(Len) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{PadStr}) + "')";
-    }
-};
-
-template <Projection P, std::size_t N>
-struct projection_traits<repeat_of<P, N>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "REPEAT(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(N) + ")";
-    }
-};
+// left_of, right_of, replace_of, lpad_of, rpad_of, repeat_of are now runtime classes — no projection_traits needed
 
 template <Projection P>
 struct projection_traits<reverse_of<P>> {
@@ -1737,23 +2014,7 @@ struct projection_traits<reverse_of<P>> {
     }
 };
 
-template <fixed_string Substr, Projection P>
-struct projection_traits<locate_of<Substr, P>> {
-    using value_type = uint64_t;
-    static std::string sql_expr() {
-        return "LOCATE('" + sql_detail::escape_sql_string(std::string_view{Substr}) + "', " +
-               std::string(projection_traits<P>::sql_expr()) + ")";
-    }
-};
-
-template <Projection P, fixed_string Substr>
-struct projection_traits<instr_of<P, Substr>> {
-    using value_type = uint64_t;
-    static std::string sql_expr() {
-        return "INSTR(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{Substr}) + "')";
-    }
-};
+// locate_of and instr_of are now runtime classes — no projection_traits needed
 
 template <Projection P>
 struct projection_traits<space_of<P>> {
@@ -1864,13 +2125,7 @@ struct projection_traits<sign_of<P>> {
     }
 };
 
-template <Projection P, int D>
-struct projection_traits<truncate_to<P, D>> {
-    using value_type = double;
-    static std::string sql_expr() {
-        return "TRUNCATE(" + std::string(projection_traits<P>::sql_expr()) + ", " + std::to_string(D) + ")";
-    }
-};
+// truncate_to is now a runtime class — no projection_traits needed
 
 template <>
 struct projection_traits<pi_val> {
@@ -1980,14 +2235,7 @@ struct projection_traits<last_day_of<P>> {
     }
 };
 
-template <Projection P, fixed_string Fmt>
-struct projection_traits<str_to_date_of<P, Fmt>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "STR_TO_DATE(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{Fmt}) + "')";
-    }
-};
+// str_to_date_of is now a runtime class — no projection_traits needed
 
 template <Projection P>
 struct projection_traits<from_unixtime_of<P>> {
@@ -2005,15 +2253,7 @@ struct projection_traits<unix_timestamp_of<P>> {
     }
 };
 
-template <Projection P, fixed_string FromTZ, fixed_string ToTZ>
-struct projection_traits<convert_tz_of<P, FromTZ, ToTZ>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "CONVERT_TZ(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{FromTZ}) + "', '" +
-               sql_detail::escape_sql_string(std::string_view{ToTZ}) + "')";
-    }
-};
+// convert_tz_of is now a runtime class — no projection_traits needed
 
 template <>
 struct projection_traits<curtime_val> {
@@ -2062,14 +2302,7 @@ struct projection_traits<timediff_of<A, B>> {
 // JSON scalar function traits
 // ===================================================================
 
-template <Projection P, fixed_string Path>
-struct projection_traits<json_extract_of<P, Path>> {
-    using value_type = std::string;
-    static std::string sql_expr() {
-        return "JSON_EXTRACT(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{Path}) + "')";
-    }
-};
+// json_extract_of is now a runtime class — no projection_traits needed
 
 template <Projection... Ps>
     requires(sizeof...(Ps) > 0)
@@ -2097,14 +2330,7 @@ struct projection_traits<json_array_of<Ps...>> {
     }
 };
 
-template <Projection P, fixed_string Val>
-struct projection_traits<json_contains_of<P, Val>> {
-    using value_type = uint32_t;
-    static std::string sql_expr() {
-        return "JSON_CONTAINS(" + std::string(projection_traits<P>::sql_expr()) + ", '" +
-               sql_detail::escape_sql_string(std::string_view{Val}) + "')";
-    }
-};
+// json_contains_of is now a runtime class — no projection_traits needed
 
 template <Projection P>
 struct projection_traits<json_length_of<P>> {
@@ -2738,6 +2964,33 @@ consteval std::size_t proj_index_in_pack() {
 
 }  // namespace sql_detail
 
+// ===================================================================
+// proj_value_type_t / proj_sql_expr — uniform access for Projection and InstanceProjection
+// ===================================================================
+
+template <typename P>
+struct proj_value_type {
+    using type = typename projection_traits<P>::value_type;
+};
+
+template <InstanceProjection P>
+struct proj_value_type<P> {
+    using type = typename P::value_type;
+};
+
+template <typename P>
+using proj_value_type_t = typename proj_value_type<P>::type;
+
+template <Projection P>
+[[nodiscard]] std::string proj_sql_expr(P const&) {
+    return std::string(projection_traits<P>::sql_expr());
+}
+
+template <InstanceProjection P>
+[[nodiscard]] std::string proj_sql_expr(P const& p) {
+    return p.sql_expr();
+}
+
 // GroupBySpec — satisfied by rollup<>, cube<>, grouping_sets<>.
 template <typename T>
 concept GroupBySpec = requires {
@@ -2768,9 +3021,14 @@ enum class select_lock_mode {
 
 template <typename Table, typename... Projs>
 struct select_query_builder {
-    using result_row_type = std::tuple<typename projection_traits<Projs>::value_type...>;
+    using result_row_type = std::tuple<proj_value_type_t<Projs>...>;
 
     select_query_builder() = default;
+
+    explicit select_query_builder(std::tuple<Projs...> projs) : projs_(std::move(projs)) {
+    }
+
+    std::tuple<Projs...> projs_;
 
     // ---- Optional clause modifiers ----
 
@@ -2802,7 +3060,7 @@ struct select_query_builder {
         requires(sizeof...(Specs) > 0 &&
                  ((sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) ||
                   (ColumnDescriptor<Specs> && ...)))
-    [[nodiscard]] select_query_builder group_by() const& {
+    [[nodiscard]] select_query_builder group_by(Specs...) const& {
         auto copy = *this;
         if constexpr (sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) {
             using Spec = std::tuple_element_t<0, std::tuple<Specs...>>;
@@ -2820,7 +3078,7 @@ struct select_query_builder {
         requires(sizeof...(Specs) > 0 &&
                  ((sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) ||
                   (ColumnDescriptor<Specs> && ...)))
-    [[nodiscard]] select_query_builder group_by() && {
+    [[nodiscard]] select_query_builder group_by(Specs...) && {
         if constexpr (sizeof...(Specs) == 1 && GroupBySpec<std::tuple_element_t<0, std::tuple<Specs...>>>) {
             using Spec = std::tuple_element_t<0, std::tuple<Specs...>>;
             group_by_ = detail::group_by_spec_traits<Spec>::cols_string();
@@ -2855,83 +3113,166 @@ struct select_query_builder {
     // order_by<Proj>()                             — ORDER BY any projection expression ASC
     // order_by<Proj, sort_order::desc>()           — ORDER BY any projection expression DESC
     // Can be chained multiple times for multi-column ordering.
-    template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || Projection<ColSpec>)
-    [[nodiscard]] select_query_builder order_by() const& {
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || NullsWrapper<Spec> || QualifiedCol<Spec> || PositionWrapper<Spec> ||
+                 ColIndexWrapper<Spec> || Projection<Spec> || DescOrder<Spec>)
+    [[nodiscard]] select_query_builder order_by(Spec) const& {
         auto copy = *this;
-        if constexpr (NullsWrapper<ColSpec>) {
-            using ColLike = typename ColSpec::col_type;
-            using Col = unwrap_order_col_t<ColLike>;
-            const std::string col_name = [] {
-                if constexpr (is_qualified_col_v<ColLike>) {
-                    return qualified_col_name<Col>();
-                } else {
-                    return std::string(column_traits<Col>::column_name());
-                }
-            }();
-            copy.order_by_clauses_.push_back("(" + col_name +
-                                             (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-            copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (QualifiedCol<ColSpec>) {
-            copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
-                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (PositionWrapper<ColSpec>) {
-            static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
-                          "order_by<position<Proj>>: Proj must be one of the projections in this SELECT");
-            static constexpr std::size_t Index =
-                sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-            copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (ColIndexWrapper<ColSpec>) {
-            static_assert(ColSpec::value <= sizeof...(Projs),
-                          "order_by<col_index<N>>: N is out of range for this SELECT list");
-            copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
-                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (Projection<ColSpec>) {
-            copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
-                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
+        if constexpr (DescOrder<Spec>) {
+            using ColSpec = typename Spec::col_spec;
+            constexpr sort_order Dir = sort_order::desc;
+            if constexpr (NullsWrapper<ColSpec>) {
+                using ColLike = typename ColSpec::col_type;
+                using Col = unwrap_order_col_t<ColLike>;
+                const std::string col_name = [] {
+                    if constexpr (is_qualified_col_v<ColLike>) {
+                        return qualified_col_name<Col>();
+                    } else {
+                        return std::string(column_traits<Col>::column_name());
+                    }
+                }();
+                copy.order_by_clauses_.push_back("(" + col_name +
+                                                 (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+                copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (QualifiedCol<ColSpec>) {
+                copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (PositionWrapper<ColSpec>) {
+                static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                              "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
+                static constexpr std::size_t Index =
+                    sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+                copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (ColIndexWrapper<ColSpec>) {
+                static_assert(ColSpec::value <= sizeof...(Projs),
+                              "order_by(col_index<N>): N is out of range for this SELECT list");
+                copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (Projection<ColSpec>) {
+                copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else {
+                copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            }
         } else {
-            copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
-                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
+            using ColSpec = Spec;
+            constexpr sort_order Dir = sort_order::asc;
+            if constexpr (NullsWrapper<ColSpec>) {
+                using ColLike = typename ColSpec::col_type;
+                using Col = unwrap_order_col_t<ColLike>;
+                const std::string col_name = [] {
+                    if constexpr (is_qualified_col_v<ColLike>) {
+                        return qualified_col_name<Col>();
+                    } else {
+                        return std::string(column_traits<Col>::column_name());
+                    }
+                }();
+                copy.order_by_clauses_.push_back("(" + col_name +
+                                                 (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+                copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (QualifiedCol<ColSpec>) {
+                copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (PositionWrapper<ColSpec>) {
+                static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                              "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
+                static constexpr std::size_t Index =
+                    sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+                copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (ColIndexWrapper<ColSpec>) {
+                static_assert(ColSpec::value <= sizeof...(Projs),
+                              "order_by(col_index<N>): N is out of range for this SELECT list");
+                copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (Projection<ColSpec>) {
+                copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else {
+                copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                                 (Dir == sort_order::asc ? " ASC" : " DESC"));
+            }
         }
         return copy;
     }
-    template <typename ColSpec, sort_order Dir = sort_order::asc>
-        requires(ColumnDescriptor<ColSpec> || NullsWrapper<ColSpec> || QualifiedCol<ColSpec> ||
-                 PositionWrapper<ColSpec> || ColIndexWrapper<ColSpec> || Projection<ColSpec>)
-    [[nodiscard]] select_query_builder order_by() && {
-        if constexpr (NullsWrapper<ColSpec>) {
-            using ColLike = typename ColSpec::col_type;
-            using Col = unwrap_order_col_t<ColLike>;
-            const std::string col_name = [] {
-                if constexpr (is_qualified_col_v<ColLike>) {
-                    return qualified_col_name<Col>();
-                } else {
-                    return std::string(column_traits<Col>::column_name());
-                }
-            }();
-            order_by_clauses_.push_back("(" + col_name +
-                                        (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-            order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (QualifiedCol<ColSpec>) {
-            order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
-                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (PositionWrapper<ColSpec>) {
-            static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
-                          "order_by<position<Proj>>: Proj must be one of the projections in this SELECT");
-            static constexpr std::size_t Index =
-                sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-            order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (ColIndexWrapper<ColSpec>) {
-            static_assert(ColSpec::value <= sizeof...(Projs),
-                          "order_by<col_index<N>>: N is out of range for this SELECT list");
-            order_by_clauses_.push_back(std::to_string(ColSpec::value) + (Dir == sort_order::asc ? " ASC" : " DESC"));
-        } else if constexpr (Projection<ColSpec>) {
-            order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
-                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || NullsWrapper<Spec> || QualifiedCol<Spec> || PositionWrapper<Spec> ||
+                 ColIndexWrapper<Spec> || Projection<Spec> || DescOrder<Spec>)
+    [[nodiscard]] select_query_builder order_by(Spec) && {
+        if constexpr (DescOrder<Spec>) {
+            using ColSpec = typename Spec::col_spec;
+            constexpr sort_order Dir = sort_order::desc;
+            if constexpr (NullsWrapper<ColSpec>) {
+                using ColLike = typename ColSpec::col_type;
+                using Col = unwrap_order_col_t<ColLike>;
+                const std::string col_name = [] {
+                    if constexpr (is_qualified_col_v<ColLike>) {
+                        return qualified_col_name<Col>();
+                    } else {
+                        return std::string(column_traits<Col>::column_name());
+                    }
+                }();
+                order_by_clauses_.push_back("(" + col_name +
+                                            (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+                order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (QualifiedCol<ColSpec>) {
+                order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (PositionWrapper<ColSpec>) {
+                static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                              "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
+                static constexpr std::size_t Index =
+                    sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+                order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (ColIndexWrapper<ColSpec>) {
+                static_assert(ColSpec::value <= sizeof...(Projs),
+                              "order_by(col_index<N>): N is out of range for this SELECT list");
+                order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (Projection<ColSpec>) {
+                order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else {
+                order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            }
         } else {
-            order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
-                                        (Dir == sort_order::asc ? " ASC" : " DESC"));
+            using ColSpec = Spec;
+            constexpr sort_order Dir = sort_order::asc;
+            if constexpr (NullsWrapper<ColSpec>) {
+                using ColLike = typename ColSpec::col_type;
+                using Col = unwrap_order_col_t<ColLike>;
+                const std::string col_name = [] {
+                    if constexpr (is_qualified_col_v<ColLike>) {
+                        return qualified_col_name<Col>();
+                    } else {
+                        return std::string(column_traits<Col>::column_name());
+                    }
+                }();
+                order_by_clauses_.push_back("(" + col_name +
+                                            (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
+                order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (QualifiedCol<ColSpec>) {
+                order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (PositionWrapper<ColSpec>) {
+                static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
+                              "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
+                static constexpr std::size_t Index =
+                    sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
+                order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (ColIndexWrapper<ColSpec>) {
+                static_assert(ColSpec::value <= sizeof...(Projs),
+                              "order_by(col_index<N>): N is out of range for this SELECT list");
+                order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else if constexpr (Projection<ColSpec>) {
+                order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            } else {
+                order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                                            (Dir == sort_order::asc ? " ASC" : " DESC"));
+            }
         }
         return std::move(*this);
     }
@@ -2956,9 +3297,8 @@ struct select_query_builder {
     // Emits MySQL FIELD() for custom value-based ordering.
     // Example: .order_by<field<product::type>>({"electronics", "clothing", "food"})
     //          → ORDER BY FIELD(type, 'electronics', 'clothing', 'food') ASC
-    template <typename ColSpec, SqlValue ValueType>
-        requires FieldOrderBy<ColSpec>
-    [[nodiscard]] select_query_builder order_by(std::initializer_list<ValueType> values,
+    template <FieldOrderBy ColSpec, SqlValue ValueType>
+    [[nodiscard]] select_query_builder order_by(ColSpec, std::initializer_list<ValueType> values,
                                                 sort_order dir = sort_order::asc) const& {
         auto copy = *this;
         using Col = typename ColSpec::col_type;
@@ -2970,9 +3310,8 @@ struct select_query_builder {
         copy.order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
         return copy;
     }
-    template <typename ColSpec, SqlValue ValueType>
-        requires FieldOrderBy<ColSpec>
-    [[nodiscard]] select_query_builder order_by(std::initializer_list<ValueType> values,
+    template <FieldOrderBy ColSpec, SqlValue ValueType>
+    [[nodiscard]] select_query_builder order_by(ColSpec, std::initializer_list<ValueType> values,
                                                 sort_order dir = sort_order::asc) && {
         using Col = typename ColSpec::col_type;
         std::string expr = "FIELD(" + std::string(column_traits<Col>::column_name());
@@ -2987,20 +3326,36 @@ struct select_query_builder {
     // order_by_alias<Proj>()        — ORDER BY the alias assigned to Proj via with_alias<Proj>()
     // order_by_alias<Proj, desc>()  — ORDER BY alias DESC
     // Falls back to the projection's sql_expr() if no alias has been set.
-    template <Projection Proj, sort_order Dir = sort_order::asc>
+    template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder order_by_alias() const& {
+    [[nodiscard]] select_query_builder order_by_alias(Proj) const& {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
         copy.order_by_clauses_.push_back(
-            alias_order_entry{Index, std::string(projection_traits<Proj>::sql_expr()), Dir});
+            alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::asc});
         return copy;
     }
-    template <Projection Proj, sort_order Dir = sort_order::asc>
+    template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder order_by_alias() && {
+    [[nodiscard]] select_query_builder order_by_alias(Proj) && {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
-        order_by_clauses_.push_back(alias_order_entry{Index, std::string(projection_traits<Proj>::sql_expr()), Dir});
+        order_by_clauses_.push_back(alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::asc});
+        return std::move(*this);
+    }
+    template <AnyProjection Proj>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_alias(desc_order<Proj>) const& {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        auto copy = *this;
+        copy.order_by_clauses_.push_back(
+            alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::desc});
+        return copy;
+    }
+    template <AnyProjection Proj>
+        requires((std::is_same_v<Proj, Projs> || ...))
+    [[nodiscard]] select_query_builder order_by_alias(desc_order<Proj>) && {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        order_by_clauses_.push_back(alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::desc});
         return std::move(*this);
     }
 
@@ -3008,17 +3363,17 @@ struct select_query_builder {
     //
     // Proj must be one of the types in Projs...; a mismatch is a compile error.
     // Example: .with_alias<sum<product::price_val>>("total")
-    template <Projection Proj>
+    template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(std::string alias) const& {
+    [[nodiscard]] select_query_builder with_alias(Proj, std::string alias) const& {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
         copy.aliases_[Index] = std::move(alias);
         return copy;
     }
-    template <Projection Proj>
+    template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(std::string alias) && {
+    [[nodiscard]] select_query_builder with_alias(Proj, std::string alias) && {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         aliases_[Index] = std::move(alias);
         return std::move(*this);
@@ -3081,184 +3436,179 @@ struct select_query_builder {
     // ColumnFieldType descriptors (e.g. symbol::id) produce bare column names.
 
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder inner_join() const& {
+    [[nodiscard]] select_query_builder inner_join(RightTable, LeftCol, RightCol) const& {
         return add_join("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder inner_join() && {
+    [[nodiscard]] select_query_builder inner_join(RightTable, LeftCol, RightCol) && {
         return std::move(*this).add_join("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                          qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder inner_join(RightTable, sql_predicate on_cond) const& {
+        return add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder inner_join(RightTable, sql_predicate on_cond) && {
+        return std::move(*this).add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
 
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder left_join() const& {
+    [[nodiscard]] select_query_builder left_join(RightTable, LeftCol, RightCol) const& {
         return add_join("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder left_join() && {
+    [[nodiscard]] select_query_builder left_join(RightTable, LeftCol, RightCol) && {
         return std::move(*this).add_join("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                          qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder left_join(RightTable, sql_predicate on_cond) const& {
+        return add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder left_join(RightTable, sql_predicate on_cond) && {
+        return std::move(*this).add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
+    }
 
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder right_join() const& {
+    [[nodiscard]] select_query_builder right_join(RightTable, LeftCol, RightCol) const& {
         return add_join("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder right_join() && {
+    [[nodiscard]] select_query_builder right_join(RightTable, LeftCol, RightCol) && {
         return std::move(*this).add_join("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                          qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder right_join(RightTable, sql_predicate on_cond) const& {
+        return add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder right_join(RightTable, sql_predicate on_cond) && {
+        return std::move(*this).add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
     }
 
     // full_join — FULL OUTER JOIN
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder full_join() const& {
+    [[nodiscard]] select_query_builder full_join(RightTable, LeftCol, RightCol) const& {
         return add_join("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder full_join() && {
+    [[nodiscard]] select_query_builder full_join(RightTable, LeftCol, RightCol) && {
         return std::move(*this).add_join("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                          qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder full_join(RightTable, sql_predicate on_cond) const& {
+        return add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
+    }
+    template <typename RightTable>
+    [[nodiscard]] select_query_builder full_join(RightTable, sql_predicate on_cond) && {
+        return std::move(*this).add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
+                                            std::move(on_cond));
     }
 
     // cross_join — CROSS JOIN (no ON clause)
     template <typename RightTable>
-    [[nodiscard]] select_query_builder cross_join() const& {
+    [[nodiscard]] select_query_builder cross_join(RightTable) const& {
         auto copy = *this;
         copy.joins_ += " CROSS JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return copy;
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder cross_join() && {
+    [[nodiscard]] select_query_builder cross_join(RightTable) && {
         joins_ += " CROSS JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return std::move(*this);
     }
 
-    // join_on — JOIN with arbitrary ON condition (compound ON support)
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder inner_join_on(sql_predicate on_cond) const& {
-        return add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
-    }
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder inner_join_on(sql_predicate on_cond) && {
-        return std::move(*this).add_join_on("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
-                                            std::move(on_cond));
-    }
-
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder left_join_on(sql_predicate on_cond) const& {
-        return add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
-    }
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder left_join_on(sql_predicate on_cond) && {
-        return std::move(*this).add_join_on("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
-                                            std::move(on_cond));
-    }
-
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder right_join_on(sql_predicate on_cond) const& {
-        return add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
-    }
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder right_join_on(sql_predicate on_cond) && {
-        return std::move(*this).add_join_on("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
-                                            std::move(on_cond));
-    }
-
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder full_join_on(sql_predicate on_cond) const& {
-        return add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
-    }
-    template <typename RightTable>
-    [[nodiscard]] select_query_builder full_join_on(sql_predicate on_cond) && {
-        return std::move(*this).add_join_on("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
-                                            std::move(on_cond));
-    }
-
     // natural_join — NATURAL JOIN (implicit column matching, no ON/USING clause)
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_join() const& {
+    [[nodiscard]] select_query_builder natural_join(RightTable) const& {
         auto copy = *this;
         copy.joins_ += " NATURAL JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return copy;
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_join() && {
+    [[nodiscard]] select_query_builder natural_join(RightTable) && {
         joins_ += " NATURAL JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return std::move(*this);
     }
 
     // natural_left_join — NATURAL LEFT JOIN
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_left_join() const& {
+    [[nodiscard]] select_query_builder natural_left_join(RightTable) const& {
         auto copy = *this;
         copy.joins_ += " NATURAL LEFT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return copy;
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_left_join() && {
+    [[nodiscard]] select_query_builder natural_left_join(RightTable) && {
         joins_ += " NATURAL LEFT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return std::move(*this);
     }
 
     // natural_right_join — NATURAL RIGHT JOIN
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_right_join() const& {
+    [[nodiscard]] select_query_builder natural_right_join(RightTable) const& {
         auto copy = *this;
         copy.joins_ += " NATURAL RIGHT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return copy;
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder natural_right_join() && {
+    [[nodiscard]] select_query_builder natural_right_join(RightTable) && {
         joins_ += " NATURAL RIGHT JOIN " + std::string(table_name_for<RightTable>::value().to_string_view());
         return std::move(*this);
     }
 
     // join_using — JOIN ... USING (col1, col2, ...) variants
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder inner_join_using() const& {
+    [[nodiscard]] select_query_builder inner_join_using(RightTable, UsingCols...) const& {
         return add_join_using("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
                               build_using_cols_string<UsingCols...>());
     }
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder inner_join_using() && {
+    [[nodiscard]] select_query_builder inner_join_using(RightTable, UsingCols...) && {
         return std::move(*this).add_join_using("INNER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                                build_using_cols_string<UsingCols...>());
     }
 
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder left_join_using() const& {
+    [[nodiscard]] select_query_builder left_join_using(RightTable, UsingCols...) const& {
         return add_join_using("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
                               build_using_cols_string<UsingCols...>());
     }
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder left_join_using() && {
+    [[nodiscard]] select_query_builder left_join_using(RightTable, UsingCols...) && {
         return std::move(*this).add_join_using("LEFT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                                build_using_cols_string<UsingCols...>());
     }
 
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder right_join_using() const& {
+    [[nodiscard]] select_query_builder right_join_using(RightTable, UsingCols...) const& {
         return add_join_using("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
                               build_using_cols_string<UsingCols...>());
     }
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder right_join_using() && {
+    [[nodiscard]] select_query_builder right_join_using(RightTable, UsingCols...) && {
         return std::move(*this).add_join_using("RIGHT JOIN", table_name_for<RightTable>::value().to_string_view(),
                                                build_using_cols_string<UsingCols...>());
     }
 
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder full_join_using() const& {
+    [[nodiscard]] select_query_builder full_join_using(RightTable, UsingCols...) const& {
         return add_join_using("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
                               build_using_cols_string<UsingCols...>());
     }
     template <typename RightTable, ColumnDescriptor... UsingCols>
-    [[nodiscard]] select_query_builder full_join_using() && {
+    [[nodiscard]] select_query_builder full_join_using(RightTable, UsingCols...) && {
         return std::move(*this).add_join_using("FULL OUTER JOIN", table_name_for<RightTable>::value().to_string_view(),
                                                build_using_cols_string<UsingCols...>());
     }
@@ -3290,14 +3640,14 @@ struct select_query_builder {
     [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
                                                        sql_predicate on_cond) const& {
         auto copy = *this;
-        copy.joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
-                       on_cond.build_sql();
+        copy.joins_ +=
+            " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " + on_cond.build_sql();
         return copy;
     }
     [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
                                                        sql_predicate on_cond) && {
-        joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
-                  on_cond.build_sql();
+        joins_ +=
+            " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " + on_cond.build_sql();
         return std::move(*this);
     }
 
@@ -3318,22 +3668,21 @@ struct select_query_builder {
 
     // straight_join — STRAIGHT_JOIN (MySQL optimizer hint: forces left-to-right join order)
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder straight_join() const& {
+    [[nodiscard]] select_query_builder straight_join(RightTable, LeftCol, RightCol) const& {
         return add_join("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
                         qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
     template <typename RightTable, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-    [[nodiscard]] select_query_builder straight_join() && {
+    [[nodiscard]] select_query_builder straight_join(RightTable, LeftCol, RightCol) && {
         return std::move(*this).add_join("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
                                          qualified_col_name<LeftCol>(), qualified_col_name<RightCol>());
     }
-
     template <typename RightTable>
-    [[nodiscard]] select_query_builder straight_join_on(sql_predicate on_cond) const& {
+    [[nodiscard]] select_query_builder straight_join(RightTable, sql_predicate on_cond) const& {
         return add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(), std::move(on_cond));
     }
     template <typename RightTable>
-    [[nodiscard]] select_query_builder straight_join_on(sql_predicate on_cond) && {
+    [[nodiscard]] select_query_builder straight_join(RightTable, sql_predicate on_cond) && {
         return std::move(*this).add_join_on("STRAIGHT_JOIN", table_name_for<RightTable>::value().to_string_view(),
                                             std::move(on_cond));
     }
@@ -3349,21 +3698,24 @@ struct select_query_builder {
         }
         std::size_t proj_idx = 0;
         bool first = true;
-        (
-            [&](auto expr) {
-                if (!first) {
-                    sql += ", ";
-                }
-                sql += expr;
-                auto it = aliases_.find(proj_idx);
-                if (it != aliases_.end()) {
-                    sql += " AS ";
-                    sql += it->second;
-                }
-                first = false;
-                ++proj_idx;
-            }(projection_traits<Projs>::sql_expr()),
-            ...);
+        std::apply(
+            [&](auto const&... projs) {
+                (
+                    [&](auto const& p) {
+                        if (!first)
+                            sql += ", ";
+                        sql += proj_sql_expr(p);
+                        auto it = aliases_.find(proj_idx);
+                        if (it != aliases_.end()) {
+                            sql += " AS ";
+                            sql += it->second;
+                        }
+                        first = false;
+                        ++proj_idx;
+                    }(projs),
+                    ...);
+            },
+            projs_);
 
         if (!from_subquery_.empty()) {
             sql += " FROM ";
@@ -3522,25 +3874,32 @@ struct select_query_builder {
 template <typename... Projs>
 class select_builder {
 public:
+    select_builder() = default;
+
+    explicit select_builder(std::tuple<Projs...> projs) : projs_(std::move(projs)) {
+    }
+
     // Checked: all column projections must belong to Table.
     // For JOIN queries use from<joined<Table>>() to skip the check.
     template <typename TableSpec>
-    [[nodiscard]] auto from() const {
+    [[nodiscard]] auto from(TableSpec) const {
         if constexpr (is_joined_v<TableSpec>) {
-            return select_query_builder<typename TableSpec::table_type, Projs...>{};
+            return select_query_builder<typename TableSpec::table_type, Projs...>{projs_};
         } else {
             static_assert(ValidTable<TableSpec>);
-            static_assert(((AggregateProjection<Projs> || column_belongs_to_table_v<Projs, TableSpec>) && ...),
+            static_assert(((AggregateProjection<Projs> || InstanceProjection<Projs> ||
+                            column_belongs_to_table_v<Projs, TableSpec>) &&
+                           ...),
                           "All column projections must belong to the table passed to from<Table>(). "
                           "For JOIN queries spanning multiple tables, use from<joined<Table>>() instead.");
-            return select_query_builder<TableSpec, Projs...>{};
+            return select_query_builder<TableSpec, Projs...>{projs_};
         }
     }
 
     // from(subquery, "alias") — derived table: SELECT ... FROM (subquery) AS alias
     template <AnySelectQuery Query>
     [[nodiscard]] select_query_builder<subquery_source, Projs...> from(Query const& subquery, std::string alias) const {
-        select_query_builder<subquery_source, Projs...> builder;
+        select_query_builder<subquery_source, Projs...> builder{projs_};
         auto sub_sql = subquery.build_sql();
         builder.from_subquery_.reserve(2 + sub_sql.size() + 5 + alias.size());
         builder.from_subquery_ += '(';
@@ -3549,6 +3908,9 @@ public:
         builder.from_subquery_ += std::move(alias);
         return builder;
     }
+
+private:
+    std::tuple<Projs...> projs_{};
 };
 
 // ===================================================================
@@ -3665,7 +4027,7 @@ template <typename Query>
  *
  * Example (single table):
  *   auto rows = db.query_typed(
- *       select<symbol::id, symbol::ticker>()
+ *       select(symbol::id{}, symbol::ticker{})
  *           .from<symbol>()
  *           .where(equal<symbol::ticker>("AAPL"))
  *           .order_by<symbol::id>()
@@ -3673,15 +4035,16 @@ template <typename Query>
  *
  * Example (JOIN — use col<T,I> for table-qualified ON columns):
  *   auto rows = db.query_typed(
- *       select<col<symbol, 1>, col<price, 2>>()
+ *       select(col<symbol, 1>{}, col<price, 2>{})
  *           .from_joined<symbol>()
  *           .inner_join<price, col<symbol, 0>, col<price, 1>>()
  *           .order_by<col<price, 3>, sort_order::desc>()
  *           .limit(100));
  */
-template <Projection... Projs>
-[[nodiscard]] detail::select_builder<Projs...> select() {
-    return {};
+template <AnyProjection... Projs>
+[[nodiscard]] detail::select_builder<std::decay_t<Projs>...> select(Projs&&... projs) {
+    return detail::select_builder<std::decay_t<Projs>...>{
+        std::tuple<std::decay_t<Projs>...>{std::forward<Projs>(projs)...}};
 }
 
 /**
@@ -4120,11 +4483,11 @@ using mysql_group_concat = group_concat<Col>;
 template <ColumnDescriptor Col1, ColumnDescriptor Col2>
 using mysql_ifnull_of = ifnull_of<Col1, Col2>;
 
-template <Projection P, int Scale>
-using mysql_format_to = format_to<P, Scale>;
+template <Projection P>
+using mysql_format_to = format_to<P>;
 
-template <Projection P, fixed_string Format>
-using mysql_date_format_of = date_format_of<P, Format>;
+template <Projection P>
+using mysql_date_format_of = date_format_of<P>;
 
 template <Projection P, sql_cast_type Type>
 using mysql_convert_as = convert_as<P, Type>;

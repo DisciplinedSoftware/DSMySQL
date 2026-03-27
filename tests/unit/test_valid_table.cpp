@@ -375,7 +375,7 @@ suite<"ValidTable entry points"> entry_points_suite = [] {
     };
 
     "select from valid table compiles"_test = [] {
-        auto const sql = select<table_with_macro::id>().from<table_with_macro>().build_sql();
+        auto const sql = select(table_with_macro::id{}).from(table_with_macro{}).build_sql();
         expect(sql.find("SELECT") != std::string::npos);
         expect(sql.find("id") != std::string::npos);
     };

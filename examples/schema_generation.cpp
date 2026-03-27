@@ -103,8 +103,8 @@ int main() {
 
     // Show SELECT query SQL
     std::println("=== SELECT query SQL ===\n");
-    auto q = ds_mysql::select<user::id, user::username, user::email>()
-                 .from<user>()
+    auto q = ds_mysql::select(user::id{}, user::username{}, user::email{})
+                 .from(user{})
                  .where(ds_mysql::equal<user::is_active>(true))
                  .limit(10);
     std::println("{}\n", q.build_sql());

@@ -296,9 +296,9 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
         expect(db->execute(insert_into<temporal_precision_trade>().values(row)).has_value());
 
         auto const results =
-            db->query(select<date_format_of<temporal_precision_trade::executed_at, "%Y-%m-%d %H:%i:%s.%f">,
-                             date_format_of<temporal_precision_trade::recorded_at, "%Y-%m-%d %H:%i:%s.%f">>()
-                          .from<temporal_precision_trade>()
+            db->query(select(date_format_of<temporal_precision_trade::executed_at>("%Y-%m-%d %H:%i:%s.%f"),
+                             date_format_of<temporal_precision_trade::recorded_at>("%Y-%m-%d %H:%i:%s.%f"))
+                          .from(temporal_precision_trade{})
                           .where(equal<temporal_precision_trade::code>("PREC"))
                           .limit(1));
 
@@ -334,7 +334,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::id, trade::code>().from<trade>());
+        auto const results = db->query(select(trade::id{}, trade::code{}).from(trade{}));
         expect(fatal(results.has_value()));
         expect(results->size() == 3u) << "Should have 3 trades";
         expect(std::get<1>((*results)[0]) == "AAPL") << "First code should be AAPL";
@@ -363,13 +363,13 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         row.currency_ = "USD";
         expect(db->execute(insert_into<trade>().values(row)).has_value());
 
-        auto const results =
-            db->query(select<trade::id, trade::account_id, trade::code, trade::type, trade::name, trade::category,
-                             trade::currency, date_format_of<trade::executed_at, "%Y-%m-%d %H:%i:%s">,
-                             date_format_of<trade::recorded_at, "%Y-%m-%d %H:%i:%s">>()
-                          .from<trade>()
-                          .order_by<trade::id>()
-                          .limit(1));
+        auto const results = db->query(select(trade::id{}, trade::account_id{}, trade::code{}, trade::type{},
+                                              trade::name{}, trade::category{}, trade::currency{},
+                                              date_format_of<trade::executed_at>("%Y-%m-%d %H:%i:%s"),
+                                              date_format_of<trade::recorded_at>("%Y-%m-%d %H:%i:%s"))
+                                           .from(trade{})
+                                           .order_by(trade::id{})
+                                           .limit(1));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u);
 
@@ -407,7 +407,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where(equal<trade::code>("AAPL")));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(equal<trade::code>("AAPL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "Should find only AAPL";
         expect(std::get<0>((*results)[0]) == "AAPL");
@@ -439,7 +439,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         expect(db->execute(insert_into<trade>().values(googl)).has_value());
 
         auto const rows =
-            db->query(select<trade::code, trade::name>().from<trade>().where(equal<trade::category>("Technology")));
+            db->query(select(trade::code{}, trade::name{}).from(trade{}).where(equal<trade::category>("Technology")));
         expect(fatal(rows.has_value()));
         expect(rows->size() == 2u) << "Should have 2 technology trades";
     };
@@ -464,7 +464,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::id, trade::code>().from<trade>().limit(3));
+        auto const results = db->query(select(trade::id{}, trade::code{}).from(trade{}).limit(3));
         expect(fatal(results.has_value()));
         expect(results->size() <= 3u) << "LIMIT 3 should return at most 3 rows";
 
@@ -532,7 +532,7 @@ suite<"UPDATE Integration"> update_integration_suite = [] {
         expect(
             db->execute(update<trade>().set<trade::type>("Tech Stock").where(equal<trade::code>("AAPL"))).has_value());
 
-        auto const results = db->query(select<trade::type>().from<trade>().where(equal<trade::code>("AAPL")));
+        auto const results = db->query(select(trade::type{}).from(trade{}).where(equal<trade::code>("AAPL")));
         expect(fatal(results.has_value()));
         expect(results->size() >= 1u);
         expect(std::get<0>((*results)[0]) == "Tech Stock");
@@ -565,7 +565,7 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
 
         expect(db->execute(delete_from<trade>().where(equal<trade::code>("AAPL"))).has_value());
 
-        auto const results = db->query(select<trade::code>().from<trade>());
+        auto const results = db->query(select(trade::code{}).from(trade{}));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "Should have 2 trades left";
 
@@ -621,7 +621,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where(col_ref<trade::code> == "AAPL"));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref<trade::code> == "AAPL"));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "col_ref == should filter to AAPL only";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
@@ -646,7 +646,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where(col_ref<trade::code> != "AAPL"));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref<trade::code> != "AAPL"));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "col_ref != should exclude AAPL";
         expect(std::get<0>((*results)[0]) == "GOOGL"s);
@@ -672,8 +672,10 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where((col_ref<trade::code> == "AAPL") |
-                                                                                 (col_ref<trade::code> == "GOOGL")));
+        auto const results =
+            db->query(select(trade::code{})
+                          .from(trade{})
+                          .where((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "| should match AAPL or GOOGL";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
@@ -699,8 +701,10 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where((col_ref<trade::code> != "AAPL") &
-                                                                                 (col_ref<trade::code> != "GOOGL")));
+        auto const results =
+            db->query(select(trade::code{})
+                          .from(trade{})
+                          .where((col_ref<trade::code> != "AAPL") & (col_ref<trade::code> != "GOOGL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "& should leave only MSFT";
         expect(std::get<0>((*results)[0]) == "MSFT"s);
@@ -725,7 +729,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into<trade>().values(row)).has_value());
         }
 
-        auto const results = db->query(select<trade::code>().from<trade>().where(!(col_ref<trade::code> == "AAPL")));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(!(col_ref<trade::code> == "AAPL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "! should exclude AAPL";
         expect(std::get<0>((*results)[0]) == "GOOGL"s);
@@ -755,8 +759,11 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         googl.type_ = "Stock";
         expect(db->execute(insert_into<trade>().values(googl)).has_value());
 
-        auto const results = db->query(select<trade::code>().from<trade>().where(
-            ((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")) & (col_ref<trade::type> == "Bond")));
+        auto const results =
+            db->query(select(trade::code{})
+                          .from(trade{})
+                          .where(((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")) &
+                                 (col_ref<trade::type> == "Bond")));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "(a | b) & c priority: only AAPL should survive";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
@@ -1247,9 +1254,9 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         expect(db->execute(insert_into<integer_width_table>().values(row)).has_value()) << "Insert should succeed";
 
         auto const results =
-            db->query(select<integer_width_table::count, integer_width_table::flags, integer_width_table::big,
-                             integer_width_table::big_flags, integer_width_table::opt_count>()
-                          .from<integer_width_table>()
+            db->query(select(integer_width_table::count{}, integer_width_table::flags{}, integer_width_table::big{},
+                             integer_width_table::big_flags{}, integer_width_table::opt_count{})
+                          .from(integer_width_table{})
                           .limit(1));
 
         expect(fatal(results.has_value()));
@@ -1285,9 +1292,9 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         without_value.opt_count_ = std::nullopt;
         expect(db->execute(insert_into<integer_width_table>().values(without_value)).has_value());
 
-        auto const results = db->query(select<integer_width_table::count, integer_width_table::opt_count>()
-                                           .from<integer_width_table>()
-                                           .order_by<integer_width_table::count>());
+        auto const results = db->query(select(integer_width_table::count{}, integer_width_table::opt_count{})
+                                           .from(integer_width_table{})
+                                           .order_by(integer_width_table::count{}));
 
         expect(fatal(results.has_value()));
         expect(fatal(results->size() == 2u));
@@ -1323,7 +1330,7 @@ suite<"Integer Type Integration"> integer_type_integration_suite = [] {
         expect(db->execute(insert_into<integer_width_table>().values(row)).has_value());
 
         auto const results =
-            db->query(select<format_to<integer_width_table::big, 0>>().from<integer_width_table>().limit(1));
+            db->query(select(format_to<integer_width_table::big>(0)).from(integer_width_table{}).limit(1));
 
         expect(fatal(results.has_value()));
         expect(fatal(results->size() == 1u));

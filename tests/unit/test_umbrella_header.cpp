@@ -26,10 +26,10 @@ suite<"public api umbrella header"> public_api_umbrella_header_suite = [] {
         expect(cfg.credentials().user().to_string() == "root"s);
         expect(cfg.port().to_unsigned_int() == 3306_u);
 
-        auto const sql = select<api_product::id, api_product::name>()
-                             .from<api_product>()
+        auto const sql = select(api_product::id{}, api_product::name{})
+                             .from(api_product{})
                              .where(equal<api_product::sku>(api_product::sku{"ABC"}))
-                             .order_by<api_product::id>()
+                             .order_by(api_product::id{})
                              .build_sql();
 
         expect(sql == "SELECT id, name FROM api_product WHERE sku = 'ABC' ORDER BY id ASC"s) << sql;

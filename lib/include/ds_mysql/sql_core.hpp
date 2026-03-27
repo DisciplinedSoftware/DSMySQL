@@ -57,6 +57,23 @@ enum class sql_cast_type {
 
 enum class sort_order { asc, desc };
 
+// desc_order<ColSpec> — wraps a column spec to request DESC ordering.
+// Created via desc():
+//   order_by(desc(product::id{}))      — ORDER BY id DESC
+//   order_by(desc(nulls_last<Col>{}))  — ORDER BY (col IS NULL) ASC, col DESC
+template <typename ColSpec>
+struct desc_order {
+    using col_spec = ColSpec;
+};
+
+template <typename ColSpec>
+[[nodiscard]] constexpr desc_order<std::decay_t<ColSpec>> desc(ColSpec&&) noexcept {
+    return {};
+}
+
+template <typename T>
+concept DescOrder = requires { typename T::col_spec; } && std::is_same_v<T, desc_order<typename T::col_spec>>;
+
 enum class match_search_modifier {
     natural_language,                       // MATCH(...) AGAINST ('expr') — default, no modifier emitted
     boolean_mode,                           // MATCH(...) AGAINST ('expr' IN BOOLEAN MODE)
@@ -271,7 +288,8 @@ struct check_expr {
 
     check_expr() = default;
     check_expr(std::string_view col_name_, std::string_view op_, std::string value_)
-        : col_name(col_name_), op(op_), value(std::move(value_)) {}
+        : col_name(col_name_), op(op_), value(std::move(value_)) {
+    }
 
     [[nodiscard]] std::string build_sql() const {
         if (col_name.empty())
@@ -304,11 +322,13 @@ struct sql_predicate {
 
     sql_predicate() = default;
     sql_predicate(std::string_view col_name_, std::string_view op_, std::string value_)
-        : col_name(col_name_), op(op_), value(std::move(value_)) {}
+        : col_name(col_name_), op(op_), value(std::move(value_)) {
+    }
 
     // Every check_expr is a valid sql_predicate.
     // NOLINTNEXTLINE(google-explicit-constructor)
-    sql_predicate(check_expr e) : col_name(e.col_name), op(e.op), value(std::move(e.value)) {}
+    sql_predicate(check_expr e) : col_name(e.col_name), op(e.op), value(std::move(e.value)) {
+    }
 
     [[nodiscard]] std::string build_sql() const {
         if (col_name.empty())
@@ -663,7 +683,7 @@ template <ColumnFieldType Col>
 template <ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] sql_predicate match_against(std::string_view expr,
-                                            match_search_modifier modifier = match_search_modifier::natural_language) {
+                                          match_search_modifier modifier = match_search_modifier::natural_language) {
     std::string s;
     s.reserve(64 + expr.size());
     s += "MATCH(";

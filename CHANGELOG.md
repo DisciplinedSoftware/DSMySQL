@@ -54,6 +54,49 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** Uniform value-argument API — all query builder methods previously requiring template parameters now accept value arguments instead. Every column descriptor, table type, and expression type is passed as a default-constructed instance. No runtime cost: these are empty structs or trivially constructed types that are fully elided by the optimizer at `-O1` or above.
+
+  | Old (template params) | New (value args) |
+  |---|---|
+  | `select<col1, col2>()` | `select(col1{}, col2{})` |
+  | `.from<Table>()` | `.from(Table{})` |
+  | `.from<joined<Table>>()` | `.from(joined<Table>{})` |
+  | `.group_by<Col1, Col2>()` | `.group_by(Col1{}, Col2{})` |
+  | `.order_by<Col>()` | `.order_by(Col{})` |
+  | `.order_by<Col, sort_order::desc>()` | `.order_by(desc(Col{}))` |
+  | `.order_by_alias<Proj>()` | `.order_by_alias(Proj{})` |
+  | `.order_by_alias<Proj, sort_order::desc>()` | `.order_by_alias(desc(Proj{}))` |
+  | `.with_alias<Proj>("name")` | `.with_alias(Proj{}, "name")` |
+  | `.inner_join<T, L, R>()` | `.inner_join(T{}, L{}, R{})` |
+  | `.inner_join_on<T>(pred)` | `.inner_join(T{}, pred)` |
+  | `.left_join<T, L, R>()` | `.left_join(T{}, L{}, R{})` |
+  | `.left_join_on<T>(pred)` | `.left_join(T{}, pred)` |
+  | `.cross_join<T>()` | `.cross_join(T{})` |
+  | `.natural_join<T>()` | `.natural_join(T{})` |
+  | `.inner_join_using<T, C1, C2>()` | `.inner_join_using(T{}, C1{}, C2{})` |
+  | `.straight_join<T, L, R>()` | `.straight_join(T{}, L{}, R{})` |
+  | `.straight_join_on<T>(pred)` | `.straight_join(T{}, pred)` |
+  | `update<T>().order_by<Col, sort_order::desc>()` | `.order_by(desc(Col{}))` |
+  | `delete_from<T>().order_by<Col>()` | `.order_by(Col{})` |
+
+- **Breaking:** Scalar projection functions previously using string/integer template parameters now take runtime constructor arguments. Types used as string values must be passed as instances of their column type; date intervals use the new `interval::*` namespace.
+
+  | Old (template params) | New (runtime constructor) |
+  |---|---|
+  | `left_of<Col, 3>` | `left_of<Col>(3)` |
+  | `right_of<Col, 3>` | `right_of<Col>(3)` |
+  | `replace_of<Col, "a", "b">` | `replace_of<Col>(Col{"a"}, Col{"b"})` |
+  | `lpad_of<Col, 10, "0">` | `lpad_of<Col>(10, Col{"0"})` |
+  | `date_format_of<Col, "%Y-%m-%d">` | `date_format_of<Col>("%Y-%m-%d")` |
+  | `date_add_of<Col, 7, day>` | `date_add_of<Col>(interval::day{7})` |
+  | `truncate_to<Col, 2>` | `truncate_to<Col>(2)` |
+  | `json_extract_of<Col, "$.field">` | `json_extract_of<Col>("$.field")` |
+  | `if_of<"cond", Then, Else>` | `sql_if<Then, Else>(predicate)` |
+
+- **Breaking:** `*_join_on<T>(pred)` overloads removed; use `*_join(T{}, pred)` instead (same function, `_on` suffix dropped).
+
+- `desc_order<T>` and `desc()` moved from `sql_dql.hpp` to `sql_core.hpp`; now available in DML and any other context that includes `sql_core.hpp`.
+
 - **Breaking:** `where_condition` renamed to `sql_predicate`; update any code that names the type explicitly
 - **Breaking:** `table_constraint::check()` now accepts `check_expr` instead of `sql_predicate`; subquery predicates (`in_subquery`, `exists`, etc.) and `match_against` do not produce `check_expr` and will no longer compile in a CHECK context
 - Simple column-ref predicate factories (`equal`, `greater_than`, `like`, `between`, `in`, etc.) now return `check_expr` instead of `sql_predicate`; `check_expr` implicitly converts to `sql_predicate` so existing WHERE/HAVING/JOIN ON usage is unaffected

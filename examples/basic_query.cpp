@@ -101,8 +101,9 @@ int main() {
     std::println("Inserted one product.");
 
     // --- Query all products ---
-    auto rows = db.query(
-        ds_mysql::select<product::id, product::sku, product::name, product::price, product::stock>().from<product>());
+    auto rows =
+        db.query(ds_mysql::select(product::id{}, product::sku{}, product::name{}, product::price{}, product::stock{})
+                     .from(product{}));
     if (!rows) {
         std::println(stderr, "SELECT failed: {}", rows.error());
         return 1;

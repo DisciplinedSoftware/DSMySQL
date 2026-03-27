@@ -642,21 +642,21 @@ suite<"DDL"> ddl_suite = [] {
 
     "create_table.as(select) - generates CREATE TABLE AS SELECT"_test = [] {
         auto const sql =
-            create_table<new_table>().as(select<test_table::id, test_table::name>().from<test_table>()).build_sql();
+            create_table<new_table>().as(select(test_table::id{}, test_table::name{}).from(test_table{})).build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table;\n"s) << sql;
     };
 
     "create_table.if_not_exists.as(select) - generates CREATE TABLE IF NOT EXISTS AS SELECT"_test = [] {
         auto const sql = create_table<new_table>()
                              .if_not_exists()
-                             .as(select<test_table::id, test_table::name>().from<test_table>())
+                             .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
         expect(sql == "CREATE TABLE IF NOT EXISTS new_table AS SELECT id, name FROM test_table;\n"s) << sql;
     };
 
     "create_temporary_table.as(select) - generates CREATE TEMPORARY TABLE AS SELECT"_test = [] {
         auto const sql = create_temporary_table<new_table>()
-                             .as(select<test_table::id, test_table::name>().from<test_table>())
+                             .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
         expect(sql == "CREATE TEMPORARY TABLE new_table AS SELECT id, name FROM test_table;\n"s) << sql;
     };
@@ -665,7 +665,7 @@ suite<"DDL"> ddl_suite = [] {
         [] {
             auto const sql = create_temporary_table<new_table>()
                                  .if_not_exists()
-                                 .as(select<test_table::id, test_table::name>().from<test_table>())
+                                 .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                                  .build_sql();
             expect(sql == "CREATE TEMPORARY TABLE IF NOT EXISTS new_table AS SELECT id, name FROM test_table;\n"s)
                 << sql;
@@ -673,23 +673,25 @@ suite<"DDL"> ddl_suite = [] {
 
     "create_table.as(select).with_where - generates CREATE TABLE AS SELECT WHERE"_test = [] {
         auto const sql = create_table<new_table>()
-                             .as(select<test_table::id, test_table::name>().from<test_table>().where(
-                                 equal<test_table::name>("name")))
+                             .as(select(test_table::id{}, test_table::name{})
+                                     .from(test_table{})
+                                     .where(equal<test_table::name>("name")))
                              .build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE name = 'name';\n"s) << sql;
     };
 
     "create_table.as(select).with_where(is_not_null) - generates CREATE TABLE AS SELECT WHERE"_test = [] {
-        auto const sql =
-            create_table<new_table>()
-                .as(select<test_table::id, test_table::name>().from<test_table>().where(is_not_null<test_table::tag>()))
-                .build_sql();
+        auto const sql = create_table<new_table>()
+                             .as(select(test_table::id{}, test_table::name{})
+                                     .from(test_table{})
+                                     .where(is_not_null<test_table::tag>()))
+                             .build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table WHERE tag IS NOT NULL;\n"s) << sql;
     };
 
     "create_table.as(select) with fluent table attributes"_test = [] {
         auto const sql = create_table<new_table>()
-                             .as(select<test_table::id, test_table::name>().from<test_table>())
+                             .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .engine(Engine::InnoDB)
                              .auto_increment(1)
                              .default_charset(Charset::utf8mb4)
@@ -820,7 +822,7 @@ suite<"DDL"> ddl_suite = [] {
                              .if_exists()
                              .then()
                              .create_table<new_table>()
-                             .as(select<test_table::id, test_table::name>().from<test_table>())
+                             .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
         expect(sql ==
                "DROP TABLE IF EXISTS new_table;\n"
@@ -1087,13 +1089,13 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
 
 suite<"DDL Features"> ddl_features_suite = [] {
     "create_view.as(select) - generates CREATE VIEW AS SELECT"_test = [] {
-        auto const sql = create_view<new_table>().as(select<test_table::id>().from<test_table>()).build_sql();
+        auto const sql = create_view<new_table>().as(select(test_table::id{}).from(test_table{})).build_sql();
         expect(sql == "CREATE VIEW new_table AS SELECT id FROM test_table;\n"s) << sql;
     };
 
     "create_view.or_replace.as(select) - generates CREATE OR REPLACE VIEW"_test = [] {
         auto const sql =
-            create_view<new_table>().or_replace().as(select<test_table::id>().from<test_table>()).build_sql();
+            create_view<new_table>().or_replace().as(select(test_table::id{}).from(test_table{})).build_sql();
         expect(sql == "CREATE OR REPLACE VIEW new_table AS SELECT id FROM test_table;\n"s) << sql;
     };
 

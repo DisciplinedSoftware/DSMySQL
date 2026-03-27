@@ -1,14 +1,14 @@
 #pragma once
 
-#include "ds_mysql/database_name.hpp"
-#include "ds_mysql/host_name.hpp"
-#include "ds_mysql/schema_generator.hpp"
-#include "ds_mysql/user_name.hpp"
-
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include "ds_mysql/database_name.hpp"
+#include "ds_mysql/host_name.hpp"
+#include "ds_mysql/schema_generator.hpp"
+#include "ds_mysql/user_name.hpp"
 
 namespace ds_mysql {
 
@@ -20,7 +20,7 @@ enum class privilege {
     select,
     insert,
     update,
-    delete_,                   // DELETE (reserved keyword in C++)
+    delete_,  // DELETE (reserved keyword in C++)
     create,
     drop,
     references,
@@ -45,42 +45,71 @@ enum class privilege {
     replication_client,
     create_user,
     create_tablespace,
-    all,                       // ALL PRIVILEGES
+    all,  // ALL PRIVILEGES
 };
 
 namespace dcl_detail {
 
 [[nodiscard]] inline std::string_view privilege_to_sql(privilege p) noexcept {
     switch (p) {
-        case privilege::select:                  return "SELECT";
-        case privilege::insert:                  return "INSERT";
-        case privilege::update:                  return "UPDATE";
-        case privilege::delete_:                 return "DELETE";
-        case privilege::create:                  return "CREATE";
-        case privilege::drop:                    return "DROP";
-        case privilege::references:              return "REFERENCES";
-        case privilege::index:                   return "INDEX";
-        case privilege::alter:                   return "ALTER";
-        case privilege::create_view:             return "CREATE VIEW";
-        case privilege::show_view:               return "SHOW VIEW";
-        case privilege::create_routine:          return "CREATE ROUTINE";
-        case privilege::alter_routine:           return "ALTER ROUTINE";
-        case privilege::execute:                 return "EXECUTE";
-        case privilege::trigger:                 return "TRIGGER";
-        case privilege::event:                   return "EVENT";
-        case privilege::create_temporary_tables: return "CREATE TEMPORARY TABLES";
-        case privilege::lock_tables:             return "LOCK TABLES";
-        case privilege::reload:                  return "RELOAD";
-        case privilege::shutdown:                return "SHUTDOWN";
-        case privilege::process:                 return "PROCESS";
-        case privilege::file:                    return "FILE";
-        case privilege::show_databases:          return "SHOW DATABASES";
-        case privilege::super:                   return "SUPER";
-        case privilege::replication_slave:       return "REPLICATION SLAVE";
-        case privilege::replication_client:      return "REPLICATION CLIENT";
-        case privilege::create_user:             return "CREATE USER";
-        case privilege::create_tablespace:       return "CREATE TABLESPACE";
-        case privilege::all:                     return "ALL PRIVILEGES";
+        case privilege::select:
+            return "SELECT";
+        case privilege::insert:
+            return "INSERT";
+        case privilege::update:
+            return "UPDATE";
+        case privilege::delete_:
+            return "DELETE";
+        case privilege::create:
+            return "CREATE";
+        case privilege::drop:
+            return "DROP";
+        case privilege::references:
+            return "REFERENCES";
+        case privilege::index:
+            return "INDEX";
+        case privilege::alter:
+            return "ALTER";
+        case privilege::create_view:
+            return "CREATE VIEW";
+        case privilege::show_view:
+            return "SHOW VIEW";
+        case privilege::create_routine:
+            return "CREATE ROUTINE";
+        case privilege::alter_routine:
+            return "ALTER ROUTINE";
+        case privilege::execute:
+            return "EXECUTE";
+        case privilege::trigger:
+            return "TRIGGER";
+        case privilege::event:
+            return "EVENT";
+        case privilege::create_temporary_tables:
+            return "CREATE TEMPORARY TABLES";
+        case privilege::lock_tables:
+            return "LOCK TABLES";
+        case privilege::reload:
+            return "RELOAD";
+        case privilege::shutdown:
+            return "SHUTDOWN";
+        case privilege::process:
+            return "PROCESS";
+        case privilege::file:
+            return "FILE";
+        case privilege::show_databases:
+            return "SHOW DATABASES";
+        case privilege::super:
+            return "SUPER";
+        case privilege::replication_slave:
+            return "REPLICATION SLAVE";
+        case privilege::replication_client:
+            return "REPLICATION CLIENT";
+        case privilege::create_user:
+            return "CREATE USER";
+        case privilege::create_tablespace:
+            return "CREATE TABLESPACE";
+        case privilege::all:
+            return "ALL PRIVILEGES";
     }
     return "";
 }
@@ -90,7 +119,8 @@ template <privilege... Privs>
     std::string result;
     bool first = true;
     for (privilege p : {Privs...}) {
-        if (!first) result += ", ";
+        if (!first)
+            result += ", ";
         result += privilege_to_sql(p);
         first = false;
     }
@@ -152,7 +182,8 @@ public:
     [[nodiscard]] std::string to_sql() const {
         std::string result;
         for (std::size_t i = 0; i < privs_.size(); ++i) {
-            if (i > 0) result += ", ";
+            if (i > 0)
+                result += ", ";
             result += dcl_detail::privilege_to_sql(privs_[i]);
         }
         return result;
@@ -318,17 +349,18 @@ public:
 //   revoke(privileges().select(), on::global(), user(user_name("u")).at_any_host())
 //
 // Compile-time privilege set (template parameters):
-//   grant<privilege::select, privilege::insert>(on::schema(database_name("mydb")), user(user_name("u")).at(host_name("h")))
-//   revoke<privilege::select>(on::global(), user(user_name("u")).at_any_host())
+//   grant<privilege::select, privilege::insert>(on::schema(database_name("mydb")),
+//   user(user_name("u")).at(host_name("h"))) revoke<privilege::select>(on::global(),
+//   user(user_name("u")).at_any_host())
 // ===================================================================
 
 [[nodiscard]] inline dcl_detail::grant_builder grant(privilege_list privs, grant_target const& target,
-                                                      grant_user const& grantee) {
+                                                     grant_user const& grantee) {
     return {privs.to_sql(), target.to_sql(), grantee.to_sql()};
 }
 
 [[nodiscard]] inline dcl_detail::revoke_builder revoke(privilege_list privs, grant_target const& target,
-                                                        grant_user const& grantee) {
+                                                       grant_user const& grantee) {
     return {privs.to_sql(), target.to_sql(), grantee.to_sql()};
 }
 

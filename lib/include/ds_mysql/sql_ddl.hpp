@@ -85,17 +85,23 @@ enum class Encryption {
 
 template <fixed_string Name>
 struct check_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+    [[nodiscard]] static constexpr std::string_view name() noexcept {
+        return Name;
+    }
 };
 
 template <fixed_string Name>
 struct index_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+    [[nodiscard]] static constexpr std::string_view name() noexcept {
+        return Name;
+    }
 };
 
 template <fixed_string Name>
 struct trigger_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept { return Name; }
+    [[nodiscard]] static constexpr std::string_view name() noexcept {
+        return Name;
+    }
 };
 
 // NamedIdType — satisfied by check_id<N>, index_id<N>, trigger_id<N>, and any type with static name() → string_view.
@@ -2633,8 +2639,7 @@ private:
 
 class call_builder {
 public:
-    explicit call_builder(std::string name, std::string args = {})
-        : name_(std::move(name)), args_(std::move(args)) {
+    explicit call_builder(std::string name, std::string args = {}) : name_(std::move(name)), args_(std::move(args)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -2649,7 +2654,7 @@ private:
 }  // namespace ddl_detail
 
 [[nodiscard]] inline ddl_detail::create_procedure_builder create_procedure(std::string name, std::string params,
-                                                                            std::string body) {
+                                                                           std::string body) {
     return {std::move(name), std::move(params), std::move(body)};
 }
 
@@ -2755,7 +2760,7 @@ private:
 
 template <NamedIdType TrigId, ValidTable T>
 [[nodiscard]] ddl_detail::create_trigger_builder<T> create_trigger(TriggerTiming timing, TriggerEvent event,
-                                                                    std::string body) {
+                                                                   std::string body) {
     return {std::string(TrigId::name()), timing, event, std::move(body)};
 }
 

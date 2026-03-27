@@ -23,44 +23,40 @@ struct catalog_db : ds_mysql::database_schema {};
 
 suite<"DCL grant"> dcl_grant_suite = [] {
     "grant - runtime privileges - generates GRANT ... ON ... TO ..."_test = [] {
-        auto const sql = grant(privileges().select().insert(),
-                               on::schema(database_name("mydb")),
-                               user(user_name("user")).at(host_name("localhost"))).build_sql();
+        auto const sql = grant(privileges().select().insert(), on::schema(database_name("mydb")),
+                               user(user_name("user")).at(host_name("localhost")))
+                             .build_sql();
         expect(sql == "GRANT SELECT, INSERT ON mydb.* TO 'user'@'localhost'"s) << sql;
     };
 
     "grant - all privileges on global"_test = [] {
-        auto const sql = grant(privileges().all(),
-                               on::global(),
-                               user(user_name("admin")).at(host_name("%"))).build_sql();
+        auto const sql =
+            grant(privileges().all(), on::global(), user(user_name("admin")).at(host_name("%"))).build_sql();
         expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%'"s) << sql;
     };
 
     "grant - with_grant_option - appends WITH GRANT OPTION"_test = [] {
-        auto const sql = grant(privileges().all(),
-                               on::global(),
-                               user(user_name("admin")).at_any_host()).with_grant_option().build_sql();
+        auto const sql = grant(privileges().all(), on::global(), user(user_name("admin")).at_any_host())
+                             .with_grant_option()
+                             .build_sql();
         expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%' WITH GRANT OPTION"s) << sql;
     };
 
     "grant - template privileges"_test = [] {
-        auto const sql = grant<privilege::select, privilege::insert>(
-                             on::schema(database_name("mydb")),
-                             user(user_name("user")).at_localhost()).build_sql();
+        auto const sql = grant<privilege::select, privilege::insert>(on::schema(database_name("mydb")),
+                                                                     user(user_name("user")).at_localhost())
+                             .build_sql();
         expect(sql == "GRANT SELECT, INSERT ON mydb.* TO 'user'@'localhost'"s) << sql;
     };
 
     "grant - template all privilege"_test = [] {
-        auto const sql = grant<privilege::all>(
-                             on::global(),
-                             user(user_name("admin")).at_any_host()).build_sql();
+        auto const sql = grant<privilege::all>(on::global(), user(user_name("admin")).at_any_host()).build_sql();
         expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%'"s) << sql;
     };
 
     "grant - template with_grant_option"_test = [] {
-        auto const sql = grant<privilege::all>(
-                             on::global(),
-                             user(user_name("admin")).at_any_host()).with_grant_option().build_sql();
+        auto const sql =
+            grant<privilege::all>(on::global(), user(user_name("admin")).at_any_host()).with_grant_option().build_sql();
         expect(sql == "GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%' WITH GRANT OPTION"s) << sql;
     };
 };
@@ -71,16 +67,16 @@ suite<"DCL grant"> dcl_grant_suite = [] {
 
 suite<"DCL revoke"> dcl_revoke_suite = [] {
     "revoke - runtime privileges - generates REVOKE ... ON ... FROM ..."_test = [] {
-        auto const sql = revoke(privileges().select(),
-                                on::schema(database_name("mydb")),
-                                user(user_name("user")).at(host_name("localhost"))).build_sql();
+        auto const sql = revoke(privileges().select(), on::schema(database_name("mydb")),
+                                user(user_name("user")).at(host_name("localhost")))
+                             .build_sql();
         expect(sql == "REVOKE SELECT ON mydb.* FROM 'user'@'localhost'"s) << sql;
     };
 
     "revoke - template privileges"_test = [] {
-        auto const sql = revoke<privilege::select, privilege::insert>(
-                             on::global(),
-                             user(user_name("user")).at_any_host()).build_sql();
+        auto const sql =
+            revoke<privilege::select, privilege::insert>(on::global(), user(user_name("user")).at_any_host())
+                .build_sql();
         expect(sql == "REVOKE SELECT, INSERT ON *.* FROM 'user'@'%'"s) << sql;
     };
 };

@@ -227,11 +227,16 @@ public:
         return s;
     }
 
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
-    [[nodiscard]] update_set_where_builder order_by() const {
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+    [[nodiscard]] update_set_where_builder order_by(Spec) const {
         auto copy = *this;
-        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
-                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        if constexpr (DescOrder<Spec>) {
+            using Col = typename Spec::col_spec;
+            copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) + " DESC");
+        } else {
+            copy.order_by_clauses_.push_back(std::string(column_traits<Spec>::column_name()) + " ASC");
+        }
         return copy;
     }
 
@@ -265,9 +270,10 @@ public:
         return {assignments_, std::move(condition)};
     }
 
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
-    [[nodiscard]] update_set_where_builder<T, Cols...> order_by() const {
-        return update_set_where_builder<T, Cols...>{assignments_, std::nullopt}.template order_by<Col, Dir>();
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+    [[nodiscard]] update_set_where_builder<T, Cols...> order_by(Spec s) const {
+        return update_set_where_builder<T, Cols...>{assignments_, std::nullopt}.order_by(s);
     }
 
     [[nodiscard]] update_set_where_builder<T, Cols...> limit(std::size_t n) const {
@@ -337,11 +343,16 @@ public:
         return s;
     }
 
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
-    [[nodiscard]] delete_from_where_builder order_by() const {
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+    [[nodiscard]] delete_from_where_builder order_by(Spec) const {
         auto copy = *this;
-        copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) +
-                                         (Dir == sort_order::asc ? " ASC" : " DESC"));
+        if constexpr (DescOrder<Spec>) {
+            using Col = typename Spec::col_spec;
+            copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) + " DESC");
+        } else {
+            copy.order_by_clauses_.push_back(std::string(column_traits<Spec>::column_name()) + " ASC");
+        }
         return copy;
     }
 
@@ -364,9 +375,10 @@ public:
         return delete_from_where_builder<T>{std::move(condition)};
     }
 
-    template <ColumnDescriptor Col, sort_order Dir = sort_order::asc>
-    [[nodiscard]] delete_from_where_builder<T> order_by() const {
-        return delete_from_where_builder<T>{std::nullopt}.template order_by<Col, Dir>();
+    template <typename Spec>
+        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+    [[nodiscard]] delete_from_where_builder<T> order_by(Spec s) const {
+        return delete_from_where_builder<T>{std::nullopt}.order_by(s);
     }
 
     [[nodiscard]] delete_from_where_builder<T> limit(std::size_t n) const {
