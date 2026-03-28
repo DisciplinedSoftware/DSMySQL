@@ -4059,6 +4059,11 @@ template <ValidTable T>
     return {};
 }
 
+template <ValidTable T>
+[[nodiscard]] detail::select_query_builder<T, count_all> count(T const&) {
+    return {};
+}
+
 /**
  * truncate_table<T>() — TRUNCATE TABLE <table>.
  *
@@ -4069,6 +4074,11 @@ template <ValidTable T>
  */
 template <ValidTable T>
 [[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table(T const&) {
     return {};
 }
 
@@ -4449,6 +4459,11 @@ template <ValidTable T>
     return {};
 }
 
+template <ValidTable T>
+[[nodiscard]] dml_detail::insert_ignore_into_builder<T> insert_ignore_into(T const&) {
+    return {};
+}
+
 // insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
 template <ValidTable T, SqlBuilder Query>
 [[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(Query&& query) {
@@ -4458,6 +4473,11 @@ template <ValidTable T, SqlBuilder Query>
 // replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
 template <ValidTable T>
 [[nodiscard]] dml_detail::replace_into_builder<T> replace_into() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] dml_detail::replace_into_builder<T> replace_into(T const&) {
     return {};
 }
 

@@ -2319,7 +2319,17 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
+[[nodiscard]] ddl_detail::create_table_builder<T> create_table(T const&) {
+    return ddl_detail::create_table_builder<T>{};
+}
+
+template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table() {
+    return ddl_detail::create_table_builder<T>{true};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table(T const&) {
     return ddl_detail::create_table_builder<T>{true};
 }
 
@@ -2329,7 +2339,17 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_table_builder<T> drop_table(T const&) {
+    return ddl_detail::drop_table_builder<T>{};
+}
+
+template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table() {
+    return ddl_detail::drop_table_builder<T>{true};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table(T const&) {
     return ddl_detail::drop_table_builder<T>{true};
 }
 
@@ -2339,7 +2359,17 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
+[[nodiscard]] ddl_detail::create_view_builder<T> create_view(T const&) {
+    return ddl_detail::create_view_builder<T>{};
+}
+
+template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_view_builder<T> drop_view() {
+    return ddl_detail::drop_view_builder<T>{};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_view_builder<T> drop_view(T const&) {
     return ddl_detail::drop_view_builder<T>{};
 }
 
@@ -2360,6 +2390,11 @@ template <NamedIdType IndexId, ValidTable Table>
 
 template <ValidTable Table>
 [[nodiscard]] ddl_detail::alter_table_builder<Table> alter_table() {
+    return ddl_detail::alter_table_builder<Table>{};
+}
+
+template <ValidTable Table>
+[[nodiscard]] ddl_detail::alter_table_builder<Table> alter_table(Table const&) {
     return ddl_detail::alter_table_builder<Table>{};
 }
 
@@ -2601,7 +2636,17 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
+[[nodiscard]] ddl_detail::show_columns_builder<T> show_columns(T const&) {
+    return {};
+}
+
+template <ValidTable T>
 [[nodiscard]] ddl_detail::show_create_table_builder<T> show_create_table() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::show_create_table_builder<T> show_create_table(T const&) {
     return {};
 }
 

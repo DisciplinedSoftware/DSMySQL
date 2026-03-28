@@ -400,6 +400,11 @@ template <ValidTable T>
     return {};
 }
 
+template <ValidTable T>
+[[nodiscard]] dml_detail::describe_builder<T> describe(T const&) {
+    return {};
+}
+
 /**
  * insert_into<T>() — INSERT INTO <table> (...) VALUES (...).
  *
@@ -430,6 +435,11 @@ template <ValidTable T>
     return {};
 }
 
+template <ValidTable T>
+[[nodiscard]] dml_detail::insert_into_builder<T> insert_into(T const&) {
+    return {};
+}
+
 /**
  * update<T>() — UPDATE <table> SET ... [WHERE ...].
  *
@@ -444,6 +454,11 @@ template <ValidTable T>
     return {};
 }
 
+template <ValidTable T>
+[[nodiscard]] dml_detail::update_builder<T> update(T const&) {
+    return {};
+}
+
 /**
  * delete_from<T>() — DELETE FROM <table> [WHERE ...].
  *
@@ -452,6 +467,11 @@ template <ValidTable T>
  */
 template <ValidTable T>
 [[nodiscard]] dml_detail::delete_from_builder<T> delete_from() {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] dml_detail::delete_from_builder<T> delete_from(T const&) {
     return {};
 }
 
