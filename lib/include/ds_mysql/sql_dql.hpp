@@ -4470,6 +4470,12 @@ template <ValidTable T, SqlBuilder Query>
     return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
 }
 
+template <ValidTable T, SqlBuilder Query>
+[[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(T const&,
+                                                                                                Query&& query) {
+    return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
+}
+
 // replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
 template <ValidTable T>
 [[nodiscard]] dml_detail::replace_into_builder<T> replace_into() {
@@ -4484,6 +4490,13 @@ template <ValidTable T>
 // update_join<T1, T2>() — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
 template <ValidTable T1, ValidTable T2, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
 [[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join() {
+    std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +
+                              detail::qualified_col_name<LeftCol>() + " = " + detail::qualified_col_name<RightCol>();
+    return dml_detail::update_join_builder<T1, T2>{std::move(join_clause)};
+}
+
+template <ColumnDescriptor LeftCol, ColumnDescriptor RightCol, ValidTable T1, ValidTable T2>
+[[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join(T1 const&, T2 const&) {
     std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +
                               detail::qualified_col_name<LeftCol>() + " = " + detail::qualified_col_name<RightCol>();
     return dml_detail::update_join_builder<T1, T2>{std::move(join_clause)};

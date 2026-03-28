@@ -14,7 +14,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Instance-based overloads for all `ValidTable` entry-point functions — e.g. `delete_from(table{})` as an alternative to `delete_from<table>()`; applies to `describe`, `insert_into`, `update`, `delete_from`, `count`, `truncate_table`, `insert_ignore_into`, `replace_into`, `create_table`, `create_temporary_table`, `drop_table`, `drop_temporary_table`, `create_view`, `drop_view`, `alter_table`, `show_columns`, `show_create_table`
+- Instance-based overloads for all `ValidTable` entry-point functions — e.g. `delete_from(table{})` as an alternative to `delete_from<table>()`; applies to `describe`, `insert_into`, `update`, `delete_from`, `count`, `truncate_table`, `insert_ignore_into`, `replace_into`, `insert_into_select`, `create_table`, `create_temporary_table`, `drop_table`, `drop_temporary_table`, `create_view`, `drop_view`, `rename_table`, `create_index_on`, `drop_index_on`, `alter_table`, `show_columns`, `show_create_table`, `update_join`
 
 ---
 

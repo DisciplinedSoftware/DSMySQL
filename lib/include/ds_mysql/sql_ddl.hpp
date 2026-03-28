@@ -2378,13 +2378,28 @@ template <ValidTable From, ValidTable To>
     return ddl_detail::rename_table_builder<From, To>{};
 }
 
+template <ValidTable From, ValidTable To>
+[[nodiscard]] ddl_detail::rename_table_builder<From, To> rename_table(From const&, To const&) {
+    return ddl_detail::rename_table_builder<From, To>{};
+}
+
 template <NamedIdType IndexId, ValidTable Table, ColumnDescriptor... Cols>
 [[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on() {
     return ddl_detail::create_index_builder<Table, Cols...>{std::string(IndexId::name())};
 }
 
+template <NamedIdType IndexId, ColumnDescriptor... Cols, ValidTable Table>
+[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(Table const&) {
+    return ddl_detail::create_index_builder<Table, Cols...>{std::string(IndexId::name())};
+}
+
 template <NamedIdType IndexId, ValidTable Table>
 [[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on() {
+    return ddl_detail::drop_index_builder<Table>{std::string(IndexId::name())};
+}
+
+template <NamedIdType IndexId, ValidTable Table>
+[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(Table const&) {
     return ddl_detail::drop_index_builder<Table>{std::string(IndexId::name())};
 }
 
