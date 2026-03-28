@@ -161,7 +161,8 @@ namespace sql_detail {
     return result;
 }
 
-[[nodiscard]] inline std::string format_datetime(std::chrono::system_clock::time_point tp, uint32_t fractional_second_precision = 0) {
+[[nodiscard]] inline std::string format_datetime(std::chrono::system_clock::time_point tp,
+                                                 uint32_t fractional_second_precision = 0) {
     auto const precision = normalize_fractional_second_precision(fractional_second_precision);
     auto const micros = std::chrono::floor<std::chrono::microseconds>(tp);
     auto const secs = std::chrono::floor<std::chrono::seconds>(micros);
@@ -550,12 +551,11 @@ template <ColumnFieldType Col>
     return or_(std::move(a), std::move(b));
 }
 
-// Concept for any query that can produce SQL — used for subquery predicates.
-// Forward-declared here so subquery predicates can reference it before the full
-// SELECT builder is defined.
-template <typename Q>
-concept AnySelectQuery = requires(Q const& q) {
-    { q.build_sql() } -> std::convertible_to<std::string>;
+// SqlBuilder — any type that can produce a SQL string via build_sql().
+// Defined early so subquery predicates can reference it before the full SELECT builder is defined.
+template <typename T>
+concept SqlBuilder = requires(T const& t) {
+    { t.build_sql() } -> std::convertible_to<std::string>;
 };
 
 // check-safe: literal value list
@@ -715,7 +715,7 @@ template <ColumnFieldType... Cols>
     return {{}, {}, std::move(s)};
 }
 
-template <ColumnFieldType Col, AnySelectQuery Query>
+template <ColumnFieldType Col, SqlBuilder Query>
 [[nodiscard]] sql_predicate in_subquery(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string rhs;
@@ -726,7 +726,7 @@ template <ColumnFieldType Col, AnySelectQuery Query>
     return {column_traits<Col>::column_name(), " IN ", std::move(rhs)};
 }
 
-template <ColumnFieldType Col, AnySelectQuery Query>
+template <ColumnFieldType Col, SqlBuilder Query>
 [[nodiscard]] sql_predicate not_in_subquery(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string rhs;
@@ -737,7 +737,7 @@ template <ColumnFieldType Col, AnySelectQuery Query>
     return {column_traits<Col>::column_name(), " NOT IN ", std::move(rhs)};
 }
 
-template <AnySelectQuery Query>
+template <SqlBuilder Query>
 [[nodiscard]] sql_predicate exists(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string s;
@@ -748,7 +748,7 @@ template <AnySelectQuery Query>
     return {{}, {}, std::move(s)};
 }
 
-template <AnySelectQuery Query>
+template <SqlBuilder Query>
 [[nodiscard]] sql_predicate not_exists(Query const& subquery) {
     auto sub = subquery.build_sql();
     std::string s;
@@ -871,17 +871,17 @@ struct col_expr {
         return ds_mysql::null_safe_equal<Col>(Col{val});
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate in_subquery(Query const& subquery) const {
         return ds_mysql::in_subquery<Col>(subquery);
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate not_in_subquery(Query const& subquery) const {
         return ds_mysql::not_in_subquery<Col>(subquery);
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate eq_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -892,7 +892,7 @@ struct col_expr {
         return {column_traits<Col>::column_name(), " = ", std::move(rhs)};
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate ne_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -903,7 +903,7 @@ struct col_expr {
         return {column_traits<Col>::column_name(), " != ", std::move(rhs)};
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate lt_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -914,7 +914,7 @@ struct col_expr {
         return {column_traits<Col>::column_name(), " < ", std::move(rhs)};
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate gt_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -925,7 +925,7 @@ struct col_expr {
         return {column_traits<Col>::column_name(), " > ", std::move(rhs)};
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate le_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -936,7 +936,7 @@ struct col_expr {
         return {column_traits<Col>::column_name(), " <= ", std::move(rhs)};
     }
 
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] sql_predicate ge_subquery(Query const& subquery) const {
         auto sub = subquery.build_sql();
         std::string rhs;
@@ -951,15 +951,5 @@ struct col_expr {
 // col_ref<Col> — inline variable for natural operator-based WHERE expressions.
 template <ColumnFieldType Col>
 inline constexpr col_expr<Col> col_ref{};
-
-// ===================================================================
-// SqlStatement — unified concept for all SQL builder types.
-// Satisfied by any builder stage that exposes build_sql() -> std::string.
-// ===================================================================
-
-template <typename T>
-concept SqlStatement = requires(T const& t) {
-    { t.build_sql() } -> std::convertible_to<std::string>;
-};
 
 }  // namespace ds_mysql

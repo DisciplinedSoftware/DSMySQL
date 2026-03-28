@@ -1108,7 +1108,8 @@ void append_column_defs(std::string& sql, std::index_sequence<Is...>) {
     if constexpr (sizeof...(Is) > 0) {
         std::string col_defs[] = {column_def_for<T, Is>()...};
         for (std::size_t i = 0; i < sizeof...(Is); ++i) {
-            if (i > 0) sql += ",\n";
+            if (i > 0)
+                sql += ",\n";
             sql += col_defs[i];
         }
         std::string fk_clauses[] = {fk_clause_for<T, Is>()...};
@@ -1132,9 +1133,24 @@ template <typename T>
     return sql;
 }
 
-template <typename T>
-concept BuildsSql = requires(T const& t) {
-    { t.build_sql() } -> std::convertible_to<std::string>;
+// Sentinel prior type for top-level builders (no preceding DDL statement)
+struct no_prior {
+    [[nodiscard]] std::string build_sql() const {
+        return {};
+    }
+};
+
+// Prior type for sub-step builders that bake their SQL into a string
+// (used when a builder cannot carry the full prior chain as a template parameter)
+struct sql_string_builder {
+    explicit sql_string_builder(std::string sql) : sql_(std::move(sql)) {
+    }
+    [[nodiscard]] std::string build_sql() const {
+        return sql_;
+    }
+
+private:
+    std::string sql_;
 };
 
 template <typename Table>
@@ -1171,8 +1187,9 @@ template <Database DB, bool IfNotExists>
 }
 
 // Forward declarations
+template <SqlBuilder Prior>
 class ddl_continuation;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class create_table_builder;
 template <typename T>
 class create_table_cond_builder;
@@ -1180,65 +1197,78 @@ template <typename T>
 class create_table_as_builder;
 template <typename T, typename SourceT>
 class create_table_like_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class drop_table_builder;
 template <typename T>
 class drop_table_cond_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class create_database_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class create_database_if_not_exists_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class drop_database_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class drop_database_if_exists_builder;
+template <SqlBuilder Prior>
 class create_database_named_builder;
+template <SqlBuilder Prior>
 class create_database_named_if_not_exists_builder;
+template <SqlBuilder Prior>
 class drop_database_named_builder;
+template <SqlBuilder Prior>
 class drop_database_named_if_exists_builder;
-template <Database DB>
+template <Database DB, SqlBuilder Prior>
 class create_all_tables_builder;
-template <Database DB>
+template <Database DB, SqlBuilder Prior>
 class create_all_tables_cond_builder;
-template <typename T>
+template <typename T, SqlBuilder Prior>
 class use_builder;
-class use_name_builder;  // defined below in ddl_detail namespace
+template <SqlBuilder Prior>
+class use_name_builder;
 
 // ---------------------------------------------------------------
-// ddl_continuation — returned by .then(), allows chaining
+// ddl_continuation — returned by .then(), allows chaining DDL statements.
+// Stores the prior builder and delegates build_sql() to it.
 // ---------------------------------------------------------------
+template <SqlBuilder Prior = no_prior>
 class ddl_continuation {
 public:
-    explicit ddl_continuation(std::string sql) : sql_(std::move(sql)) {
+    using ddl_tag_type = void;
+
+    explicit ddl_continuation(Prior builder) : builder_(std::move(builder)) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return builder_.build_sql();
     }
 
     template <typename T>
-    [[nodiscard]] create_table_builder<T> create_table() const;
+    [[nodiscard]] auto create_table() const;
 
     template <typename T>
-    [[nodiscard]] create_table_builder<T> create_temporary_table() const;
+    [[nodiscard]] auto create_temporary_table() const;
 
     template <typename T>
-    [[nodiscard]] drop_table_builder<T> drop_table() const;
+    [[nodiscard]] auto drop_table() const;
 
     template <typename T>
-    [[nodiscard]] drop_table_builder<T> drop_temporary_table() const;
+    [[nodiscard]] auto drop_temporary_table() const;
 
     template <Database T>
-    [[nodiscard]] create_database_builder<T> create_database() const;
+    [[nodiscard]] auto create_database() const;
 
-    [[nodiscard]] create_database_named_builder create_database(database_name name) const;
+    [[nodiscard]] auto create_database(database_name name) const;
 
     template <Database T>
-    [[nodiscard]] drop_database_builder<T> drop_database() const;
+    [[nodiscard]] auto drop_database() const;
 
-    [[nodiscard]] drop_database_named_builder drop_database(database_name name) const;
+    [[nodiscard]] auto drop_database(database_name name) const;
 
     // USE <database> — sets default database for the session.
     template <Database T>
-    [[nodiscard]] use_builder<T> use() const;
+    [[nodiscard]] auto use() const;
 
-    [[nodiscard]] use_name_builder use(database_name name) const;
+    [[nodiscard]] auto use(database_name name) const;
 
     template <typename T>
     [[nodiscard]] auto create_view() const;
@@ -1250,35 +1280,35 @@ public:
     [[nodiscard]] auto rename_table() const;
 
     template <Database DB>
-    [[nodiscard]] create_all_tables_builder<DB> create_all_tables() const;
+    [[nodiscard]] auto create_all_tables() const;
 
 private:
-    std::string sql_;
+    Prior builder_;
 };
 
 template <typename T>
 class create_view_as_builder;
 
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class create_view_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit create_view_builder(std::string prior = {}, bool or_replace = false)
-        : prior_sql_(std::move(prior)), or_replace_(or_replace) {
+    explicit create_view_builder(Prior prior = {}, bool or_replace = false)
+        : prior_(std::move(prior)), or_replace_(or_replace) {
     }
 
     [[nodiscard]] create_view_builder or_replace() const {
-        return create_view_builder{prior_sql_, true};
+        return create_view_builder{prior_, true};
     }
 
-    template <BuildsSql SelectQuery>
+    template <SqlBuilder SelectQuery>
     [[nodiscard]] create_view_as_builder<T> as(SelectQuery const& query) const {
-        return create_view_as_builder<T>{prior_sql_, or_replace_, query.build_sql()};
+        return create_view_as_builder<T>{prior_.build_sql(), or_replace_, query.build_sql()};
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     bool or_replace_;
 };
 
@@ -1291,8 +1321,8 @@ public:
         : prior_sql_(std::move(prior)), or_replace_(or_replace), select_sql_(std::move(select_sql)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1326,8 +1356,8 @@ public:
     explicit drop_view_cond_builder(std::string prefix) : prefix_(std::move(prefix)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1338,49 +1368,49 @@ private:
     std::string prefix_;
 };
 
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class drop_view_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_view_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit drop_view_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
     [[nodiscard]] drop_view_cond_builder<T> if_exists() const {
-        return drop_view_cond_builder<T>{prior_sql_ + "DROP VIEW "};
+        return drop_view_cond_builder<T>{prior_.build_sql() + "DROP VIEW "};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_view_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "DROP VIEW " + std::string(table_name_for<T>::value().to_string_view()) + ";\n";
+        return prior_.build_sql() + "DROP VIEW " + std::string(table_name_for<T>::value().to_string_view()) + ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
-template <typename From, typename To>
+template <typename From, typename To, SqlBuilder Prior = no_prior>
 class rename_table_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit rename_table_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit rename_table_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<rename_table_builder<From, To, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "RENAME TABLE " + std::string(table_name_for<From>::value().to_string_view()) + " TO " +
-               std::string(table_name_for<To>::value().to_string_view()) + ";\n";
+        return prior_.build_sql() + "RENAME TABLE " + std::string(table_name_for<From>::value().to_string_view()) +
+               " TO " + std::string(table_name_for<To>::value().to_string_view()) + ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 template <typename Table, ColumnDescriptor... Cols>
@@ -1388,22 +1418,20 @@ class create_index_builder {
 public:
     using ddl_tag_type = void;
 
-    create_index_builder(std::string name, std::string prior = {}, bool unique = false)
-        : prior_sql_(std::move(prior)), name_(std::move(name)), unique_(unique) {
+    create_index_builder(std::string name, bool unique = false) : name_(std::move(name)), unique_(unique) {
     }
 
     [[nodiscard]] create_index_builder unique() const {
-        return create_index_builder{name_, prior_sql_, true};
+        return create_index_builder{name_, true};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
         std::string s;
-        s.reserve(prior_sql_.size() + 24 + name_.size() + table_name_for<Table>::value().to_string_view().size() + 4);
-        s += prior_sql_;
+        s.reserve(24 + name_.size() + table_name_for<Table>::value().to_string_view().size() + 4);
         s += "CREATE ";
         if (unique_) {
             s += "UNIQUE ";
@@ -1420,7 +1448,6 @@ public:
     }
 
 private:
-    std::string prior_sql_;
     std::string name_;
     bool unique_;
 };
@@ -1430,31 +1457,28 @@ class drop_index_builder {
 public:
     using ddl_tag_type = void;
 
-    drop_index_builder(std::string name, std::string prior = {})
-        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    explicit drop_index_builder(std::string name) : name_(std::move(name)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "DROP INDEX " + name_ + " ON " +
-               std::string(table_name_for<Table>::value().to_string_view()) + ";\n";
+        return "DROP INDEX " + name_ + " ON " + std::string(table_name_for<Table>::value().to_string_view()) + ";\n";
     }
 
 private:
-    std::string prior_sql_;
     std::string name_;
 };
 
-template <typename Table>
+template <typename Table, SqlBuilder Prior = no_prior>
 class alter_table_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit alter_table_builder(std::string prior = {}, std::vector<std::string> actions = {})
-        : prior_sql_(std::move(prior)), actions_(std::move(actions)) {
+    explicit alter_table_builder(Prior prior = {}, std::vector<std::string> actions = {})
+        : prior_(std::move(prior)), actions_(std::move(actions)) {
     }
 
     template <ColumnDescriptor Col>
@@ -1611,14 +1635,12 @@ public:
         return copy;
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<alter_table_builder<Table, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        std::string s;
-        s.reserve(prior_sql_.size() + 16 + table_name_for<Table>::value().to_string_view().size() + 16);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "ALTER TABLE ";
         s += table_name_for<Table>::value().to_string_view();
         s += ' ';
@@ -1635,7 +1657,7 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     std::vector<std::string> actions_;
 };
 
@@ -1651,11 +1673,11 @@ public:
         : create_prefix_(std::move(create_prefix)), column_defs_(std::move(cols)), options_(std::move(options)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
-    template <BuildsSql SelectQuery>
+    template <SqlBuilder SelectQuery>
     [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const;
 
     template <typename SourceT>
@@ -1708,13 +1730,13 @@ namespace ddl_detail {
 // ---------------------------------------------------------------
 // create_table_builder — after create_table<T>() or create_temporary_table<T>()
 // ---------------------------------------------------------------
-template <typename T>
-class create_table_builder : public create_table_attributes_mixin<create_table_builder<T>> {
+template <typename T, SqlBuilder Prior = no_prior>
+class create_table_builder : public create_table_attributes_mixin<create_table_builder<T, Prior>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_table_builder(std::string prior = {}, bool temporary = false)
-        : prior_sql_(std::move(prior)),
+    explicit create_table_builder(bool temporary = false, Prior prior = {})
+        : prior_(std::move(prior)),
           is_temporary_(temporary),
           column_defs_(ddl_detail::make_column_defs<T>()),
           options_(table_attributes<T>::get()) {
@@ -1724,7 +1746,7 @@ public:
         return create_table_cond_builder<T>{build_create_prefix(), column_defs_, options_};
     }
 
-    template <BuildsSql SelectQuery>
+    template <SqlBuilder SelectQuery>
     [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const {
         return create_table_as_builder<T>{build_create_prefix(), query.build_sql(), false, options_};
     }
@@ -1738,8 +1760,8 @@ public:
         options_.set(std::move(key), std::move(value_sql));
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_table_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1759,10 +1781,10 @@ public:
 
 private:
     [[nodiscard]] std::string build_create_prefix() const {
-        return prior_sql_ + "CREATE " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
+        return prior_.build_sql() + "CREATE " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
     }
 
-    std::string prior_sql_;
+    Prior prior_;
     bool is_temporary_;
     std::string column_defs_;
     create_table_option options_;
@@ -1780,8 +1802,8 @@ public:
     explicit create_table_like_builder(std::string create_prefix) : create_prefix_(std::move(create_prefix)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1812,8 +1834,8 @@ public:
     explicit drop_table_cond_builder(std::string drop_prefix) : drop_prefix_(std::move(drop_prefix)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1834,21 +1856,21 @@ private:
 // ---------------------------------------------------------------
 // drop_table_builder — after drop_table<T>() or drop_temporary_table<T>()
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class drop_table_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_table_builder(std::string prior = {}, bool temporary = false)
-        : prior_sql_(std::move(prior)), is_temporary_(temporary) {
+    explicit drop_table_builder(bool temporary = false, Prior prior = {})
+        : prior_(std::move(prior)), is_temporary_(temporary) {
     }
 
     [[nodiscard]] drop_table_cond_builder<T> if_exists() const {
         return drop_table_cond_builder<T>{build_drop_prefix()};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_table_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -1864,37 +1886,35 @@ public:
 
 private:
     [[nodiscard]] std::string build_drop_prefix() const {
-        return prior_sql_ + "DROP " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
+        return prior_.build_sql() + "DROP " + (is_temporary_ ? "TEMPORARY " : "") + "TABLE ";
     }
 
-    std::string prior_sql_;
+    Prior prior_;
     bool is_temporary_;
 };
 
 // ---------------------------------------------------------------
 // create_database_if_not_exists_builder — after create_database<DB>().if_not_exists()
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class create_database_if_not_exists_builder
-    : public create_database_attributes_mixin<create_database_if_not_exists_builder<T>> {
+    : public create_database_attributes_mixin<create_database_if_not_exists_builder<T, Prior>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_if_not_exists_builder(std::string prior = {},
+    explicit create_database_if_not_exists_builder(Prior prior = {},
                                                    create_database_option options = database_attributes<T>::get())
-        : create_database_attributes_mixin<create_database_if_not_exists_builder<T>>(std::move(options)),
-          prior_sql_(std::move(prior)) {
+        : create_database_attributes_mixin<create_database_if_not_exists_builder<T, Prior>>(std::move(options)),
+          prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_database_if_not_exists_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
-        std::string s;
-        s.reserve(prior_sql_.size() + 22 + db_name.size() + this->options_.to_sql().size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "CREATE DATABASE IF NOT EXISTS ";
         s += db_name;
         s += this->options_.to_sql();
@@ -1903,36 +1923,33 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // create_database_builder — after create_database<DB>()
 // ---------------------------------------------------------------
-template <typename T>
-class create_database_builder : public create_database_attributes_mixin<create_database_builder<T>> {
+template <typename T, SqlBuilder Prior = no_prior>
+class create_database_builder : public create_database_attributes_mixin<create_database_builder<T, Prior>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_builder(std::string prior = {},
-                                     create_database_option options = database_attributes<T>::get())
-        : create_database_attributes_mixin<create_database_builder<T>>(std::move(options)),
-          prior_sql_(std::move(prior)) {
+    explicit create_database_builder(Prior prior = {}, create_database_option options = database_attributes<T>::get())
+        : create_database_attributes_mixin<create_database_builder<T, Prior>>(std::move(options)),
+          prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] create_database_if_not_exists_builder<T> if_not_exists() const {
-        return create_database_if_not_exists_builder<T>{prior_sql_, this->options_};
+    [[nodiscard]] create_database_if_not_exists_builder<T, Prior> if_not_exists() const {
+        return create_database_if_not_exists_builder<T, Prior>{prior_, this->options_};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_database_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
-        std::string s;
-        s.reserve(prior_sql_.size() + 16 + db_name.size() + this->options_.to_sql().size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "CREATE DATABASE ";
         s += db_name;
         s += this->options_.to_sql();
@@ -1941,138 +1958,138 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // create_database_named_if_not_exists_builder — runtime database name
 // ---------------------------------------------------------------
+template <SqlBuilder Prior = no_prior>
 class create_database_named_if_not_exists_builder
-    : public create_database_attributes_mixin<create_database_named_if_not_exists_builder> {
+    : public create_database_attributes_mixin<create_database_named_if_not_exists_builder<Prior>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_named_if_not_exists_builder(database_name name, std::string prior = {},
+    explicit create_database_named_if_not_exists_builder(database_name name, Prior prior = {},
                                                          create_database_option options = {})
-        : create_database_attributes_mixin<create_database_named_if_not_exists_builder>(std::move(options)),
-          prior_sql_(std::move(prior)),
+        : create_database_attributes_mixin<create_database_named_if_not_exists_builder<Prior>>(std::move(options)),
+          prior_(std::move(prior)),
           name_(std::move(name)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_database_named_if_not_exists_builder<Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "CREATE DATABASE IF NOT EXISTS " + name_.to_string() + this->options_.to_sql() + ";\n";
+        return prior_.build_sql() + "CREATE DATABASE IF NOT EXISTS " + name_.to_string() + this->options_.to_sql() +
+               ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     database_name name_;
 };
 
 // ---------------------------------------------------------------
 // create_database_named_builder — runtime database name
 // ---------------------------------------------------------------
-class create_database_named_builder : public create_database_attributes_mixin<create_database_named_builder> {
+template <SqlBuilder Prior = no_prior>
+class create_database_named_builder : public create_database_attributes_mixin<create_database_named_builder<Prior>> {
 public:
     using ddl_tag_type = void;
 
-    explicit create_database_named_builder(database_name name, std::string prior = {},
-                                           create_database_option options = {})
-        : create_database_attributes_mixin<create_database_named_builder>(std::move(options)),
-          prior_sql_(std::move(prior)),
+    explicit create_database_named_builder(database_name name, Prior prior = {}, create_database_option options = {})
+        : create_database_attributes_mixin<create_database_named_builder<Prior>>(std::move(options)),
+          prior_(std::move(prior)),
           name_(std::move(name)) {
     }
 
-    [[nodiscard]] create_database_named_if_not_exists_builder if_not_exists() const {
-        return create_database_named_if_not_exists_builder{name_, prior_sql_, this->options_};
+    [[nodiscard]] create_database_named_if_not_exists_builder<Prior> if_not_exists() const {
+        return create_database_named_if_not_exists_builder<Prior>{name_, prior_, this->options_};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_database_named_builder<Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "CREATE DATABASE " + name_.to_string() + this->options_.to_sql() + ";\n";
+        return prior_.build_sql() + "CREATE DATABASE " + name_.to_string() + this->options_.to_sql() + ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     database_name name_;
 };
 
 // ---------------------------------------------------------------
 // create_all_tables_cond_builder — after create_all_tables<DB>().if_not_exists()
 // ---------------------------------------------------------------
-template <Database DB>
+template <Database DB, SqlBuilder Prior = no_prior>
 class create_all_tables_cond_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit create_all_tables_cond_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit create_all_tables_cond_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_all_tables_cond_builder<DB, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return build_create_all_tables_sql<DB, true>(prior_sql_);
+        return build_create_all_tables_sql<DB, true>(prior_.build_sql());
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // create_all_tables_builder — emits CREATE TABLE for every table in DB
 // ---------------------------------------------------------------
-template <Database DB>
+template <Database DB, SqlBuilder Prior = no_prior>
 class create_all_tables_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit create_all_tables_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit create_all_tables_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] create_all_tables_cond_builder<DB> if_not_exists() const {
-        return create_all_tables_cond_builder<DB>{prior_sql_};
+    [[nodiscard]] create_all_tables_cond_builder<DB, Prior> if_not_exists() const {
+        return create_all_tables_cond_builder<DB, Prior>{prior_};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<create_all_tables_builder<DB, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return build_create_all_tables_sql<DB, false>(prior_sql_);
+        return build_create_all_tables_sql<DB, false>(prior_.build_sql());
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // drop_database_if_exists_builder — after drop_database<DB>().if_exists()
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class drop_database_if_exists_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_database_if_exists_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit drop_database_if_exists_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_database_if_exists_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
-        std::string s;
-        s.reserve(prior_sql_.size() + 21 + db_name.size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "DROP DATABASE IF EXISTS ";
         s += db_name;
         s += ";\n";
@@ -2080,33 +2097,31 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // drop_database_builder — after drop_database<DB>()
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class drop_database_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_database_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit drop_database_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] drop_database_if_exists_builder<T> if_exists() const {
-        return drop_database_if_exists_builder<T>{prior_sql_};
+    [[nodiscard]] drop_database_if_exists_builder<T, Prior> if_exists() const {
+        return drop_database_if_exists_builder<T, Prior>{prior_};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_database_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
-        std::string s;
-        s.reserve(prior_sql_.size() + 14 + db_name.size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "DROP DATABASE ";
         s += db_name;
         s += ";\n";
@@ -2114,118 +2129,132 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
 // ---------------------------------------------------------------
 // drop_database_named_if_exists_builder — runtime database name
 // ---------------------------------------------------------------
+template <SqlBuilder Prior = no_prior>
 class drop_database_named_if_exists_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_database_named_if_exists_builder(database_name name, std::string prior = {})
-        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    explicit drop_database_named_if_exists_builder(database_name name, Prior prior = {})
+        : prior_(std::move(prior)), name_(std::move(name)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_database_named_if_exists_builder<Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "DROP DATABASE IF EXISTS " + name_.to_string() + ";\n";
+        return prior_.build_sql() + "DROP DATABASE IF EXISTS " + name_.to_string() + ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     database_name name_;
 };
 
 // ---------------------------------------------------------------
 // drop_database_named_builder — runtime database name
 // ---------------------------------------------------------------
+template <SqlBuilder Prior = no_prior>
 class drop_database_named_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit drop_database_named_builder(database_name name, std::string prior = {})
-        : prior_sql_(std::move(prior)), name_(std::move(name)) {
+    explicit drop_database_named_builder(database_name name, Prior prior = {})
+        : prior_(std::move(prior)), name_(std::move(name)) {
     }
 
-    [[nodiscard]] drop_database_named_if_exists_builder if_exists() const {
-        return drop_database_named_if_exists_builder{name_, prior_sql_};
+    [[nodiscard]] drop_database_named_if_exists_builder<Prior> if_exists() const {
+        return drop_database_named_if_exists_builder<Prior>{name_, prior_};
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<drop_database_named_builder<Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return prior_sql_ + "DROP DATABASE " + name_.to_string() + ";\n";
+        return prior_.build_sql() + "DROP DATABASE " + name_.to_string() + ";\n";
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
     database_name name_;
 };
 
-// Out-of-line definitions for ddl_continuation
+// Out-of-line definitions for ddl_continuation<Prior>
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] create_table_builder<T> ddl_continuation::create_table() const {
-    return create_table_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::create_table() const {
+    return create_table_builder<T, ddl_continuation<Prior>>{false, *this};
 }
 
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] create_table_builder<T> ddl_continuation::create_temporary_table() const {
-    return create_table_builder<T>{sql_, true};
+[[nodiscard]] auto ddl_continuation<Prior>::create_temporary_table() const {
+    return create_table_builder<T, ddl_continuation<Prior>>{true, *this};
 }
 
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] drop_table_builder<T> ddl_continuation::drop_table() const {
-    return drop_table_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::drop_table() const {
+    return drop_table_builder<T, ddl_continuation<Prior>>{false, *this};
 }
 
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] drop_table_builder<T> ddl_continuation::drop_temporary_table() const {
-    return drop_table_builder<T>{sql_, true};
+[[nodiscard]] auto ddl_continuation<Prior>::drop_temporary_table() const {
+    return drop_table_builder<T, ddl_continuation<Prior>>{true, *this};
 }
 
+template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] create_database_builder<T> ddl_continuation::create_database() const {
-    return create_database_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::create_database() const {
+    return create_database_builder<T, ddl_continuation<Prior>>{*this};
 }
 
-[[nodiscard]] inline create_database_named_builder ddl_continuation::create_database(database_name name) const {
-    return create_database_named_builder{std::move(name), sql_};
+template <SqlBuilder Prior>
+[[nodiscard]] auto ddl_continuation<Prior>::create_database(database_name name) const {
+    return create_database_named_builder<ddl_continuation<Prior>>{std::move(name), *this};
 }
 
+template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] drop_database_builder<T> ddl_continuation::drop_database() const {
-    return drop_database_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::drop_database() const {
+    return drop_database_builder<T, ddl_continuation<Prior>>{*this};
 }
 
-[[nodiscard]] inline drop_database_named_builder ddl_continuation::drop_database(database_name name) const {
-    return drop_database_named_builder{std::move(name), sql_};
+template <SqlBuilder Prior>
+[[nodiscard]] auto ddl_continuation<Prior>::drop_database(database_name name) const {
+    return drop_database_named_builder<ddl_continuation<Prior>>{std::move(name), *this};
 }
 
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation::create_view() const {
-    return create_view_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::create_view() const {
+    return create_view_builder<T, ddl_continuation<Prior>>{*this};
 }
 
+template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation::drop_view() const {
-    return drop_view_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::drop_view() const {
+    return drop_view_builder<T, ddl_continuation<Prior>>{*this};
 }
 
+template <SqlBuilder Prior>
 template <typename From, typename To>
-[[nodiscard]] auto ddl_continuation::rename_table() const {
-    return rename_table_builder<From, To>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::rename_table() const {
+    return rename_table_builder<From, To, ddl_continuation<Prior>>{*this};
 }
 
+template <SqlBuilder Prior>
 template <Database DB>
-[[nodiscard]] create_all_tables_builder<DB> ddl_continuation::create_all_tables() const {
-    return create_all_tables_builder<DB>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::create_all_tables() const {
+    return create_all_tables_builder<DB, ddl_continuation<Prior>>{*this};
 }
 
 // ---------------------------------------------------------------
@@ -2245,8 +2274,8 @@ public:
           options_(std::move(options)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
     }
 
     void set_table_option(std::string key, std::string value_sql) {
@@ -2277,7 +2306,7 @@ private:
 
 // Out-of-line .as() definition for create_table_cond_builder (needs create_table_as_builder to be complete)
 template <typename T>
-template <BuildsSql SelectQuery>
+template <SqlBuilder SelectQuery>
 [[nodiscard]] create_table_as_builder<T> create_table_cond_builder<T>::as(SelectQuery const& query) const {
     return create_table_as_builder<T>{create_prefix_, query.build_sql(), true, options_};
 }
@@ -2291,7 +2320,7 @@ template <ValidTable T>
 
 template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table() {
-    return ddl_detail::create_table_builder<T>{{}, true};
+    return ddl_detail::create_table_builder<T>{true};
 }
 
 template <ValidTable T>
@@ -2301,7 +2330,7 @@ template <ValidTable T>
 
 template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table() {
-    return ddl_detail::drop_table_builder<T>{{}, true};
+    return ddl_detail::drop_table_builder<T>{true};
 }
 
 template <ValidTable T>
@@ -2355,8 +2384,8 @@ template <Database T>
     return ddl_detail::create_database_builder<T>{};
 }
 
-[[nodiscard]] inline ddl_detail::create_database_named_builder create_database(database_name name) {
-    return ddl_detail::create_database_named_builder{std::move(name)};
+[[nodiscard]] inline ddl_detail::create_database_named_builder<> create_database(database_name name) {
+    return ddl_detail::create_database_named_builder<>{std::move(name)};
 }
 
 /**
@@ -2371,8 +2400,8 @@ template <Database T>
     return ddl_detail::drop_database_builder<T>{};
 }
 
-[[nodiscard]] inline ddl_detail::drop_database_named_builder drop_database(database_name name) {
-    return ddl_detail::drop_database_named_builder{std::move(name)};
+[[nodiscard]] inline ddl_detail::drop_database_named_builder<> drop_database(database_name name) {
+    return ddl_detail::drop_database_named_builder<>{std::move(name)};
 }
 
 /**
@@ -2397,23 +2426,21 @@ namespace ddl_detail {
 // ---------------------------------------------------------------
 // use_builder — USE <database>
 // ---------------------------------------------------------------
-template <typename T>
+template <typename T, SqlBuilder Prior = no_prior>
 class use_builder {
 public:
     using ddl_tag_type = void;
 
-    explicit use_builder(std::string prior = {}) : prior_sql_(std::move(prior)) {
+    explicit use_builder(Prior prior = {}) : prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<use_builder<T, Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = database_name_for<T>::value();
-        std::string s;
-        s.reserve(prior_sql_.size() + 4 + db_name.size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "USE ";
         s += db_name;
         s += ";\n";
@@ -2421,14 +2448,15 @@ public:
     }
 
 private:
-    std::string prior_sql_;
+    Prior prior_;
 };
 
-// Out-of-line definition for ddl_continuation::use<T>()
-// (declared in ddl_continuation; defined here after use_builder<T> is complete)
+// Out-of-line definition for ddl_continuation<Prior>::use<T>()
+// (declared in ddl_continuation; defined here after use_builder<T, Prior> is complete)
+template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] use_builder<T> ddl_continuation::use() const {
-    return use_builder<T>{sql_};
+[[nodiscard]] auto ddl_continuation<Prior>::use() const {
+    return use_builder<T, ddl_continuation<Prior>>{*this};
 }
 
 }  // namespace ddl_detail
@@ -2452,25 +2480,23 @@ template <Database T>
 namespace ddl_detail {
 
 // ---------------------------------------------------------------
-// use_builder — USE <database>
+// use_name_builder — USE <database> (runtime name)
 // ---------------------------------------------------------------
+template <SqlBuilder Prior = no_prior>
 class use_name_builder {
 public:
     using ddl_tag_type = void;
 
-    use_name_builder(database_name db_name, std::string prior = {})
-        : db_name_(std::move(db_name)), prior_sql_(std::move(prior)) {
+    use_name_builder(database_name db_name, Prior prior = {}) : db_name_(std::move(db_name)), prior_(std::move(prior)) {
     }
 
-    [[nodiscard]] ddl_continuation then() const {
-        return ddl_continuation{build_sql()};
+    [[nodiscard]] auto then() const {
+        return ddl_continuation<use_name_builder<Prior>>{*this};
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto db_name = db_name_.to_string();
-        std::string s;
-        s.reserve(prior_sql_.size() + 4 + db_name.size() + 2);
-        s += prior_sql_;
+        std::string s = prior_.build_sql();
         s += "USE ";
         s += db_name;
         s += ";\n";
@@ -2479,13 +2505,14 @@ public:
 
 private:
     database_name db_name_;
-    std::string prior_sql_;
+    Prior prior_;
 };
 
-// Out-of-line definition for ddl_continuation::use(database_name)
+// Out-of-line definition for ddl_continuation<Prior>::use(database_name)
 // (declared in ddl_continuation; defined here after use_name_builder is complete)
-[[nodiscard]] inline use_name_builder ddl_continuation::use(database_name name) const {
-    return ddl_detail::use_name_builder{std::move(name), sql_};
+template <SqlBuilder Prior>
+[[nodiscard]] auto ddl_continuation<Prior>::use(database_name name) const {
+    return use_name_builder<ddl_continuation<Prior>>{std::move(name), *this};
 }
 
 }  // namespace ddl_detail
@@ -2501,8 +2528,8 @@ private:
  *   db.execute(create_database<my_db>().if_not_exists()
  *                  .then().use("my_db"));
  */
-[[nodiscard]] inline ddl_detail::use_name_builder use(database_name name) {
-    return ddl_detail::use_name_builder{std::move(name)};
+[[nodiscard]] inline ddl_detail::use_name_builder<> use(database_name name) {
+    return ddl_detail::use_name_builder<>{std::move(name)};
 }
 
 // ===================================================================

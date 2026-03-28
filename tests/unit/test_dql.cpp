@@ -1695,14 +1695,14 @@ suite<"DQL Arithmetic Projections"> dql_arithmetic_projections_suite = [] {
 };
 
 // ===================================================================
-// Column alias — with_alias(Proj{}, column_alias{"name"})
+// Column alias — with_alias(Proj{}, sql_alias{"name"})
 // ===================================================================
 
-suite<"DQL Column Alias"> dql_column_alias_suite = [] {
-    "with_alias(Proj{}, column_alias{\"n\"}) — appends AS to matching projection"_test = [] {
+suite<"DQL Column Alias"> dql_sql_alias_suite = [] {
+    "with_alias(Proj{}, sql_alias{\"n\"}) — appends AS to matching projection"_test = [] {
         auto const sql = select(sum<ext_product::price_val>{})
                              .from(ext_product{})
-                             .with_alias(sum<ext_product::price_val>{}, column_alias{"total"})
+                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
                              .build_sql();
         expect(sql == "SELECT SUM(price_val) AS total FROM ext_product"s) << sql;
     };
@@ -1711,7 +1711,7 @@ suite<"DQL Column Alias"> dql_column_alias_suite = [] {
         auto const sql = select(ext_product::type{}, count_all{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .with_alias(count_all{}, column_alias{"cnt"})
+                             .with_alias(count_all{}, sql_alias{"cnt"})
                              .build_sql();
         expect(sql == "SELECT type, COUNT(*) AS cnt FROM ext_product GROUP BY type"s) << sql;
     };
@@ -1719,8 +1719,8 @@ suite<"DQL Column Alias"> dql_column_alias_suite = [] {
     "multiple aliases — both projections aliased"_test = [] {
         auto const sql = select(sum<ext_product::price_val>{}, count_all{})
                              .from(ext_product{})
-                             .with_alias(sum<ext_product::price_val>{}, column_alias{"total"})
-                             .with_alias(count_all{}, column_alias{"qty"})
+                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
+                             .with_alias(count_all{}, sql_alias{"qty"})
                              .build_sql();
         expect(sql == "SELECT SUM(price_val) AS total, COUNT(*) AS qty FROM ext_product"s) << sql;
     };
@@ -1730,7 +1730,7 @@ suite<"DQL Column Alias"> dql_column_alias_suite = [] {
 // The concept variable separates the constraint check from the static_assert
 // so that GCC treats the requires-clause violation as a substitution failure.
 template <typename Builder, typename Proj>
-inline constexpr bool can_alias_with = requires(Builder b) { b.with_alias(Proj{}, column_alias{""}); };
+inline constexpr bool can_alias_with = requires(Builder b) { b.with_alias(Proj{}, sql_alias{""}); };
 
 static_assert(!can_alias_with<decltype(select(ext_product::id{}).from(ext_product{})), ext_product::sku>);
 
@@ -2045,7 +2045,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
         auto const sql = select(ext_product::type{}, sum<ext_product::price_val>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .with_alias(sum<ext_product::price_val>{}, column_alias{"total"})
+                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
                              .order_by_alias(sum<ext_product::price_val>{})
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) AS total FROM ext_product GROUP BY type ORDER BY total ASC"s) << sql;
@@ -2055,7 +2055,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
         auto const sql = select(ext_product::type{}, sum<ext_product::price_val>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .with_alias(sum<ext_product::price_val>{}, column_alias{"revenue"})
+                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"revenue"})
                              .order_by_alias(desc(sum<ext_product::price_val>{}))
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) AS revenue FROM ext_product GROUP BY type ORDER BY revenue DESC"s)
@@ -2450,35 +2450,38 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
     // ---- LATERAL JOIN ----
 
     "lateral_join — generates JOIN LATERAL (subquery) AS alias"_test = [] {
-        auto const sub = select(ext_product::sku{}).from(ext_product{}).build_sql();
-        auto const sql = select(ext_product::sku{}).from(joined<ext_product>{}).lateral_join(sub, "lat").build_sql();
+        auto const sub = select(ext_product::sku{}).from(ext_product{});
+        auto const sql =
+            select(ext_product::sku{}).from(joined<ext_product>{}).lateral_join(sub, sql_alias{"lat"}).build_sql();
         expect(sql == "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s) << sql;
     };
 
     "left_lateral_join — generates LEFT JOIN LATERAL (subquery) AS alias"_test = [] {
-        auto const sub = select(ext_product::sku{}).from(ext_product{}).build_sql();
-        auto const sql =
-            select(ext_product::sku{}).from(joined<ext_product>{}).left_lateral_join(sub, "lat").build_sql();
+        auto const sub = select(ext_product::sku{}).from(ext_product{});
+        auto const sql = select(ext_product::sku{})
+                             .from(joined<ext_product>{})
+                             .left_lateral_join(sub, sql_alias{"lat"})
+                             .build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s) << sql;
     };
 
     "lateral_join_on — generates JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
-        auto const sub = select(ext_product::sku{}).from(ext_product{}).build_sql();
+        auto const sub = select(ext_product::sku{}).from(ext_product{});
         auto const on = col_ref<ext_product::id> == 1u;
         auto const sql = select(ext_product::sku{})
                              .from(joined<ext_product>{})
-                             .lateral_join_on(sub, "lat", std::move(on))
+                             .lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 1"s)
             << sql;
     };
 
     "left_lateral_join_on — generates LEFT JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
-        auto const sub = select(ext_product::sku{}).from(ext_product{}).build_sql();
+        auto const sub = select(ext_product::sku{}).from(ext_product{});
         auto const on = col_ref<ext_product::id> == 2u;
         auto const sql = select(ext_product::sku{})
                              .from(joined<ext_product>{})
-                             .left_lateral_join_on(sub, "lat", std::move(on))
+                             .left_lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 2"s)
             << sql;

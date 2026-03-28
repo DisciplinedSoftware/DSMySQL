@@ -42,12 +42,12 @@ public:
     }
 };
 
-// Strong type for SQL column alias identifiers (used with AS).
-class column_alias {
+// Strong type for SQL alias identifiers (used with AS).
+class sql_alias {
     std::string_view value_;
 
 public:
-    constexpr explicit column_alias(std::string_view sv) noexcept : value_(sv) {
+    constexpr explicit sql_alias(std::string_view sv) noexcept : value_(sv) {
     }
 
     [[nodiscard]] constexpr std::string_view to_string_view() const noexcept {

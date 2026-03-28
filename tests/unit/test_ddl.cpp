@@ -888,18 +888,17 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
 };
 
 // ===================================================================
-// SqlStatement concept — compile-time checks
+// SqlBuilder concept — compile-time checks
 // ===================================================================
 
-static_assert(SqlStatement<ddl_detail::create_table_builder<test_table>>,
-              "create_table_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_table_cond_builder<test_table>>,
-              "create_table_cond_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_table_builder<test_table>>, "drop_table_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_table_cond_builder<test_table>>,
-              "drop_table_cond_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_table_as_builder<test_table>>,
-              "create_table_as_builder must satisfy SqlStatement");
+static_assert(SqlBuilder<ddl_detail::create_table_builder<test_table>>, "create_table_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_table_cond_builder<test_table>>,
+              "create_table_cond_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_table_builder<test_table>>, "drop_table_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_table_cond_builder<test_table>>,
+              "drop_table_cond_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_table_as_builder<test_table>>,
+              "create_table_as_builder must satisfy SqlBuilder");
 
 // ===================================================================
 // DDL create_database
@@ -1232,27 +1231,26 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     };
 };
 
-static_assert(SqlStatement<ddl_detail::create_database_builder<test_db>>,
-              "create_database_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_view_as_builder<new_table>>,
-              "create_view_as_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_view_builder<new_table>>, "drop_view_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::rename_table_builder<test_table, renamed_table>>,
-              "rename_table_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_database_if_not_exists_builder<test_db>>,
-              "create_database_if_not_exists_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_database_named_builder>,
-              "create_database_named_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::create_database_named_if_not_exists_builder>,
-              "create_database_named_if_not_exists_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_database_builder<test_db>>,
-              "drop_database_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_database_if_exists_builder<test_db>>,
-              "drop_database_if_exists_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_database_named_builder>,
-              "drop_database_named_builder must satisfy SqlStatement");
-static_assert(SqlStatement<ddl_detail::drop_database_named_if_exists_builder>,
-              "drop_database_named_if_exists_builder must satisfy SqlStatement");
+static_assert(SqlBuilder<ddl_detail::create_database_builder<test_db>>,
+              "create_database_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_view_as_builder<new_table>>,
+              "create_view_as_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_view_builder<new_table>>, "drop_view_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::rename_table_builder<test_table, renamed_table>>,
+              "rename_table_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_database_if_not_exists_builder<test_db>>,
+              "create_database_if_not_exists_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_database_named_builder<>>,
+              "create_database_named_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::create_database_named_if_not_exists_builder<>>,
+              "create_database_named_if_not_exists_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_database_builder<test_db>>, "drop_database_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_database_if_exists_builder<test_db>>,
+              "drop_database_if_exists_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_database_named_builder<>>,
+              "drop_database_named_builder must satisfy SqlBuilder");
+static_assert(SqlBuilder<ddl_detail::drop_database_named_if_exists_builder<>>,
+              "drop_database_named_if_exists_builder must satisfy SqlBuilder");
 static_assert(Database<test_db>, "test_db must satisfy Database concept");
 static_assert(!Database<test_table>, "plain table must NOT satisfy Database concept");
 
@@ -1340,7 +1338,7 @@ suite<"DDL USE"> ddl_use_suite = [] {
     };
 };
 
-static_assert(SqlStatement<ddl_detail::use_builder<test_db>>, "use_builder must satisfy SqlStatement");
+static_assert(SqlBuilder<ddl_detail::use_builder<test_db>>, "use_builder must satisfy SqlBuilder");
 
 // ===================================================================
 // DDL — SHOW statements

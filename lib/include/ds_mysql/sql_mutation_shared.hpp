@@ -17,12 +17,14 @@ concept FieldOf =
 
 template <typename T, std::size_t... Is>
 [[nodiscard]] std::string generate_values_impl(T const& row, std::index_sequence<Is...>) {
-    if constexpr (sizeof...(Is) == 0) return {};
+    if constexpr (sizeof...(Is) == 0)
+        return {};
     std::string parts[] = {sql_detail::to_sql_value(boost::pfr::get<Is>(row))...};
     std::string values;
     values.reserve(sizeof...(Is) * 8);
     for (std::size_t i = 0; i < sizeof...(Is); ++i) {
-        if (i > 0) values += ", ";
+        if (i > 0)
+            values += ", ";
         values += parts[i];
     }
     return values;
@@ -35,13 +37,15 @@ template <typename T>
 
 template <typename T, std::size_t... Is>
 [[nodiscard]] std::string generate_column_list_impl(std::index_sequence<Is...>) {
-    if constexpr (sizeof...(Is) == 0) return {};
+    if constexpr (sizeof...(Is) == 0)
+        return {};
     constexpr std::size_t names_len = (std::size_t{} + ... + field_schema<T, Is>::name().size());
     constexpr std::string_view parts[] = {field_schema<T, Is>::name()...};
     std::string columns;
     columns.reserve(names_len + (sizeof...(Is) - 1) * 2);
     for (std::size_t i = 0; i < sizeof...(Is); ++i) {
-        if (i > 0) columns += ", ";
+        if (i > 0)
+            columns += ", ";
         columns += parts[i];
     }
     return columns;

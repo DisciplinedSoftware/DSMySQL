@@ -190,7 +190,7 @@ concept SqlInterval = requires(T const& t) {
 // aliased_projection — wraps any Projection with a SQL alias
 //
 // Uses a runtime string for the alias name, stored via a static helper.
-// For use with select builder's .with_alias(Proj{}, column_alias{"name"}) method.
+// For use with select builder's .with_alias(Proj{}, sql_alias{"name"}) method.
 // ===================================================================
 
 // ===================================================================
@@ -733,20 +733,20 @@ template <SqlValue ValueType>
 
 // case_when_expr<VT> — type-erased wrapper for use as a Projection in select<>.
 // Constructed from a case_when_builder via .end().
-template <SqlValue ValueType>
+template <SqlValue ValueType, SqlBuilder Builder>
 class case_when_expr {
 public:
     using value_type = ValueType;
 
-    explicit case_when_expr(std::string sql) : sql_(std::move(sql)) {
+    explicit case_when_expr(Builder builder) : builder_(std::move(builder)) {
     }
 
     [[nodiscard]] std::string sql_expr() const {
-        return sql_;
+        return builder_.build_sql();
     }
 
 private:
-    std::string sql_;
+    Builder builder_;
 };
 
 // ===================================================================
@@ -2721,10 +2721,7 @@ template <AggregateProjection Agg, typename V>
 // ===================================================================
 
 template <typename T>
-concept TypedSelectQuery = requires(T const& t) {
-    typename T::result_row_type;
-    { t.build_sql() } -> std::convertible_to<std::string>;
-};
+concept TypedSelectQuery = SqlBuilder<T> && requires { typename T::result_row_type; };
 
 namespace detail {
 
@@ -3359,13 +3356,13 @@ struct select_query_builder {
         return std::move(*this);
     }
 
-    // with_alias(Proj{}, column_alias{"name"}) — add AS alias to the projection matching type Proj
+    // with_alias(Proj{}, sql_alias{"name"}) — add AS alias to the projection matching type Proj
     //
     // Proj must be one of the types in Projs...; a mismatch is a compile error.
-    // Example: .with_alias(sum<product::price_val>{}, column_alias{"total"})
+    // Example: .with_alias(sum<product::price_val>{}, sql_alias{"total"})
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(Proj, column_alias alias) const& {
+    [[nodiscard]] select_query_builder with_alias(Proj, sql_alias alias) const& {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
         copy.aliases_[Index] = std::string(alias.to_string_view());
@@ -3373,7 +3370,7 @@ struct select_query_builder {
     }
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
-    [[nodiscard]] select_query_builder with_alias(Proj, column_alias alias) && {
+    [[nodiscard]] select_query_builder with_alias(Proj, sql_alias alias) && {
         static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         aliases_[Index] = std::string(alias.to_string_view());
         return std::move(*this);
@@ -3614,55 +3611,62 @@ struct select_query_builder {
     }
 
     // lateral_join — JOIN LATERAL (subquery) AS alias (MySQL 8.0+)
-    // Pass a pre-built SQL string as the subquery (e.g. inner_query.build_sql()).
-    [[nodiscard]] select_query_builder lateral_join(std::string subquery_sql, std::string_view alias) const& {
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder lateral_join(SubQuery const& subquery, sql_alias alias) const& {
         auto copy = *this;
-        copy.joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        copy.joins_ += " JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view());
         return copy;
     }
-    [[nodiscard]] select_query_builder lateral_join(std::string subquery_sql, std::string_view alias) && {
-        joins_ += " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder lateral_join(SubQuery const& subquery, sql_alias alias) && {
+        joins_ += " JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view());
         return std::move(*this);
     }
 
     // left_lateral_join — LEFT JOIN LATERAL (subquery) AS alias (MySQL 8.0+)
-    [[nodiscard]] select_query_builder left_lateral_join(std::string subquery_sql, std::string_view alias) const& {
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder left_lateral_join(SubQuery const& subquery, sql_alias alias) const& {
         auto copy = *this;
-        copy.joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+        copy.joins_ += " LEFT JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view());
         return copy;
     }
-    [[nodiscard]] select_query_builder left_lateral_join(std::string subquery_sql, std::string_view alias) && {
-        joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias);
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder left_lateral_join(SubQuery const& subquery, sql_alias alias) && {
+        joins_ += " LEFT JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view());
         return std::move(*this);
     }
 
     // lateral_join_on — JOIN LATERAL (subquery) AS alias ON condition
-    [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder lateral_join_on(SubQuery const& subquery, sql_alias alias,
                                                        sql_predicate on_cond) const& {
         auto copy = *this;
-        copy.joins_ +=
-            " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " + on_cond.build_sql();
+        copy.joins_ += " JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view()) +
+                       " ON " + on_cond.build_sql();
         return copy;
     }
-    [[nodiscard]] select_query_builder lateral_join_on(std::string subquery_sql, std::string_view alias,
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder lateral_join_on(SubQuery const& subquery, sql_alias alias,
                                                        sql_predicate on_cond) && {
-        joins_ +=
-            " JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " + on_cond.build_sql();
+        joins_ += " JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view()) + " ON " +
+                  on_cond.build_sql();
         return std::move(*this);
     }
 
     // left_lateral_join_on — LEFT JOIN LATERAL (subquery) AS alias ON condition
-    [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder left_lateral_join_on(SubQuery const& subquery, sql_alias alias,
                                                             sql_predicate on_cond) const& {
         auto copy = *this;
-        copy.joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
-                       on_cond.build_sql();
+        copy.joins_ += " LEFT JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view()) +
+                       " ON " + on_cond.build_sql();
         return copy;
     }
-    [[nodiscard]] select_query_builder left_lateral_join_on(std::string subquery_sql, std::string_view alias,
+    template <SqlBuilder SubQuery>
+    [[nodiscard]] select_query_builder left_lateral_join_on(SubQuery const& subquery, sql_alias alias,
                                                             sql_predicate on_cond) && {
-        joins_ += " LEFT JOIN LATERAL (" + std::move(subquery_sql) + ") AS " + std::string(alias) + " ON " +
-                  on_cond.build_sql();
+        joins_ += " LEFT JOIN LATERAL (" + subquery.build_sql() + ") AS " + std::string(alias.to_string_view()) +
+                  " ON " + on_cond.build_sql();
         return std::move(*this);
     }
 
@@ -3897,7 +3901,7 @@ public:
     }
 
     // from(subquery, "alias") — derived table: SELECT ... FROM (subquery) AS alias
-    template <AnySelectQuery Query>
+    template <SqlBuilder Query>
     [[nodiscard]] select_query_builder<subquery_source, Projs...> from(Query const& subquery, std::string alias) const {
         select_query_builder<subquery_source, Projs...> builder{projs_};
         auto sub_sql = subquery.build_sql();
@@ -3917,20 +3921,23 @@ private:
 // union_query — wraps two compatible SELECT queries with UNION / UNION ALL
 // ===================================================================
 
-template <typename RowType>
+template <typename RowType, SqlBuilder Left, SqlBuilder Right>
 class union_query {
 public:
     using result_row_type = RowType;
 
-    explicit union_query(std::string sql) : sql_(std::move(sql)) {
+    union_query(Left left, Right right, std::string_view op)
+        : left_(std::move(left)), right_(std::move(right)), op_(op) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return sql_;
+        return "(" + left_.build_sql() + ") " + std::string(op_) + " (" + right_.build_sql() + ")";
     }
 
 private:
-    std::string sql_;
+    Left left_;
+    Right right_;
+    std::string_view op_;
 };
 
 class statement_query {
@@ -3959,29 +3966,26 @@ private:
 
 template <TypedSelectQuery Q1, TypedSelectQuery Q2>
     requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
-[[nodiscard]] detail::union_query<typename Q1::result_row_type> union_(Q1 const& q1, Q2 const& q2) {
-    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") UNION (" + q2.build_sql() + ")"};
+[[nodiscard]] auto union_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type, Q1, Q2>{q1, q2, "UNION"};
 }
 
 template <TypedSelectQuery Q1, TypedSelectQuery Q2>
     requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
-[[nodiscard]] detail::union_query<typename Q1::result_row_type> union_all(Q1 const& q1, Q2 const& q2) {
-    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") UNION ALL (" + q2.build_sql() +
-                                                             ")"};
+[[nodiscard]] auto union_all(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type, Q1, Q2>{q1, q2, "UNION ALL"};
 }
 
 template <TypedSelectQuery Q1, TypedSelectQuery Q2>
     requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
-[[nodiscard]] detail::union_query<typename Q1::result_row_type> intersect_(Q1 const& q1, Q2 const& q2) {
-    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") INTERSECT (" + q2.build_sql() +
-                                                             ")"};
+[[nodiscard]] auto intersect_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type, Q1, Q2>{q1, q2, "INTERSECT"};
 }
 
 template <TypedSelectQuery Q1, TypedSelectQuery Q2>
     requires std::same_as<typename Q1::result_row_type, typename Q2::result_row_type>
-[[nodiscard]] detail::union_query<typename Q1::result_row_type> except_(Q1 const& q1, Q2 const& q2) {
-    return detail::union_query<typename Q1::result_row_type>{"(" + q1.build_sql() + ") EXCEPT (" + q2.build_sql() +
-                                                             ")"};
+[[nodiscard]] auto except_(Q1 const& q1, Q2 const& q2) {
+    return detail::union_query<typename Q1::result_row_type, Q1, Q2>{q1, q2, "EXCEPT"};
 }
 
 [[nodiscard]] inline detail::statement_query start_transaction() {
@@ -4000,18 +4004,12 @@ template <TypedSelectQuery Q1, TypedSelectQuery Q2>
     return detail::statement_query{"ROLLBACK"};
 }
 
-template <typename Query>
-    requires requires(Query const& q) {
-        { q.build_sql() } -> std::convertible_to<std::string>;
-    }
+template <SqlBuilder Query>
 [[nodiscard]] inline detail::statement_query explain(Query const& query) {
     return detail::statement_query{"EXPLAIN " + query.build_sql()};
 }
 
-template <typename Query>
-    requires requires(Query const& q) {
-        { q.build_sql() } -> std::convertible_to<std::string>;
-    }
+template <SqlBuilder Query>
 [[nodiscard]] inline detail::statement_query explain_analyze(Query const& query) {
     return detail::statement_query{"EXPLAIN ANALYZE " + query.build_sql()};
 }
@@ -4086,12 +4084,12 @@ template <ValidTable T>
 
 class cte_builder {
 public:
-    template <AnySelectQuery Q>
+    template <SqlBuilder Q>
     cte_builder(std::string name, Q const& query) {
         ctes_.emplace_back(std::move(name), query.build_sql());
     }
 
-    template <AnySelectQuery Q>
+    template <SqlBuilder Q>
     [[nodiscard]] cte_builder with_cte(std::string name, Q const& query) const {
         auto copy = *this;
         copy.ctes_.emplace_back(std::move(name), query.build_sql());
@@ -4131,7 +4129,7 @@ public:
     }
 
     // Terminal: build a full CTE query
-    template <AnySelectQuery MainQuery>
+    template <SqlBuilder MainQuery>
     [[nodiscard]] std::string build_sql(MainQuery const& main) const {
         return with_prefix() + main.build_sql();
     }
@@ -4160,12 +4158,12 @@ private:
     MainQuery main_;
 };
 
-template <AnySelectQuery Q>
+template <SqlBuilder Q>
 [[nodiscard]] cte_builder with_cte(std::string name, Q const& query) {
     return cte_builder{std::move(name), query};
 }
 
-template <AnySelectQuery Q>
+template <SqlBuilder Q>
 [[nodiscard]] cte_builder with_recursive_cte(std::string name, Q const& query) {
     return cte_builder{std::move(name), query}.recursive();
 }
@@ -4257,7 +4255,7 @@ public:
 // ---------------------------------------------------------------
 // insert_into_select_builder — INSERT INTO T (...) SELECT ...
 // ---------------------------------------------------------------
-template <typename T, AnySelectQuery Query>
+template <typename T, SqlBuilder Query>
 class insert_into_select_builder {
 public:
     explicit insert_into_select_builder(Query query) : query_(std::move(query)) {
@@ -4452,7 +4450,7 @@ template <ValidTable T>
 }
 
 // insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
-template <ValidTable T, AnySelectQuery Query>
+template <ValidTable T, SqlBuilder Query>
 [[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(Query&& query) {
     return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
 }
@@ -4472,7 +4470,7 @@ template <ValidTable T1, ValidTable T2, ColumnDescriptor LeftCol, ColumnDescript
 }
 
 template <typename T>
-concept SqlExecuteStatement = SqlStatement<T> && !TypedSelectQuery<T>;
+concept SqlExecuteStatement = SqlBuilder<T> && !TypedSelectQuery<T>;
 
 // ===================================================================
 // MySQL-specific template aliases

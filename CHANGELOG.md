@@ -51,7 +51,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `grant<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `grant`
 - `revoke(privilege_list, grant_target, grant_user)` — `REVOKE ... ON ... FROM ...`
 - `revoke<privilege::select, ...>(grant_target, grant_user)` — compile-time privilege set overload of `revoke`
-- `column_alias` — strongly-typed SQL alias identifier (wraps `std::string_view`); required as the second argument to `.with_alias()` in place of a plain `std::string`
+- `SqlBuilder` concept — unified concept for any type that can produce SQL via `build_sql() const → std::string`; replaces the previous `BuildsSql`, `AnySelectQuery`, and `SqlStatement` concepts which were structurally identical
+- `sql_alias` — strongly-typed SQL alias identifier (wraps `std::string_view`); used as the alias argument to `.with_alias()`, `.lateral_join()`, etc.
+- `no_prior` / `sql_string_builder` — DDL-internal sentinel and bridge types for the typed prior chain
 
 ### Changed
 
@@ -70,7 +72,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   | `.order_by<Col, sort_order::desc>()` | `.order_by(desc(Col{}))` |
   | `.order_by_alias<Proj>()` | `.order_by_alias(Proj{})` |
   | `.order_by_alias<Proj, sort_order::desc>()` | `.order_by_alias(desc(Proj{}))` |
-  | `.with_alias<Proj>("name")` | `.with_alias(Proj{}, column_alias{"name"})` |
+  | `.with_alias<Proj>("name")` | `.with_alias(Proj{}, sql_alias{"name"})` |
   | `.inner_join<T, L, R>()` | `.inner_join(T{}, L{}, R{})` |
   | `.inner_join_on<T>(pred)` | `.inner_join(T{}, pred)` |
   | `.left_join<T, L, R>()` | `.left_join(T{}, L{}, R{})` |
@@ -106,7 +108,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Simple column-ref predicate factories (`equal`, `greater_than`, `like`, `between`, `in`, etc.) now return `check_expr` instead of `sql_predicate`; `check_expr` implicitly converts to `sql_predicate` so existing WHERE/HAVING/JOIN ON usage is unaffected
 - Subquery predicate factories (`in_subquery`, `not_in_subquery`, `exists`, `not_exists`) and `match_against` return `sql_predicate` directly (not check-safe)
 
-- **Breaking:** `.with_alias()` now requires a `column_alias` value as its second argument instead of a plain `std::string`; replace `.with_alias(Proj{}, "name")` with `.with_alias(Proj{}, column_alias{"name"})`
+- **Breaking:** `column_alias` renamed to `sql_alias`; replace `sql_alias{"name"}` with `sql_alias{"name"}`
+- **Breaking:** `.with_alias()` now requires a `sql_alias` value as its second argument instead of a plain `std::string`; replace `.with_alias(Proj{}, "name")` with `.with_alias(Proj{}, sql_alias{"name"})`
+- **Breaking:** DDL builders now use a typed `Prior` template parameter instead of `std::string prior_sql_`; builder constructors no longer accept raw strings — chaining is enforced at the type level via `ddl_continuation<Prior>`
+- **Breaking:** `lateral_join` / `left_lateral_join` / `lateral_join_on` / `left_lateral_join_on` now take a `SqlBuilder`-constrained subquery and `sql_alias` instead of `std::string` and `std::string_view`; replace `.lateral_join(q.build_sql(), "alias")` with `.lateral_join(q, sql_alias{"alias"})`
+- **Breaking:** `union_query` now stores the two query builders instead of a pre-built SQL string; `union_()`, `union_all()`, `intersect_()`, `except_()` return deduced types
+- **Breaking:** `case_when_expr` now stores the builder instead of a pre-built SQL string
+- **Breaking:** `AnySelectQuery` and `SqlStatement` concepts removed; use `SqlBuilder` instead
+- `TypedSelectQuery` now refines `SqlBuilder`: `SqlBuilder<T> && requires { typename T::result_row_type; }`
+- `explain()` and `explain_analyze()` now use `SqlBuilder` concept constraint instead of inline requires clause
 - **Breaking:** `grant` and `revoke` now require strongly-typed `privilege_list`, `grant_target`, and `grant_user` arguments instead of plain strings; the old string-based overloads have been removed
 
 - `natural_join<T>()`, `natural_left_join<T>()`, `natural_right_join<T>()` — `NATURAL [LEFT|RIGHT] JOIN` with no ON/USING clause

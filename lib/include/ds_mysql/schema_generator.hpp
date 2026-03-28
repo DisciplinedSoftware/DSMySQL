@@ -485,7 +485,8 @@ template <typename T, std::size_t... Is>
     sql += table_name;
     sql += " (\n";
     for (std::size_t i = 0; i < sizeof...(Is); ++i) {
-        if (i > 0) sql += ",\n";
+        if (i > 0)
+            sql += ",\n";
         sql += col_defs[i];
     }
     sql += "\n)";
