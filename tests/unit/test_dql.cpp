@@ -2458,10 +2458,8 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "left_lateral_join — generates LEFT JOIN LATERAL (subquery) AS alias"_test = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
-        auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
-                             .left_lateral_join(sub, sql_alias{"lat"})
-                             .build_sql();
+        auto const sql =
+            select(ext_product::sku{}).from(joined<ext_product>{}).left_lateral_join(sub, sql_alias{"lat"}).build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s) << sql;
     };
 
