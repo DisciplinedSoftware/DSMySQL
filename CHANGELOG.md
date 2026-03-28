@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [3.1.0] – 2026-03-28
+
 ### Added
 
 - Instance-based overloads for all `ValidTable` entry-point functions — e.g. `delete_from(table{})` as an alternative to `delete_from<table>()`; applies to `describe`, `insert_into`, `update`, `delete_from`, `count`, `truncate_table`, `insert_ignore_into`, `replace_into`, `create_table`, `create_temporary_table`, `drop_table`, `drop_temporary_table`, `create_view`, `drop_view`, `alter_table`, `show_columns`, `show_create_table`
@@ -247,7 +251,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...v2.1.0
