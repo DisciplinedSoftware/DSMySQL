@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [3.0.0] – 2026-03-28
+
 ### Added
 
 - `check_id<"name">` — compile-time CHECK constraint name type; pass as second argument to `table_constraint::check` to emit a named constraint
@@ -239,7 +243,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.1...v3.0.0
 [2.1.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v1.1.0...v2.0.0
