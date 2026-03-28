@@ -120,8 +120,9 @@ jobs:
           UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
           echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] https://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-20 main" \
             | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build clang-20 \
+          sudo apt-get install -y cmake ninja-build clang-20 libstdc++-15-dev \
             libmysqlclient-dev pkg-config
 
       - name: Configure

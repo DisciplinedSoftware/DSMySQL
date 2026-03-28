@@ -55,6 +55,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sql_alias` — strongly-typed SQL alias identifier (wraps `std::string_view`); used as the alias argument to `.with_alias()`, `.lateral_join()`, etc.
 - `no_prior` / `sql_string_builder` — DDL-internal sentinel and bridge types for the typed prior chain
 
+### Fixed
+
+- CI: install `libstdc++-15-dev` in `tests-clang` job so Clang 20 finds `<print>` and other C++23 headers (the `act` runner image ships an older libstdc++ without them)
+
 ### Changed
 
 - Eliminated immediately invoked lambda expressions (IILEs) from fold expressions in `schema_generator.hpp`, `sql_ddl.hpp`, `sql_mutation_shared.hpp`, and `mysql_connection.hpp`; each per-element body is now a named helper function (`column_definition_for`, `column_def_for`, `fk_clause_for`, `validate_one_table`), and separator logic uses a plain index loop over a stack-allocated array
