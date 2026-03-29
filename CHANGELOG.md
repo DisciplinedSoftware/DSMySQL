@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.2.0] – 2026-03-29
+
 ### Added
 
 - Instance-based overload for `create_index_on` — e.g. `create_index_on(index_id<"idx">{}, table{}, col1{}, col2{})` as an alternative to the template-only form
@@ -325,7 +329,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.1.0...v3.2.0
