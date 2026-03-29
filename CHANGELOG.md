@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.3.0] – 2026-03-29
+
 ### Added
 
 - `col_expr` `operator==` and `operator!=` overloads for named ID types (`index_id`, `check_id`, `trigger_id`, etc.) — e.g. `col_ref(statistics::index_name{}) == index_id<"uq_symbol_ticker">{}`
@@ -333,7 +337,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v3.2.0...v4.0.0
