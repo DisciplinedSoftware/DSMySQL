@@ -637,37 +637,37 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     // -------------------------------------------------------------------
 
     "col_ref == string literal — generates equal WHERE SQL"_test = [] {
-        auto const sql = select(product::sku{}).from(product{}).where(col_ref<product::sku> == "WIDGET").build_sql();
+        auto const sql = select(product::sku{}).from(product{}).where(col_ref(product::sku{}) == "WIDGET").build_sql();
         expect(sql == "SELECT sku FROM product WHERE sku = 'WIDGET'"s) << sql;
     };
 
     "col_ref != string literal — generates not_equal WHERE SQL"_test = [] {
-        auto const sql = select(product::sku{}).from(product{}).where(col_ref<product::sku> != "WIDGET").build_sql();
+        auto const sql = select(product::sku{}).from(product{}).where(col_ref(product::sku{}) != "WIDGET").build_sql();
         expect(sql == "SELECT sku FROM product WHERE sku != 'WIDGET'"s) << sql;
     };
 
     "col_ref == integer — generates equal WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id> == 42u).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::id{}) == 42u).build_sql();
         expect(sql == "SELECT id FROM product WHERE id = 42"s) << sql;
     };
 
     "col_ref < integer — generates less_than WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id> < 100u).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::id{}) < 100u).build_sql();
         expect(sql == "SELECT id FROM product WHERE id < 100"s) << sql;
     };
 
     "col_ref > integer — generates greater_than WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id> > 0u).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::id{}) > 0u).build_sql();
         expect(sql == "SELECT id FROM product WHERE id > 0"s) << sql;
     };
 
     "col_ref <= integer — generates less_than_or_equal WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id> <= 99u).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::id{}) <= 99u).build_sql();
         expect(sql == "SELECT id FROM product WHERE id <= 99"s) << sql;
     };
 
     "col_ref >= integer — generates greater_than_or_equal WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id> >= 1u).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::id{}) >= 1u).build_sql();
         expect(sql == "SELECT id FROM product WHERE id >= 1"s) << sql;
     };
 
@@ -676,39 +676,41 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     // -------------------------------------------------------------------
 
     "col_ref.is_null() — generates IS NULL WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::name>.is_null()).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::name{}).is_null()).build_sql();
         expect(sql == "SELECT id FROM product WHERE name IS NULL"s) << sql;
     };
 
     "col_ref.is_not_null() — generates IS NOT NULL WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::tag>.is_not_null()).build_sql();
+        auto const sql = select(product::id{}).from(product{}).where(col_ref(product::tag{}).is_not_null()).build_sql();
         expect(sql == "SELECT id FROM product WHERE tag IS NOT NULL"s) << sql;
     };
 
     "col_ref.like() — generates LIKE WHERE SQL"_test = [] {
-        auto const sql = select(product::sku{}).from(product{}).where(col_ref<product::sku>.like("WID%")).build_sql();
+        auto const sql = select(product::sku{}).from(product{}).where(col_ref(product::sku{}).like("WID%")).build_sql();
         expect(sql == "SELECT sku FROM product WHERE sku LIKE 'WID%'"s) << sql;
     };
 
     "col_ref.not_like() — generates NOT LIKE WHERE SQL"_test = [] {
-        auto const sql = select(product::sku{}).from(product{}).where(col_ref<product::sku>.not_like("X%")).build_sql();
+        auto const sql =
+            select(product::sku{}).from(product{}).where(col_ref(product::sku{}).not_like("X%")).build_sql();
         expect(sql == "SELECT sku FROM product WHERE sku NOT LIKE 'X%'"s) << sql;
     };
 
     "col_ref.between() — generates BETWEEN WHERE SQL"_test = [] {
         auto const sql =
-            select(product::id{}).from(product{}).where(col_ref<product::id>.between(1u, 100u)).build_sql();
+            select(product::id{}).from(product{}).where(col_ref(product::id{}).between(1u, 100u)).build_sql();
         expect(sql == "SELECT id FROM product WHERE id BETWEEN 1 AND 100"s) << sql;
     };
 
     "col_ref.in() — generates IN WHERE SQL"_test = [] {
-        auto const sql = select(product::id{}).from(product{}).where(col_ref<product::id>.in({1u, 2u, 3u})).build_sql();
+        auto const sql =
+            select(product::id{}).from(product{}).where(col_ref(product::id{}).in({1u, 2u, 3u})).build_sql();
         expect(sql == "SELECT id FROM product WHERE id IN (1, 2, 3)"s) << sql;
     };
 
     "col_ref.not_in() — generates NOT IN WHERE SQL"_test = [] {
         auto const sql =
-            select(product::id{}).from(product{}).where(col_ref<product::id>.not_in({10u, 20u})).build_sql();
+            select(product::id{}).from(product{}).where(col_ref(product::id{}).not_in({10u, 20u})).build_sql();
         expect(sql == "SELECT id FROM product WHERE id NOT IN (10, 20)"s) << sql;
     };
 
@@ -717,14 +719,15 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     // -------------------------------------------------------------------
 
     "! — generates NOT WHERE SQL"_test = [] {
-        auto const sql = select(product::sku{}).from(product{}).where(!(col_ref<product::sku> == "WIDGET")).build_sql();
+        auto const sql =
+            select(product::sku{}).from(product{}).where(!(col_ref(product::sku{}) == "WIDGET")).build_sql();
         expect(sql == "SELECT sku FROM product WHERE NOT (sku = 'WIDGET')"s) << sql;
     };
 
     "& — generates AND WHERE SQL"_test = [] {
         auto const sql = select(product::id{})
                              .from(product{})
-                             .where((col_ref<product::id> >= 1u) & (col_ref<product::id> <= 100u))
+                             .where((col_ref(product::id{}) >= 1u) & (col_ref(product::id{}) <= 100u))
                              .build_sql();
         expect(sql == "SELECT id FROM product WHERE (id >= 1 AND id <= 100)"s) << sql;
     };
@@ -732,7 +735,7 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     "| — generates OR WHERE SQL"_test = [] {
         auto const sql = select(product::sku{})
                              .from(product{})
-                             .where((col_ref<product::sku> == "WIDGET") | (col_ref<product::sku> == "GADGET"))
+                             .where((col_ref(product::sku{}) == "WIDGET") | (col_ref(product::sku{}) == "GADGET"))
                              .build_sql();
         expect(sql == "SELECT sku FROM product WHERE (sku = 'WIDGET' OR sku = 'GADGET')"s) << sql;
     };
@@ -746,8 +749,8 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     "(a | b) & c — parentheses override & > | precedence"_test = [] {
         auto const sql = select(product::sku{})
                              .from(product{})
-                             .where(((col_ref<product::sku> == "WIDGET") | (col_ref<product::type> == "gadget")) &
-                                    (col_ref<product::name>.is_not_null()))
+                             .where(((col_ref(product::sku{}) == "WIDGET") | (col_ref(product::type{}) == "gadget")) &
+                                    (col_ref(product::name{}).is_not_null()))
                              .build_sql();
         expect(sql == "SELECT sku FROM product WHERE ((sku = 'WIDGET' OR type = 'gadget') AND name IS NOT NULL)"s)
             << sql;
@@ -758,8 +761,8 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
     "a | (b & c) — default precedence without parens"_test = [] {
         auto const sql = select(product::sku{})
                              .from(product{})
-                             .where((col_ref<product::sku> == "WIDGET") |
-                                    ((col_ref<product::type> == "gadget") & (col_ref<product::name>.is_not_null())))
+                             .where((col_ref(product::sku{}) == "WIDGET") |
+                                    ((col_ref(product::type{}) == "gadget") & (col_ref(product::name{}).is_not_null())))
                              .build_sql();
         expect(sql == "SELECT sku FROM product WHERE (sku = 'WIDGET' OR (type = 'gadget' AND name IS NOT NULL))"s)
             << sql;
@@ -862,7 +865,7 @@ suite<"DQL NULL-safe Equality"> dql_null_safe_equality_suite = [] {
     };
 
     "col_ref.null_safe_equal() — operator method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::id>.null_safe_equal(42u);
+        auto const cond = col_ref(ext_product::id{}).null_safe_equal(42u);
         expect(cond.build_sql() == "id <=> 42"s) << cond.build_sql();
     };
 
@@ -889,7 +892,7 @@ suite<"DQL REGEXP Predicate"> dql_regexp_predicate_suite = [] {
     };
 
     "col_ref.regexp() — method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::sku>.regexp("^WIDGET");
+        auto const cond = col_ref(ext_product::sku{}).regexp("^WIDGET");
         expect(cond.build_sql() == "sku REGEXP '^WIDGET'"s) << cond.build_sql();
     };
 
@@ -919,44 +922,44 @@ suite<"DQL REGEXP Predicate"> dql_regexp_predicate_suite = [] {
 suite<"DQL Scalar Subquery Methods"> dql_scalar_subquery_suite = [] {
     "col_ref.eq_subquery — col = (SELECT ...)"_test = [] {
         auto const sub = select(max_of<ext_product::price_val>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::price_val>.eq_subquery(sub);
+        auto const cond = col_ref(ext_product::price_val{}).eq_subquery(sub);
         expect(cond.build_sql() == "price_val = (SELECT MAX(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.ne_subquery — col != (SELECT ...)"_test = [] {
         auto const sub = select(min_of<ext_product::id>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::id>.ne_subquery(sub);
+        auto const cond = col_ref(ext_product::id{}).ne_subquery(sub);
         expect(cond.build_sql() == "id != (SELECT MIN(id) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.gt_subquery — col > (SELECT ...)"_test = [] {
         auto const sub = select(avg_of<ext_product::price_val>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::price_val>.gt_subquery(sub);
+        auto const cond = col_ref(ext_product::price_val{}).gt_subquery(sub);
         expect(cond.build_sql() == "price_val > (SELECT AVG(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.lt_subquery — col < (SELECT ...)"_test = [] {
         auto const sub = select(avg_of<ext_product::price_val>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::price_val>.lt_subquery(sub);
+        auto const cond = col_ref(ext_product::price_val{}).lt_subquery(sub);
         expect(cond.build_sql() == "price_val < (SELECT AVG(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.ge_subquery — col >= (SELECT ...)"_test = [] {
         auto const sub = select(min_of<ext_product::price_val>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::price_val>.ge_subquery(sub);
+        auto const cond = col_ref(ext_product::price_val{}).ge_subquery(sub);
         expect(cond.build_sql() == "price_val >= (SELECT MIN(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.le_subquery — col <= (SELECT ...)"_test = [] {
         auto const sub = select(max_of<ext_product::price_val>{}).from(ext_product{});
-        auto const cond = col_ref<ext_product::price_val>.le_subquery(sub);
+        auto const cond = col_ref(ext_product::price_val{}).le_subquery(sub);
         expect(cond.build_sql() == "price_val <= (SELECT MAX(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.in_subquery — col IN (SELECT ...)"_test = [] {
         auto const sub =
             select(ext_product::id{}).from(ext_product{}).where(equal<ext_product::type>(ext_product::type{"widget"}));
-        auto const cond = col_ref<ext_product::category_id>.in_subquery(sub);
+        auto const cond = col_ref(ext_product::category_id{}).in_subquery(sub);
         expect(cond.build_sql() == "category_id IN (SELECT id FROM ext_product WHERE type = 'widget')"s)
             << cond.build_sql();
     };
@@ -964,7 +967,7 @@ suite<"DQL Scalar Subquery Methods"> dql_scalar_subquery_suite = [] {
     "col_ref.not_in_subquery — col NOT IN (SELECT ...)"_test = [] {
         auto const sub =
             select(ext_product::id{}).from(ext_product{}).where(equal<ext_product::type>(ext_product::type{"widget"}));
-        auto const cond = col_ref<ext_product::category_id>.not_in_subquery(sub);
+        auto const cond = col_ref(ext_product::category_id{}).not_in_subquery(sub);
         expect(cond.build_sql() == "category_id NOT IN (SELECT id FROM ext_product WHERE type = 'widget')"s)
             << cond.build_sql();
     };
@@ -973,7 +976,7 @@ suite<"DQL Scalar Subquery Methods"> dql_scalar_subquery_suite = [] {
         auto const sub = select(max_of<ext_product::price_val>{}).from(ext_product{});
         auto const sql = select(ext_product::id{}, ext_product::sku{})
                              .from(ext_product{})
-                             .where(col_ref<ext_product::price_val>.eq_subquery(sub))
+                             .where(col_ref(ext_product::price_val{}).eq_subquery(sub))
                              .build_sql();
         expect(sql == "SELECT id, sku FROM ext_product WHERE price_val = (SELECT MAX(price_val) FROM ext_product)"s)
             << sql;
@@ -1325,7 +1328,7 @@ suite<"DQL Conditional Scalar Functions"> dql_conditional_scalar_suite = [] {
     };
 
     "if_expr — generates IF(cond, then, else)"_test = [] {
-        auto const sql = select(sql_if<ext_product::name, ext_product::sku>(col_ref<ext_product::price_val> > 100.0))
+        auto const sql = select(sql_if<ext_product::name, ext_product::sku>(col_ref(ext_product::price_val{}) > 100.0))
                              .from(ext_product{})
                              .build_sql();
         expect(sql == "SELECT IF(price_val > 100.000000, name, sku) FROM ext_product"s) << sql;
@@ -1343,7 +1346,7 @@ suite<"DQL Conditional Scalar Functions"> dql_conditional_scalar_suite = [] {
 
     "sql_if alias — generates IF(cond, then, else)"_test = [] {
         auto const sql =
-            select(ds_mysql::sql_if<ext_product::name, ext_product::sku>(col_ref<ext_product::price_val> > 0.0))
+            select(ds_mysql::sql_if<ext_product::name, ext_product::sku>(col_ref(ext_product::price_val{}) > 0.0))
                 .from(ext_product{})
                 .build_sql();
         expect(sql == "SELECT IF(price_val > 0.000000, name, sku) FROM ext_product"s) << sql;
@@ -2340,7 +2343,7 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
     };
 
     "inner_join_on with compound ON — generates INNER JOIN ... ON (a AND b)"_test = [] {
-        auto const on = (col_ref<ext_product::category_id> == 1u) & is_not_null<ext_product::category_id>();
+        auto const on = (col_ref(ext_product::category_id{}) == 1u) & is_not_null<ext_product::category_id>();
         auto const sql = select(ext_product::sku{}, ext_category::label{})
                              .from(ext_product{})
                              .inner_join(ext_category{}, std::move(on))
@@ -2352,21 +2355,21 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
     };
 
     "left_join_on — generates LEFT JOIN ... ON compound"_test = [] {
-        auto const on = col_ref<ext_product::category_id> == 2u;
+        auto const on = col_ref(ext_product::category_id{}) == 2u;
         auto const sql =
             select(ext_product::sku{}).from(ext_product{}).left_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN ext_category ON category_id = 2"s) << sql;
     };
 
     "right_join_on — generates RIGHT JOIN ... ON compound"_test = [] {
-        auto const on = col_ref<ext_product::category_id> == 3u;
+        auto const on = col_ref(ext_product::category_id{}) == 3u;
         auto const sql =
             select(ext_product::sku{}).from(ext_product{}).right_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product RIGHT JOIN ext_category ON category_id = 3"s) << sql;
     };
 
     "full_join_on — generates FULL OUTER JOIN ... ON compound"_test = [] {
-        auto const on = col_ref<ext_product::category_id> == 4u;
+        auto const on = col_ref(ext_product::category_id{}) == 4u;
         auto const sql =
             select(ext_product::sku{}).from(ext_product{}).full_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product FULL OUTER JOIN ext_category ON category_id = 4"s) << sql;
@@ -2472,7 +2475,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "lateral_join_on — generates JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
-        auto const on = col_ref<ext_product::id> == 1u;
+        auto const on = col_ref(ext_product::id{}) == 1u;
         auto const sql = select(ext_product::sku{})
                              .from(ext_product{})
                              .lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
@@ -2483,7 +2486,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "left_lateral_join_on — generates LEFT JOIN LATERAL (subquery) AS alias ON condition"_test = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
-        auto const on = col_ref<ext_product::id> == 2u;
+        auto const on = col_ref(ext_product::id{}) == 2u;
         auto const sql = select(ext_product::sku{})
                              .from(ext_product{})
                              .left_lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
@@ -2514,7 +2517,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
     };
 
     "straight_join_on — generates STRAIGHT_JOIN ... ON compound condition"_test = [] {
-        auto const on = col_ref<ext_product::category_id> == 5u;
+        auto const on = col_ref(ext_product::category_id{}) == 5u;
         auto const sql =
             select(ext_product::sku{}).from(ext_product{}).straight_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product STRAIGHT_JOIN ext_category ON category_id = 5"s) << sql;
@@ -2764,7 +2767,7 @@ suite<"DQL NOT REGEXP / RLIKE Predicates"> dql_not_regexp_rlike_suite = [] {
     };
 
     "col_ref.not_regexp() — method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::sku>.not_regexp("^WIDGET");
+        auto const cond = col_ref(ext_product::sku{}).not_regexp("^WIDGET");
         expect(cond.build_sql() == "sku NOT REGEXP '^WIDGET'"s) << cond.build_sql();
     };
 
@@ -2787,7 +2790,7 @@ suite<"DQL NOT REGEXP / RLIKE Predicates"> dql_not_regexp_rlike_suite = [] {
     };
 
     "col_ref.rlike() — method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::sku>.rlike("^R");
+        auto const cond = col_ref(ext_product::sku{}).rlike("^R");
         expect(cond.build_sql() == "sku REGEXP '^R'"s) << cond.build_sql();
     };
 
@@ -2797,7 +2800,7 @@ suite<"DQL NOT REGEXP / RLIKE Predicates"> dql_not_regexp_rlike_suite = [] {
     };
 
     "col_ref.not_rlike() — method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::sku>.not_rlike("^X");
+        auto const cond = col_ref(ext_product::sku{}).not_rlike("^X");
         expect(cond.build_sql() == "sku NOT REGEXP '^X'"s) << cond.build_sql();
     };
 
@@ -2828,7 +2831,7 @@ suite<"DQL SOUNDS LIKE Predicate"> dql_sounds_like_suite = [] {
     };
 
     "col_ref.sounds_like() — method on col_expr"_test = [] {
-        auto const cond = col_ref<ext_product::sku>.sounds_like("widget");
+        auto const cond = col_ref(ext_product::sku{}).sounds_like("widget");
         expect(cond.build_sql() == "sku SOUNDS LIKE 'widget'"s) << cond.build_sql();
     };
 

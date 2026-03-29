@@ -760,43 +760,40 @@ template <SqlBuilder Query>
 }
 
 // ===================================================================
-// col_expr<Col> / col_ref<Col> — natural operator syntax for predicates
+// col_expr<Col> / col_ref(Col{}) — natural operator syntax for predicates
 //
-// col_ref<Col> is an inline constexpr variable template that exposes
-// comparison and predicate operators. Simple column-ref operators return
-// check_expr (usable in WHERE, HAVING, CHECK); subquery operators return
-// sql_predicate (WHERE/HAVING only). Results compose with &, |, ! (see above).
+// col_ref(Col{}) is a constexpr factory function that returns a col_expr<Col>,
+// exposing comparison and predicate operators. Simple column-ref operators
+// return check_expr (usable in WHERE, HAVING, CHECK); subquery operators
+// return sql_predicate (WHERE/HAVING only). Results compose with &, |, !
+// (see above).
 //
 // Single-column predicates (return check_expr):
-//   col_ref<trade::code> == "AAPL"             → equal<trade::code>("AAPL")
-//   col_ref<trade::id> != 0u                   → not_equal<trade::id>(0u)
-//   col_ref<trade::id> < 100u                  → less_than<trade::id>(100u)
-//   col_ref<trade::id> > 0u                    → greater_than<trade::id>(0u)
-//   col_ref<trade::id> <= 100u                 → less_than_or_equal<trade::id>(100u)
-//   col_ref<trade::id> >= 1u                   → greater_than_or_equal<trade::id>(1u)
-//   col_ref<trade::name>.is_null()             → is_null<trade::name>()
-//   col_ref<trade::name>.is_not_null()         → is_not_null<trade::name>()
-//   col_ref<trade::code>.like("AAPL%")         → like<trade::code>("AAPL%")
-//   col_ref<trade::code>.not_like("X%")        → not_like<trade::code>("X%")
-//   col_ref<trade::id>.between(1u, 10u)           → between<trade::id>(1u, 10u)
-//   col_ref<trade::code>.in({"AAPL", "GOOGL"})    → in<trade::code>({"AAPL", "GOOGL"})
-//   col_ref<trade::code>.not_in({"X", "Y"})       → not_in<trade::code>({"X", "Y"})
-//   col_ref<trade::code>.regexp("^A")             → regexp<trade::code>("^A")
-//   col_ref<trade::code>.not_regexp("^A")         → not_regexp<trade::code>("^A")
-//   col_ref<trade::code>.rlike("^A")              → rlike<trade::code>("^A")
-//   col_ref<trade::code>.not_rlike("^A")          → not_rlike<trade::code>("^A")
-//   col_ref<trade::name>.sounds_like("word")      → sounds_like<trade::name>("word")
+//   col_ref(trade::code{}) == "AAPL"             → equal<trade::code>("AAPL")
+//   col_ref(trade::id{}) != 0u                   → not_equal<trade::id>(0u)
+//   col_ref(trade::id{}) < 100u                  → less_than<trade::id>(100u)
+//   col_ref(trade::id{}) > 0u                    → greater_than<trade::id>(0u)
+//   col_ref(trade::id{}) <= 100u                 → less_than_or_equal<trade::id>(100u)
+//   col_ref(trade::id{}) >= 1u                   → greater_than_or_equal<trade::id>(1u)
+//   col_ref(trade::name{}).is_null()             → is_null<trade::name>()
+//   col_ref(trade::name{}).is_not_null()         → is_not_null<trade::name>()
+//   col_ref(trade::code{}).like("AAPL%")         → like<trade::code>("AAPL%")
+//   col_ref(trade::code{}).not_like("X%")        → not_like<trade::code>("X%")
+//   col_ref(trade::id{}).between(1u, 10u)           → between<trade::id>(1u, 10u)
+//   col_ref(trade::code{}).in({"AAPL", "GOOGL"})    → in<trade::code>({"AAPL", "GOOGL"})
+//   col_ref(trade::code{}).not_in({"X", "Y"})       → not_in<trade::code>({"X", "Y"})
+//   col_ref(trade::code{}).regexp("^A")             → regexp<trade::code>("^A")
+//   col_ref(trade::code{}).not_regexp("^A")         → not_regexp<trade::code>("^A")
+//   col_ref(trade::code{}).rlike("^A")              → rlike<trade::code>("^A")
+//   col_ref(trade::code{}).not_rlike("^A")          → not_rlike<trade::code>("^A")
+//   col_ref(trade::name{}).sounds_like("word")      → sounds_like<trade::name>("word")
 //
 // Composing with &, |, !:
-//   col_ref<trade::code> == "AAPL" | col_ref<trade::code> == "GOOGL"
-//   col_ref<trade::id> >= 1u & col_ref<trade::id> <= 100u
-//   !(col_ref<trade::code> == "AAPL")
-//   (col_ref<trade::code> == "AAPL" | col_ref<trade::code> == "GOOGL") &
-//       col_ref<trade::type> == "Stock"
-//
-// Note: the exact syntax `Col = value` (e.g. `trade::code = "AAPL"`) is not
-// achievable in C++ — `trade::code` is a type alias, not an object, so no
-// operator can be invoked on it directly.
+//   col_ref(trade::code{}) == "AAPL" | col_ref(trade::code{}) == "GOOGL"
+//   col_ref(trade::id{}) >= 1u & col_ref(trade::id{}) <= 100u
+//   !(col_ref(trade::code{}) == "AAPL")
+//   (col_ref(trade::code{}) == "AAPL" | col_ref(trade::code{}) == "GOOGL") &
+//       col_ref(trade::type{}) == "Stock"
 // ===================================================================
 
 template <ColumnFieldType Col>
@@ -948,9 +945,11 @@ struct col_expr {
     }
 };
 
-// col_ref<Col> — inline variable for natural operator-based WHERE expressions.
+// col_ref(Col{}) — instance-based factory for natural operator-based WHERE expressions.
 template <ColumnFieldType Col>
-inline constexpr col_expr<Col> col_ref{};
+[[nodiscard]] constexpr col_expr<Col> col_ref(Col const&) noexcept {
+    return {};
+}
 
 // ===================================================================
 // check_id<"name">     — compile-time CHECK constraint name type.

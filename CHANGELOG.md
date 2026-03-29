@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `col_ref` is now instance-based — `col_ref(col{})` replaces `col_ref<col>` for consistency with the rest of the API
+
 ---
 
 ## [4.1.0] – 2026-03-29

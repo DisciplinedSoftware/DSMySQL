@@ -621,7 +621,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into(trade{}).values(row)).has_value());
         }
 
-        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref<trade::code> == "AAPL"));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref(trade::code{}) == "AAPL"));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "col_ref == should filter to AAPL only";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
@@ -646,7 +646,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into(trade{}).values(row)).has_value());
         }
 
-        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref<trade::code> != "AAPL"));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(col_ref(trade::code{}) != "AAPL"));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "col_ref != should exclude AAPL";
         expect(std::get<0>((*results)[0]) == "GOOGL"s);
@@ -675,7 +675,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const results =
             db->query(select(trade::code{})
                           .from(trade{})
-                          .where((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")));
+                          .where((col_ref(trade::code{}) == "AAPL") | (col_ref(trade::code{}) == "GOOGL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "| should match AAPL or GOOGL";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
@@ -704,7 +704,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const results =
             db->query(select(trade::code{})
                           .from(trade{})
-                          .where((col_ref<trade::code> != "AAPL") & (col_ref<trade::code> != "GOOGL")));
+                          .where((col_ref(trade::code{}) != "AAPL") & (col_ref(trade::code{}) != "GOOGL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "& should leave only MSFT";
         expect(std::get<0>((*results)[0]) == "MSFT"s);
@@ -729,7 +729,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
             expect(db->execute(insert_into(trade{}).values(row)).has_value());
         }
 
-        auto const results = db->query(select(trade::code{}).from(trade{}).where(!(col_ref<trade::code> == "AAPL")));
+        auto const results = db->query(select(trade::code{}).from(trade{}).where(!(col_ref(trade::code{}) == "AAPL")));
         expect(fatal(results.has_value()));
         expect(results->size() == 2u) << "! should exclude AAPL";
         expect(std::get<0>((*results)[0]) == "GOOGL"s);
@@ -762,8 +762,8 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
         auto const results =
             db->query(select(trade::code{})
                           .from(trade{})
-                          .where(((col_ref<trade::code> == "AAPL") | (col_ref<trade::code> == "GOOGL")) &
-                                 (col_ref<trade::type> == "Bond")));
+                          .where(((col_ref(trade::code{}) == "AAPL") | (col_ref(trade::code{}) == "GOOGL")) &
+                                 (col_ref(trade::type{}) == "Bond")));
         expect(fatal(results.has_value()));
         expect(results->size() == 1u) << "(a | b) & c priority: only AAPL should survive";
         expect(std::get<0>((*results)[0]) == "AAPL"s);
