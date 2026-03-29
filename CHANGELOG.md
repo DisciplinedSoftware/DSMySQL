@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Instance-based overloads for `table_constraint::primary_key`, `key`, `unique_key`, `fulltext_key`, `spatial_key` — e.g. `primary_key(col{})` and `key(index_id<"idx">{}, col{})` as alternatives to the template-only forms
+
 ---
 
 ## [4.0.0] – 2026-03-29

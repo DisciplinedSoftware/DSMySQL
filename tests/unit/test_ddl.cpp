@@ -241,8 +241,8 @@ template <>
 struct ds_mysql::table_constraints<symbol_with_indexes> {
     static std::vector<std::string> get() {
         return {
-            table_constraint::primary_key<symbol_with_indexes::id>(),
-            table_constraint::key<symbol_with_indexes::exchange_id>(index_id<"index_exchange_id">{}),
+            table_constraint::primary_key(symbol_with_indexes::id{}),
+            table_constraint::key(index_id<"index_exchange_id">{}, symbol_with_indexes::exchange_id{}),
         };
     }
 };
@@ -265,7 +265,7 @@ template <>
 struct ds_mysql::table_constraints<audit_log> {
     static std::vector<std::string> get() {
         return {
-            table_constraint::primary_key<audit_log::id>(),
+            table_constraint::primary_key(audit_log::id{}),
         };
     }
 };
@@ -753,11 +753,11 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL"_test = [] {
-        expect(table_constraint::unique_key<test_table::name>(index_id<"uq_test_name">{}) ==
+        expect(table_constraint::unique_key(index_id<"uq_test_name">{}, test_table::name{}) ==
                "UNIQUE KEY uq_test_name (name)"s);
-        expect(table_constraint::fulltext_key<test_table::name>(index_id<"ft_test_name">{}) ==
+        expect(table_constraint::fulltext_key(index_id<"ft_test_name">{}, test_table::name{}) ==
                "FULLTEXT KEY ft_test_name (name)"s);
-        expect(table_constraint::spatial_key<test_table::id>(index_id<"sp_test_id">{}) ==
+        expect(table_constraint::spatial_key(index_id<"sp_test_id">{}, test_table::id{}) ==
                "SPATIAL KEY sp_test_id (id)"s);
     };
 

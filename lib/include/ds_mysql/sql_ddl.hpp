@@ -116,9 +116,21 @@ template <ColumnDescriptor... Cols>
     return "PRIMARY KEY " + columns_sql<Cols...>();
 }
 
+template <ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string primary_key(Cols const&...) {
+    return "PRIMARY KEY " + columns_sql<Cols...>();
+}
+
 template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string key(index_id<Name> const&) {
+    return "KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
+}
+
+template <fixed_string Name, ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string key(index_id<Name> const&, Cols const&...) {
     return "KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
@@ -128,15 +140,33 @@ template <ColumnDescriptor... Cols, fixed_string Name>
     return "UNIQUE KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
+template <fixed_string Name, ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string unique_key(index_id<Name> const&, Cols const&...) {
+    return "UNIQUE KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
+}
+
 template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string fulltext_key(index_id<Name> const&) {
     return "FULLTEXT KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
+template <fixed_string Name, ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string fulltext_key(index_id<Name> const&, Cols const&...) {
+    return "FULLTEXT KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
+}
+
 template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string spatial_key(index_id<Name> const&) {
+    return "SPATIAL KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
+}
+
+template <fixed_string Name, ColumnDescriptor... Cols>
+    requires(sizeof...(Cols) > 0)
+[[nodiscard]] inline std::string spatial_key(index_id<Name> const&, Cols const&...) {
     return "SPATIAL KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
