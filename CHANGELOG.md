@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Instance-based overload for `create_index_on` — e.g. `create_index_on(index_id<"idx">{}, table{}, col1{}, col2{})` as an alternative to the template-only form
+
 ### Changed
 
 - `col_ref` is now instance-based — `col_ref(col{})` replaces `col_ref<col>` for consistency with the rest of the API

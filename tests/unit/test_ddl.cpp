@@ -1663,6 +1663,20 @@ suite<"DDL Features"> ddl_features_suite = [] {
         expect(sql == "CREATE UNIQUE INDEX uq_test_table_name ON test_table (name);\n"s) << sql;
     };
 
+    "create_index_on instance-based - generates CREATE INDEX"_test = [] {
+        auto const sql =
+            create_index_on(index_id<"idx_test_table_id_name">{}, test_table{}, test_table::id{}, test_table::name{})
+                .build_sql();
+        expect(sql == "CREATE INDEX idx_test_table_id_name ON test_table (id, name);\n"s) << sql;
+    };
+
+    "create_index_on instance-based.unique - generates CREATE UNIQUE INDEX"_test = [] {
+        auto const sql = create_index_on(index_id<"uq_test_table_name">{}, test_table{}, test_table::name{})
+                             .unique()
+                             .build_sql();
+        expect(sql == "CREATE UNIQUE INDEX uq_test_table_name ON test_table (name);\n"s) << sql;
+    };
+
     "drop_index_on - generates DROP INDEX ON table"_test = [] {
         auto const sql = drop_index_on(index_id<"idx_test_table_id_name">{}, test_table{}).build_sql();
         expect(sql == "DROP INDEX idx_test_table_id_name ON test_table;\n"s) << sql;

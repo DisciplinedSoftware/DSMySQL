@@ -2331,6 +2331,12 @@ template <ColumnDescriptor... Cols, fixed_string Name, ValidTable Table>
     return ddl_detail::create_index_builder<Table, Cols...>{std::string(Name)};
 }
 
+template <fixed_string Name, ValidTable Table, ColumnDescriptor... Cols>
+[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(index_id<Name> const&, Table const&,
+                                                                               Cols const&...) {
+    return ddl_detail::create_index_builder<Table, Cols...>{std::string(Name)};
+}
+
 template <fixed_string Name, ValidTable Table>
 [[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(index_id<Name> const&, Table const&) {
     return ddl_detail::drop_index_builder<Table>{std::string(Name)};
