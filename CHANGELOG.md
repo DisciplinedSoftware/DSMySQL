@@ -24,6 +24,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `mysql_connection::character_set()` / `set_character_set(charset_name)` — get/set connection character set (`mysql_character_set_name()` / `mysql_set_character_set()`)
 - `mysql_connection::escape_string(string_view)` — escape special characters using connection charset (`mysql_real_escape_string()`)
 - `charset_name` strong type — wraps `std::string` for type-safe character set name passing
+- `ssl_mode` enum — `disabled`, `preferred`, `required`, `verify_ca`, `verify_identity`
+- `connect_options` — fluent pre-connect options builder applied between `mysql_init()` and `mysql_real_connect()`; supports timeouts (`connect_timeout`, `read_timeout`, `write_timeout`), SSL/TLS (`ssl`, `ssl_ca`, `ssl_cert`, `ssl_key`, `ssl_capath`, `ssl_cipher`, `tls_version`, `tls_ciphersuites`), connection behaviour (`charset`, `compress`, `reconnect`, `local_infile`, `init_command`, `default_auth`, `compression_algorithms`, `zstd_compression_level`, `max_allowed_packet`, `retry_count`, `bind_address`), and connection attributes (`attr`)
+- `mysql_connection::connect()` overloads accepting `connect_options` — available for both explicit-parameter and `mysql_config` forms
 - `on_duplicate_key_update` template form — `.on_duplicate_key_update<T::col>("val")` now works the same as `update().set<T::col>("val")`
 - `procedure_id<"name">` — compile-time stored procedure name type
 - `savepoint_id<"name">` — compile-time savepoint name type

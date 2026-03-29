@@ -14,6 +14,7 @@
 
 #include "ds_mysql/charset_name.hpp"
 #include "ds_mysql/config.hpp"
+#include "ds_mysql/connect_options.hpp"
 #include "ds_mysql/credentials.hpp"
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/host_name.hpp"
@@ -162,23 +163,27 @@ public:
                                                                               database_name const& database,
                                                                               auth_credentials const& credentials,
                                                                               port_number port = default_mysql_port) {
-        auto conn = std::unique_ptr<MYSQL, decltype(&mysql_close)>(mysql_init(nullptr), mysql_close);
-        if (!conn) {
-            return std::unexpected(std::string("mysql_init failed"));
-        }
+        return connect_impl(host, database, credentials, port, nullptr);
+    }
 
-        if (!mysql_real_connect(conn.get(), host.to_string().c_str(), credentials.user().to_string().c_str(),
-                                credentials.password().to_string().c_str(), database.to_string().c_str(),
-                                port.to_unsigned_int(), nullptr, 0)) {
-            return std::unexpected(std::string(mysql_error(conn.get())));
-        }
-
-        return mysql_connection{std::move(conn)};
+    // Factory: connect with explicit parameters and pre-connect options.
+    [[nodiscard]] static std::expected<mysql_connection, std::string> connect(host_name const& host,
+                                                                              database_name const& database,
+                                                                              auth_credentials const& credentials,
+                                                                              port_number port,
+                                                                              connect_options const& options) {
+        return connect_impl(host, database, credentials, port, &options);
     }
 
     // Factory: connect with a mysql_config object.
     [[nodiscard]] static std::expected<mysql_connection, std::string> connect(mysql_config const& config) {
-        return connect(config.host(), config.database(), config.credentials(), config.port());
+        return connect_impl(config.host(), config.database(), config.credentials(), config.port(), nullptr);
+    }
+
+    // Factory: connect with a mysql_config object and pre-connect options.
+    [[nodiscard]] static std::expected<mysql_connection, std::string> connect(mysql_config const& config,
+                                                                              connect_options const& options) {
+        return connect_impl(config.host(), config.database(), config.credentials(), config.port(), &options);
     }
 
     // SELECT, DESCRIBE, COUNT, aggregate queries — deserializes rows into typed tuples.
@@ -543,6 +548,32 @@ private:
     template <typename TablesTuple, std::size_t... Is>
     void validate_all_tables(std::string& errors, std::index_sequence<Is...>) const {
         (validate_one_table<std::tuple_element_t<Is, TablesTuple>>(errors), ...);
+    }
+
+    [[nodiscard]] static std::expected<mysql_connection, std::string> connect_impl(host_name const& host,
+                                                                                   database_name const& database,
+                                                                                   auth_credentials const& credentials,
+                                                                                   port_number port,
+                                                                                   connect_options const* options) {
+        auto conn = std::unique_ptr<MYSQL, decltype(&mysql_close)>(mysql_init(nullptr), mysql_close);
+        if (!conn) {
+            return std::unexpected(std::string("mysql_init failed"));
+        }
+
+        if (options != nullptr) {
+            auto result = options->apply(conn.get());
+            if (!result) {
+                return std::unexpected(result.error());
+            }
+        }
+
+        if (!mysql_real_connect(conn.get(), host.to_string().c_str(), credentials.user().to_string().c_str(),
+                                credentials.password().to_string().c_str(), database.to_string().c_str(),
+                                port.to_unsigned_int(), nullptr, 0)) {
+            return std::unexpected(std::string(mysql_error(conn.get())));
+        }
+
+        return mysql_connection{std::move(conn)};
     }
 
     explicit mysql_connection(std::unique_ptr<MYSQL, decltype(&mysql_close)> connection)
