@@ -1532,8 +1532,7 @@ public:
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] alter_table_builder add_index(index_id<Name> const&) const {
         auto copy = *this;
-        copy.actions_.push_back("ADD INDEX " + std::string(Name) + " " +
-                                table_constraint::columns_sql<Cols...>());
+        copy.actions_.push_back("ADD INDEX " + std::string(Name) + " " + table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
@@ -2644,8 +2643,9 @@ template <fixed_string Name>
 // Triggers
 //
 // Entry points (executeable via db.execute()):
-//   create_trigger<T>(trigger_id<"name">{}, timing, event, body) — CREATE TRIGGER name timing event ON T FOR EACH ROW body
-//   drop_trigger<T>(trigger_id<"name">{})                        — DROP TRIGGER name
+//   create_trigger(T{}, trigger_id<"name">{}, timing, event, body)
+//       — CREATE TRIGGER name timing event ON T FOR EACH ROW body
+//   drop_trigger(T{}, trigger_id<"name">{})  — DROP TRIGGER name
 //   drop_trigger<T>(trigger_id<"name">{}).if_exists()            — DROP TRIGGER IF EXISTS name
 // ===================================================================
 

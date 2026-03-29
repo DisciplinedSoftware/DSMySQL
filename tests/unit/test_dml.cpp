@@ -511,6 +511,23 @@ suite<"DML"> dml_suite = [] {
             << sql;
     };
 
+    "on_duplicate_key_update - template form matches instance form"_test = [] {
+        asset row;
+        row.exchange_id_ = 1u;
+        row.ticker_ = "AAPL";
+        row.instrument_ = "Stock";
+        auto const sql = insert_into(asset{})
+                             .values(row)
+                             .on_duplicate_key_update<asset::ticker, asset::instrument>("AAPL", "Stock")
+                             .build_sql();
+        expect(sql ==
+               "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, "
+               "last_updated_date) "
+               "VALUES (0, 1, 'AAPL', 'Stock', NULL, NULL, NULL, NOW(), NOW()) "
+               "ON DUPLICATE KEY UPDATE ticker = 'AAPL', instrument = 'Stock'"s)
+            << sql;
+    };
+
     // -------------------------------------------------------------------
     // insert_into<T> with empty vector
     // -------------------------------------------------------------------

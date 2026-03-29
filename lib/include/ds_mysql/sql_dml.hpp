@@ -104,7 +104,8 @@ public:
     }
 
     // on_duplicate_key_update(col1, col2, ...) — appends ON DUPLICATE KEY UPDATE clause.
-    // Each argument must be a FieldOf<T> column_field instance carrying the new value.
+    // Instance form: .on_duplicate_key_update(T::col{"val"}, ...)
+    // Template form: .on_duplicate_key_update<T::col>("val")  (mirrors update().set<>())
     template <FieldOf<T>... Cols>
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] insert_into_upsert_builder<T, Cols...> on_duplicate_key_update(Cols const&... assignments) const {
@@ -411,6 +412,7 @@ template <ValidTable T>
  *
  * Upsert (INSERT … ON DUPLICATE KEY UPDATE):
  *   insert_into(symbol{}).values(row).on_duplicate_key_update(symbol::ticker{"AAPL"}, ...)
+ *   insert_into(symbol{}).values(row).on_duplicate_key_update<symbol::ticker>("AAPL")  // template form
  *
  * Example:
  *   symbol row;

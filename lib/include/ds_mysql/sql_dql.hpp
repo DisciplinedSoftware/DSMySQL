@@ -8,33 +8,33 @@ namespace ds_mysql {
 // ===================================================================
 // Aggregate projections — used with select<Proj...>().from<Table>()
 //
-//   count_all         — COUNT(*)              → uint64_t
-//   count_col<Col>    — COUNT(col)            → uint64_t
-//   sum<Col>          — SUM(col)              → double
-//   avg<Col>          — AVG(col)              → double
-//   min_of<Col>       — MIN(col)              → value_type of Col
-//   max_of<Col>       — MAX(col)              → value_type of Col
-//   count_distinct<Col> — COUNT(DISTINCT col) → uint64_t
-//   group_concat<Col> — GROUP_CONCAT(col)     → std::string
-//   stddev<Col>       — STDDEV(col)           → double
-//   std_of<Col>       — STD(col)              → double
-//   stddev_pop<Col>   — STDDEV_POP(col)       → double
-//   stddev_samp<Col>  — STDDEV_SAMP(col)      → double
-//   variance<Col>     — VARIANCE(col)         → double
-//   var_pop<Col>      — VAR_POP(col)          → double
-//   var_samp<Col>     — VAR_SAMP(col)         → double
-//   bit_and_of<Col>   — BIT_AND(col)          → uint64_t  (alias: bit_and)
-//   bit_or_of<Col>    — BIT_OR(col)           → uint64_t  (alias: bit_or)
-//   bit_xor_of<Col>   — BIT_XOR(col)          → uint64_t  (alias: bit_xor)
-//   json_arrayagg<Col>         — JSON_ARRAYAGG(col)      → std::string
-//   json_objectagg<Key, Val>   — JSON_OBJECTAGG(key,val) → std::string
-//   any_value<Col>    — ANY_VALUE(col)         → value_type of Col
+//   count_all              — COUNT(*)              → uint64_t
+//   count_of<Col>          — COUNT(col)            → uint64_t
+//   sum_of<Col>            — SUM(col)              → double
+//   avg_of<Col>            — AVG(col)              → double
+//   min_of<Col>            — MIN(col)              → value_type of Col
+//   max_of<Col>            — MAX(col)              → value_type of Col
+//   count_distinct_of<Col> — COUNT(DISTINCT col)   → uint64_t
+//   group_concat_of<Col>   — GROUP_CONCAT(col)     → std::string
+//   stddev_of<Col>         — STDDEV(col)           → double
+//   std_of<Col>            — STD(col)              → double
+//   stddev_pop_of<Col>     — STDDEV_POP(col)       → double
+//   stddev_samp_of<Col>    — STDDEV_SAMP(col)      → double
+//   variance_of<Col>       — VARIANCE(col)         → double
+//   var_pop_of<Col>        — VAR_POP(col)          → double
+//   var_samp_of<Col>       — VAR_SAMP(col)         → double
+//   bit_and_of<Col>        — BIT_AND(col)          → uint64_t
+//   bit_or_of<Col>         — BIT_OR(col)           → uint64_t
+//   bit_xor_of<Col>        — BIT_XOR(col)          → uint64_t
+//   json_arrayagg_of<Col>  — JSON_ARRAYAGG(col)    → std::string
+//   json_objectagg_of<K,V> — JSON_OBJECTAGG(k,v)   → std::string
+//   any_value_of<Col>      — ANY_VALUE(col)        → value_type of Col
 //
 // Aggregate tags also support typed comparison operators via free functions
 // (defined after projection_traits), enabling HAVING predicate syntax:
-//   sum<Col>() > 100.0       → SUM(col) > 100.000000
-//   avg<Col>() >= 4.0        → AVG(col) >= 4.000000
-//   min_of<Col>() < 100u     → MIN(col) < 100
+//   sum_of<Col>() > 100.0       → SUM(col) > 100.000000
+//   avg_of<Col>() >= 4.0        → AVG(col) >= 4.000000
+//   min_of<Col>() < 100u        → MIN(col) < 100
 // For COUNT(*), prefer the count() factory which returns an agg_expr with
 // additional named methods (like .greater_than()).
 // ===================================================================
@@ -42,13 +42,13 @@ namespace ds_mysql {
 struct count_all {};
 
 template <ColumnDescriptor Col>
-struct count_col {};
+struct count_of {};
 
 template <ColumnDescriptor Col>
-struct sum {};
+struct sum_of {};
 
 template <ColumnDescriptor Col>
-struct avg {};
+struct avg_of {};
 
 template <ColumnDescriptor Col>
 struct min_of {};
@@ -56,41 +56,41 @@ struct min_of {};
 template <ColumnDescriptor Col>
 struct max_of {};
 
-// count_distinct<Col> — COUNT(DISTINCT col) → uint64_t
+// count_distinct_of<Col> — COUNT(DISTINCT col) → uint64_t
 template <ColumnDescriptor Col>
-struct count_distinct {};
+struct count_distinct_of {};
 
-// group_concat<Col> — GROUP_CONCAT(col) → std::string  (MySQL-specific)
+// group_concat_of<Col> — GROUP_CONCAT(col) → std::string  (MySQL-specific)
 template <ColumnDescriptor Col>
-struct group_concat {};
+struct group_concat_of {};
 
-// stddev<Col> — STDDEV(col) → double
+// stddev_of<Col> — STDDEV(col) → double
 template <ColumnDescriptor Col>
-struct stddev {};
+struct stddev_of {};
 
 // std_of<Col> — STD(col) → double  (STD is a MySQL synonym for STDDEV)
 template <ColumnDescriptor Col>
 struct std_of {};
 
-// stddev_pop<Col> — STDDEV_POP(col) → double
+// stddev_pop_of<Col> — STDDEV_POP(col) → double
 template <ColumnDescriptor Col>
-struct stddev_pop {};
+struct stddev_pop_of {};
 
-// stddev_samp<Col> — STDDEV_SAMP(col) → double
+// stddev_samp_of<Col> — STDDEV_SAMP(col) → double
 template <ColumnDescriptor Col>
-struct stddev_samp {};
+struct stddev_samp_of {};
 
-// variance<Col> — VARIANCE(col) → double
+// variance_of<Col> — VARIANCE(col) → double
 template <ColumnDescriptor Col>
-struct variance {};
+struct variance_of {};
 
-// var_pop<Col> — VAR_POP(col) → double
+// var_pop_of<Col> — VAR_POP(col) → double
 template <ColumnDescriptor Col>
-struct var_pop {};
+struct var_pop_of {};
 
-// var_samp<Col> — VAR_SAMP(col) → double
+// var_samp_of<Col> — VAR_SAMP(col) → double
 template <ColumnDescriptor Col>
-struct var_samp {};
+struct var_samp_of {};
 
 // bit_and_of<Col> — BIT_AND(col) → uint64_t  (alias: bit_and)
 template <ColumnDescriptor Col>
@@ -104,18 +104,18 @@ struct bit_or_of {};
 template <ColumnDescriptor Col>
 struct bit_xor_of {};
 
-// json_arrayagg<Col> — JSON_ARRAYAGG(col) → std::string  (MySQL 5.7.22+)
+// json_arrayagg_of<Col> — JSON_ARRAYAGG(col) → std::string  (MySQL 5.7.22+)
 template <ColumnDescriptor Col>
-struct json_arrayagg {};
+struct json_arrayagg_of {};
 
-// json_objectagg<KeyCol, ValCol> — JSON_OBJECTAGG(key, val) → std::string  (MySQL 5.7.22+)
+// json_objectagg_of<KeyCol, ValCol> — JSON_OBJECTAGG(key, val) → std::string  (MySQL 5.7.22+)
 template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
-struct json_objectagg {};
+struct json_objectagg_of {};
 
-// any_value<Col> — ANY_VALUE(col) → value_type of Col
+// any_value_of<Col> — ANY_VALUE(col) → value_type of Col
 //   Suppresses ONLY_FULL_GROUP_BY errors for non-aggregated columns.
 template <ColumnDescriptor Col>
-struct any_value {};
+struct any_value_of {};
 
 // rand_val — RAND() projection for ORDER BY clauses (e.g. order_by<rand_val>())
 struct rand_val {};
@@ -629,7 +629,51 @@ using json_length = json_length_of<P>;
 template <typename P>
 using json_unquote = json_unquote_of<P>;
 
-// Convenience aliases for bitwise aggregate names that shadow std:: functors.
+// Convenience aliases — short names for aggregate projections.
+// The primary names use the _of suffix for consistency and to avoid
+// collisions with std:: identifiers.
+template <ColumnDescriptor Col>
+using count_col = count_of<Col>;
+
+template <ColumnDescriptor Col>
+using sum = sum_of<Col>;
+
+template <ColumnDescriptor Col>
+using avg = avg_of<Col>;
+
+template <ColumnDescriptor Col>
+using count_distinct = count_distinct_of<Col>;
+
+template <ColumnDescriptor Col>
+using group_concat = group_concat_of<Col>;
+
+template <ColumnDescriptor Col>
+using stddev = stddev_of<Col>;
+
+template <ColumnDescriptor Col>
+using stddev_pop = stddev_pop_of<Col>;
+
+template <ColumnDescriptor Col>
+using stddev_samp = stddev_samp_of<Col>;
+
+template <ColumnDescriptor Col>
+using variance = variance_of<Col>;
+
+template <ColumnDescriptor Col>
+using var_pop = var_pop_of<Col>;
+
+template <ColumnDescriptor Col>
+using var_samp = var_samp_of<Col>;
+
+template <ColumnDescriptor Col>
+using json_arrayagg = json_arrayagg_of<Col>;
+
+template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
+using json_objectagg = json_objectagg_of<KeyCol, ValCol>;
+
+template <ColumnDescriptor Col>
+using any_value = any_value_of<Col>;
+
 template <ColumnDescriptor Col>
 using bit_and = bit_and_of<Col>;
 
@@ -978,7 +1022,7 @@ struct projection_traits<count_all> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<count_col<Col>> {
+struct projection_traits<count_of<Col>> {
     using value_type = uint64_t;
     [[nodiscard]] static std::string sql_expr() {
         return "COUNT(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -986,7 +1030,7 @@ struct projection_traits<count_col<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<sum<Col>> {
+struct projection_traits<sum_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "SUM(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -994,7 +1038,7 @@ struct projection_traits<sum<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<avg<Col>> {
+struct projection_traits<avg_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "AVG(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1018,7 +1062,7 @@ struct projection_traits<max_of<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<count_distinct<Col>> {
+struct projection_traits<count_distinct_of<Col>> {
     using value_type = uint64_t;
     [[nodiscard]] static std::string sql_expr() {
         return "COUNT(DISTINCT " + std::string(column_traits<Col>::column_name()) + ")";
@@ -1026,7 +1070,7 @@ struct projection_traits<count_distinct<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<group_concat<Col>> {
+struct projection_traits<group_concat_of<Col>> {
     using value_type = std::string;
     [[nodiscard]] static std::string sql_expr() {
         return "GROUP_CONCAT(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1034,7 +1078,7 @@ struct projection_traits<group_concat<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<stddev<Col>> {
+struct projection_traits<stddev_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "STDDEV(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1050,7 +1094,7 @@ struct projection_traits<std_of<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<stddev_pop<Col>> {
+struct projection_traits<stddev_pop_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "STDDEV_POP(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1058,7 +1102,7 @@ struct projection_traits<stddev_pop<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<stddev_samp<Col>> {
+struct projection_traits<stddev_samp_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "STDDEV_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1066,7 +1110,7 @@ struct projection_traits<stddev_samp<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<variance<Col>> {
+struct projection_traits<variance_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "VARIANCE(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1074,7 +1118,7 @@ struct projection_traits<variance<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<var_pop<Col>> {
+struct projection_traits<var_pop_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "VAR_POP(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1082,7 +1126,7 @@ struct projection_traits<var_pop<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<var_samp<Col>> {
+struct projection_traits<var_samp_of<Col>> {
     using value_type = double;
     [[nodiscard]] static std::string sql_expr() {
         return "VAR_SAMP(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1114,7 +1158,7 @@ struct projection_traits<bit_xor_of<Col>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<json_arrayagg<Col>> {
+struct projection_traits<json_arrayagg_of<Col>> {
     using value_type = std::string;
     [[nodiscard]] static std::string sql_expr() {
         return "JSON_ARRAYAGG(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -1122,7 +1166,7 @@ struct projection_traits<json_arrayagg<Col>> {
 };
 
 template <ColumnDescriptor KeyCol, ColumnDescriptor ValCol>
-struct projection_traits<json_objectagg<KeyCol, ValCol>> {
+struct projection_traits<json_objectagg_of<KeyCol, ValCol>> {
     using value_type = std::string;
     [[nodiscard]] static std::string sql_expr() {
         return "JSON_OBJECTAGG(" + std::string(column_traits<KeyCol>::column_name()) + ", " +
@@ -1131,7 +1175,7 @@ struct projection_traits<json_objectagg<KeyCol, ValCol>> {
 };
 
 template <ColumnDescriptor Col>
-struct projection_traits<any_value<Col>> {
+struct projection_traits<any_value_of<Col>> {
     using value_type = typename column_traits<Col>::value_type;
     [[nodiscard]] static std::string sql_expr() {
         return "ANY_VALUE(" + std::string(column_traits<Col>::column_name()) + ")";
@@ -2504,12 +2548,12 @@ struct projection_traits<nth_value_over<Col, N, PartitionCol, OrderCol, Dir, Fra
 //
 // Factory functions:
 //   count()           → agg_expr<count_all>        COUNT(*)
-//   count<Col>()      → agg_expr<count_col<Col>>   COUNT(col)
+//   count<Col>()      → agg_expr<count_of<Col>>    COUNT(col)
 //
 // For SUM/AVG/MIN/MAX, use the aggregate tag directly — free-function operators
 // (defined after projection_traits) allow the same operator syntax:
-//   sum<Col>() > 100.0       — SUM(col) > 100.000000
-//   avg<Col>() >= 4.0        — AVG(col) >= 4.000000
+//   sum_of<Col>() > 100.0       — SUM(col) > 100.000000
+//   avg_of<Col>() >= 4.0        — AVG(col) >= 4.000000
 //
 // The resulting sql_predicate composes with &, |, ! operators.
 // ===================================================================
@@ -2633,9 +2677,9 @@ struct agg_expr {
 }
 
 // count<Col>() — COUNT(col) aggregate expression
-// Note: count_col<Col> is the class template tag; count<Col>() is the factory function.
+// Note: count_of<Col> is the class template tag; count<Col>() is the factory function.
 template <ColumnDescriptor Col>
-[[nodiscard]] agg_expr<count_col<Col>> count() noexcept {
+[[nodiscard]] agg_expr<count_of<Col>> count() noexcept {
     return {};
 }
 
@@ -2643,10 +2687,10 @@ template <ColumnDescriptor Col>
 // Free-function comparison operators for aggregate tags
 //
 // Allow natural HAVING syntax without requiring factory functions:
-//   sum<Col>() > 100.0       → SUM(col) > 100.000000
-//   avg<Col>() >= 4.0        → AVG(col) >= 4.000000
-//   min_of<Col>() < n        → MIN(col) < n
-//   max_of<Col>() > n        → MAX(col) > n
+//   sum_of<Col>() > 100.0       → SUM(col) > 100.000000
+//   avg_of<Col>() >= 4.0        → AVG(col) >= 4.000000
+//   min_of<Col>() < n           → MIN(col) < n
+//   max_of<Col>() > n           → MAX(col) > n
 //
 // These compose with &, |, ! like any other sql_predicate.
 // ===================================================================
@@ -3883,19 +3927,30 @@ public:
     explicit select_builder(std::tuple<Projs...> projs) : projs_(std::move(projs)) {
     }
 
-    // Checked: all column projections must belong to Table.
-    // For JOIN queries use from<joined<Table>>() to skip the check.
+    // Column membership check for single-table queries.
+    //
+    // When ALL column projections belong to TableSpec, the check passes (single-table).
+    // When SOME columns are from other tables but at least one belongs to TableSpec,
+    // this is detected as a multi-table (JOIN) query and the check is skipped.
+    // When NO columns belong to TableSpec, a static_assert fires (likely wrong table).
+    // Use from(joined<Table>{}) to suppress the check entirely.
     template <typename TableSpec>
     [[nodiscard]] auto from(TableSpec) const {
         if constexpr (is_joined_v<TableSpec>) {
             return select_query_builder<typename TableSpec::table_type, Projs...>{projs_};
         } else {
             static_assert(ValidTable<TableSpec>);
-            static_assert(((AggregateProjection<Projs> || InstanceProjection<Projs> ||
-                            column_belongs_to_table_v<Projs, TableSpec>) &&
-                           ...),
-                          "All column projections must belong to the table passed to from<Table>(). "
-                          "For JOIN queries spanning multiple tables, use from<joined<Table>>() instead.");
+            constexpr bool all_local = ((AggregateProjection<Projs> || InstanceProjection<Projs> ||
+                                         column_belongs_to_table_v<Projs, TableSpec>) &&
+                                        ...);
+            if constexpr (!all_local) {
+                // Some columns are from other tables — verify at least one belongs to TableSpec.
+                constexpr bool any_belongs = (column_belongs_to_table_v<Projs, TableSpec> || ...);
+                static_assert(any_belongs,
+                              "No column projections belong to the table passed to from(). "
+                              "Check that you're using the correct table, or use "
+                              "from(joined<Table>{}) to suppress this check.");
+            }
             return select_query_builder<TableSpec, Projs...>{projs_};
         }
     }
@@ -4477,7 +4532,7 @@ concept SqlExecuteStatement = SqlBuilder<T> && !TypedSelectQuery<T>;
 // MySQL-specific template aliases
 // ===================================================================
 template <ColumnDescriptor Col>
-using mysql_group_concat = group_concat<Col>;
+using mysql_group_concat = group_concat_of<Col>;
 
 template <ColumnDescriptor Col1, ColumnDescriptor Col2>
 using mysql_ifnull_of = ifnull_of<Col1, Col2>;

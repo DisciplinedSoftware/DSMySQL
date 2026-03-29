@@ -773,9 +773,8 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
-        auto const sql = table_constraint::check(check_id<"chk_id_range">{},
-                                                  greater_than<test_table::id>(0u) &
-                                                      less_than_or_equal<test_table::id>(100u));
+        auto const sql = table_constraint::check(
+            check_id<"chk_id_range">{}, greater_than<test_table::id>(0u) & less_than_or_equal<test_table::id>(100u));
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 
@@ -1291,9 +1290,7 @@ suite<"DDL"> ddl_suite = [] {
 
     "create_table.union_tables - emits UNION=(t1,t2,t3)"_test = [] {
         auto const sql =
-            create_table(test_table{})
-                .union_tables(test_table{}, new_table{}, table_with_attrs{})
-                .build_sql();
+            create_table(test_table{}).union_tables(test_table{}, new_table{}, table_with_attrs{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -1325,10 +1322,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table duplicate option key - later call replaces earlier"_test = [] {
-        auto const sql = create_table(test_table{})
-                             .engine(Engine::InnoDB)
-                             .engine(Engine::MyISAM)
-                             .build_sql();
+        auto const sql = create_table(test_table{}).engine(Engine::InnoDB).engine(Engine::MyISAM).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -1341,10 +1335,11 @@ suite<"DDL"> ddl_suite = [] {
     "create_table.engine all enum values - emits correct strings"_test = [] {
         auto check_engine = [](Engine e, std::string_view expected_name) {
             auto const sql = create_table(new_table{}).engine(e).build_sql();
-            auto const expected = "CREATE TABLE new_table (\n"
-                                  "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
-                                  ") ENGINE=" +
-                                  std::string(expected_name) + ";\n";
+            auto const expected =
+                "CREATE TABLE new_table (\n"
+                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                ") ENGINE=" +
+                std::string(expected_name) + ";\n";
             expect(sql == expected) << sql;
         };
         check_engine(Engine::InnoDB, "InnoDB");
@@ -1361,10 +1356,11 @@ suite<"DDL"> ddl_suite = [] {
     "create_table.default_charset all enum values - emits correct strings"_test = [] {
         auto check_charset = [](Charset c, std::string_view expected_name) {
             auto const sql = create_table(new_table{}).default_charset(c).build_sql();
-            auto const expected = "CREATE TABLE new_table (\n"
-                                  "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
-                                  ") DEFAULT CHARSET=" +
-                                  std::string(expected_name) + ";\n";
+            auto const expected =
+                "CREATE TABLE new_table (\n"
+                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                ") DEFAULT CHARSET=" +
+                std::string(expected_name) + ";\n";
             expect(sql == expected) << sql;
         };
         check_charset(Charset::utf8mb4, "utf8mb4");
@@ -1923,8 +1919,7 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
     };
 
     "create_procedure with params - includes params"_test = [] {
-        auto const sql =
-            create_procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;").build_sql();
+        auto const sql = create_procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;").build_sql();
         expect(sql == "CREATE PROCEDURE usp_add(IN a INT, IN b INT)\nBEGIN\nSELECT a + b;\nEND"s) << sql;
     };
 
@@ -1951,8 +1946,7 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
     "create_procedure instance-based - deduces Name from named variable"_test = [] {
         constexpr auto proc = procedure_id<"usp_greet">{};
         auto const sql = create_procedure(proc, "IN name VARCHAR(50)", "SELECT CONCAT('Hello, ', name);").build_sql();
-        expect(sql ==
-               "CREATE PROCEDURE usp_greet(IN name VARCHAR(50))\nBEGIN\nSELECT CONCAT('Hello, ', name);\nEND"s)
+        expect(sql == "CREATE PROCEDURE usp_greet(IN name VARCHAR(50))\nBEGIN\nSELECT CONCAT('Hello, ', name);\nEND"s)
             << sql;
     };
 
@@ -1985,10 +1979,10 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "create_trigger AFTER UPDATE - generates correct SQL"_test = [] {
-        auto const sql = create_trigger<test_table>(trigger_id<"trg_after_update">{}, TriggerTiming::After,
-                                                    TriggerEvent::Update,
-                                                    "INSERT INTO audit_log VALUES (OLD.id, NOW());")
-                             .build_sql();
+        auto const sql =
+            create_trigger<test_table>(trigger_id<"trg_after_update">{}, TriggerTiming::After, TriggerEvent::Update,
+                                       "INSERT INTO audit_log VALUES (OLD.id, NOW());")
+                .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_after_update AFTER UPDATE ON test_table FOR EACH ROW\n"
                "INSERT INTO audit_log VALUES (OLD.id, NOW());"s)

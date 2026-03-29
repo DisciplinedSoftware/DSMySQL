@@ -190,18 +190,18 @@ suite<"DQL WHERE Predicates"> dql_where_predicates_suite = [] {
 // ===================================================================
 
 suite<"DQL Aggregate Projections"> dql_aggregate_projections_suite = [] {
-    "select count_col - generates COUNT(col)"_test = [] {
-        auto const sql = select(count_col<product::id>{}).from(product{}).build_sql();
+    "select count_of - generates COUNT(col)"_test = [] {
+        auto const sql = select(count_of<product::id>{}).from(product{}).build_sql();
         expect(sql == "SELECT COUNT(id) FROM product"s) << sql;
     };
 
-    "select sum - generates SUM(col)"_test = [] {
-        auto const sql = select(sum<product::id>{}).from(product{}).build_sql();
+    "select sum_of - generates SUM(col)"_test = [] {
+        auto const sql = select(sum_of<product::id>{}).from(product{}).build_sql();
         expect(sql == "SELECT SUM(id) FROM product"s) << sql;
     };
 
-    "select avg - generates AVG(col)"_test = [] {
-        auto const sql = select(avg<product::id>{}).from(product{}).build_sql();
+    "select avg_of - generates AVG(col)"_test = [] {
+        auto const sql = select(avg_of<product::id>{}).from(product{}).build_sql();
         expect(sql == "SELECT AVG(id) FROM product"s) << sql;
     };
 
@@ -431,13 +431,13 @@ suite<"DQL HAVING Predicates"> dql_having_predicates_suite = [] {
         expect(cond.build_sql() == "COUNT(id) > 0"s) << cond.build_sql();
     };
 
-    "sum<Col>() > n - SUM operator syntax"_test = [] {
-        auto const cond = sum<product::id>() > 100.0;
+    "sum_of<Col>() > n - SUM operator syntax"_test = [] {
+        auto const cond = sum_of<product::id>() > 100.0;
         expect(cond.build_sql() == "SUM(id) > 100.000000"s) << cond.build_sql();
     };
 
-    "avg<Col>() >= n - AVG operator syntax"_test = [] {
-        auto const cond = avg<product::id>() >= 4.0;
+    "avg_of<Col>() >= n - AVG operator syntax"_test = [] {
+        auto const cond = avg_of<product::id>() >= 4.0;
         expect(cond.build_sql() == "AVG(id) >= 4.000000"s) << cond.build_sql();
     };
 
@@ -522,34 +522,35 @@ struct category {
 }  // namespace
 
 suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
-    "inner_join - generates INNER JOIN ON clause"_test = [] {
+    "inner_join - auto-detects multi-table from()"_test = [] {
         // product.category_id FK → category.id
+        // No need for joined<product>{} — multi-table detected from projections.
         auto const sql = select(product::sku{}, category::label{})
-                             .from(joined<product>{})
+                             .from(product{})
                              .inner_join(category{}, product::category_id{}, category::id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product INNER JOIN category ON category_id = id"s) << sql;
     };
 
-    "left_join - generates LEFT JOIN ON clause"_test = [] {
+    "left_join - auto-detects multi-table from()"_test = [] {
         auto const sql = select(product::sku{}, category::label{})
-                             .from(joined<product>{})
+                             .from(product{})
                              .left_join(category{}, product::category_id{}, category::id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product LEFT JOIN category ON category_id = id"s) << sql;
     };
 
-    "right_join - generates RIGHT JOIN ON clause"_test = [] {
+    "right_join - auto-detects multi-table from()"_test = [] {
         auto const sql = select(product::sku{}, category::label{})
-                             .from(joined<product>{})
+                             .from(product{})
                              .right_join(category{}, product::category_id{}, category::id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product RIGHT JOIN category ON category_id = id"s) << sql;
     };
 
-    "inner_join with WHERE and ORDER BY - generates full query"_test = [] {
+    "inner_join with WHERE and ORDER BY - auto-detects multi-table"_test = [] {
         auto const sql = select(product::sku{}, category::label{})
-                             .from(joined<product>{})
+                             .from(product{})
                              .inner_join(category{}, product::category_id{}, category::id{})
                              .where(is_not_null<product::category_id>())
                              .order_by(product::sku{})
@@ -561,14 +562,22 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
             << sql;
     };
 
-    "inner_join with col<T,I> descriptors - generates qualified ON condition"_test = [] {
+    "inner_join with col<T,I> descriptors - auto-detects multi-table"_test = [] {
         // col<product, 1> = category_id field, col<category, 0> = id field
         auto const sql = select(col<product, 2>{}, col<category, 1>{})
-                             .from(joined<product>{})
+                             .from(product{})
                              .inner_join(category{}, col<product, 1>{}, col<category, 0>{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM product INNER JOIN category ON product.category_id = category.id"s)
             << sql;
+    };
+
+    "joined<T> still works as explicit escape hatch"_test = [] {
+        auto const sql = select(product::sku{}, category::label{})
+                             .from(joined<product>{})
+                             .inner_join(category{}, product::category_id{}, category::id{})
+                             .build_sql();
+        expect(sql == "SELECT sku, label FROM product INNER JOIN category ON category_id = id"s) << sql;
     };
 };
 
@@ -826,8 +835,8 @@ suite<"DQL agg_expr Predicates"> dql_agg_expr_predicates_suite = [] {
         expect(cond.build_sql() == "COUNT(*) IS NOT NULL"s) << cond.build_sql();
     };
 
-    "sum<Col>().between — SUM BETWEEN"_test = [] {
-        auto const cond = agg_expr<sum<ext_product::price_val>>{}.between(0.0, 1000.0);
+    "sum_of<Col>().between — SUM BETWEEN"_test = [] {
+        auto const cond = agg_expr<sum_of<ext_product::price_val>>{}.between(0.0, 1000.0);
         expect(cond.build_sql() == "SUM(price_val) BETWEEN 0.000000 AND 1000.000000"s) << cond.build_sql();
     };
 
@@ -921,13 +930,13 @@ suite<"DQL Scalar Subquery Methods"> dql_scalar_subquery_suite = [] {
     };
 
     "col_ref.gt_subquery — col > (SELECT ...)"_test = [] {
-        auto const sub = select(avg<ext_product::price_val>{}).from(ext_product{});
+        auto const sub = select(avg_of<ext_product::price_val>{}).from(ext_product{});
         auto const cond = col_ref<ext_product::price_val>.gt_subquery(sub);
         expect(cond.build_sql() == "price_val > (SELECT AVG(price_val) FROM ext_product)"s) << cond.build_sql();
     };
 
     "col_ref.lt_subquery — col < (SELECT ...)"_test = [] {
-        auto const sub = select(avg<ext_product::price_val>{}).from(ext_product{});
+        auto const sub = select(avg_of<ext_product::price_val>{}).from(ext_product{});
         auto const cond = col_ref<ext_product::price_val>.lt_subquery(sub);
         expect(cond.build_sql() == "price_val < (SELECT AVG(price_val) FROM ext_product)"s) << cond.build_sql();
     };
@@ -976,18 +985,18 @@ suite<"DQL Scalar Subquery Methods"> dql_scalar_subquery_suite = [] {
 // ===================================================================
 
 suite<"DQL Aggregate Features"> dql_aggregate_features_suite = [] {
-    "count_distinct<Col> — generates COUNT(DISTINCT col)"_test = [] {
-        auto const sql = select(count_distinct<ext_product::type>{}).from(ext_product{}).build_sql();
+    "count_distinct_of<Col> — generates COUNT(DISTINCT col)"_test = [] {
+        auto const sql = select(count_distinct_of<ext_product::type>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT COUNT(DISTINCT type) FROM ext_product"s) << sql;
     };
 
-    "count_distinct in HAVING — count distinct comparison"_test = [] {
-        auto const cond = agg_expr<count_distinct<ext_product::type>>{} > 3u;
+    "count_distinct_of in HAVING — count distinct comparison"_test = [] {
+        auto const cond = agg_expr<count_distinct_of<ext_product::type>>{} > 3u;
         expect(cond.build_sql() == "COUNT(DISTINCT type) > 3"s) << cond.build_sql();
     };
 
-    "group_concat<Col> — generates GROUP_CONCAT(col)"_test = [] {
-        auto const sql = select(ext_product::type{}, group_concat<ext_product::sku>{})
+    "group_concat_of<Col> — generates GROUP_CONCAT(col)"_test = [] {
+        auto const sql = select(ext_product::type{}, group_concat_of<ext_product::sku>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
                              .build_sql();
@@ -1023,8 +1032,8 @@ suite<"DQL Aggregate Features"> dql_aggregate_features_suite = [] {
     };
 
     // STDDEV / VARIANCE family
-    "stddev<Col> — generates STDDEV(col)"_test = [] {
-        auto const sql = select(stddev<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "stddev_of<Col> — generates STDDEV(col)"_test = [] {
+        auto const sql = select(stddev_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT STDDEV(price_val) FROM ext_product"s) << sql;
     };
 
@@ -1033,28 +1042,28 @@ suite<"DQL Aggregate Features"> dql_aggregate_features_suite = [] {
         expect(sql == "SELECT STD(price_val) FROM ext_product"s) << sql;
     };
 
-    "stddev_pop<Col> — generates STDDEV_POP(col)"_test = [] {
-        auto const sql = select(stddev_pop<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "stddev_pop_of<Col> — generates STDDEV_POP(col)"_test = [] {
+        auto const sql = select(stddev_pop_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT STDDEV_POP(price_val) FROM ext_product"s) << sql;
     };
 
-    "stddev_samp<Col> — generates STDDEV_SAMP(col)"_test = [] {
-        auto const sql = select(stddev_samp<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "stddev_samp_of<Col> — generates STDDEV_SAMP(col)"_test = [] {
+        auto const sql = select(stddev_samp_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT STDDEV_SAMP(price_val) FROM ext_product"s) << sql;
     };
 
-    "variance<Col> — generates VARIANCE(col)"_test = [] {
-        auto const sql = select(variance<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "variance_of<Col> — generates VARIANCE(col)"_test = [] {
+        auto const sql = select(variance_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT VARIANCE(price_val) FROM ext_product"s) << sql;
     };
 
-    "var_pop<Col> — generates VAR_POP(col)"_test = [] {
-        auto const sql = select(var_pop<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "var_pop_of<Col> — generates VAR_POP(col)"_test = [] {
+        auto const sql = select(var_pop_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT VAR_POP(price_val) FROM ext_product"s) << sql;
     };
 
-    "var_samp<Col> — generates VAR_SAMP(col)"_test = [] {
-        auto const sql = select(var_samp<ext_product::price_val>{}).from(ext_product{}).build_sql();
+    "var_samp_of<Col> — generates VAR_SAMP(col)"_test = [] {
+        auto const sql = select(var_samp_of<ext_product::price_val>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT VAR_SAMP(price_val) FROM ext_product"s) << sql;
     };
 
@@ -1090,19 +1099,20 @@ suite<"DQL Aggregate Features"> dql_aggregate_features_suite = [] {
     };
 
     // JSON aggregates
-    "json_arrayagg<Col> — generates JSON_ARRAYAGG(col)"_test = [] {
-        auto const sql = select(json_arrayagg<ext_product::name>{}).from(ext_product{}).build_sql();
+    "json_arrayagg_of<Col> — generates JSON_ARRAYAGG(col)"_test = [] {
+        auto const sql = select(json_arrayagg_of<ext_product::name>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT JSON_ARRAYAGG(name) FROM ext_product"s) << sql;
     };
 
-    "json_objectagg<KeyCol, ValCol> — generates JSON_OBJECTAGG(key, val)"_test = [] {
-        auto const sql = select(json_objectagg<ext_product::sku, ext_product::name>{}).from(ext_product{}).build_sql();
+    "json_objectagg_of<KeyCol, ValCol> — generates JSON_OBJECTAGG(key, val)"_test = [] {
+        auto const sql =
+            select(json_objectagg_of<ext_product::sku, ext_product::name>{}).from(ext_product{}).build_sql();
         expect(sql == "SELECT JSON_OBJECTAGG(sku, name) FROM ext_product"s) << sql;
     };
 
     // ANY_VALUE
-    "any_value<Col> — generates ANY_VALUE(col)"_test = [] {
-        auto const sql = select(ext_product::type{}, any_value<ext_product::name>{})
+    "any_value_of<Col> — generates ANY_VALUE(col)"_test = [] {
+        auto const sql = select(ext_product::type{}, any_value_of<ext_product::name>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
                              .build_sql();
@@ -1700,9 +1710,9 @@ suite<"DQL Arithmetic Projections"> dql_arithmetic_projections_suite = [] {
 
 suite<"DQL Column Alias"> dql_sql_alias_suite = [] {
     "with_alias(Proj{}, sql_alias{\"n\"}) — appends AS to matching projection"_test = [] {
-        auto const sql = select(sum<ext_product::price_val>{})
+        auto const sql = select(sum_of<ext_product::price_val>{})
                              .from(ext_product{})
-                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
+                             .with_alias(sum_of<ext_product::price_val>{}, sql_alias{"total"})
                              .build_sql();
         expect(sql == "SELECT SUM(price_val) AS total FROM ext_product"s) << sql;
     };
@@ -1717,9 +1727,9 @@ suite<"DQL Column Alias"> dql_sql_alias_suite = [] {
     };
 
     "multiple aliases — both projections aliased"_test = [] {
-        auto const sql = select(sum<ext_product::price_val>{}, count_all{})
+        auto const sql = select(sum_of<ext_product::price_val>{}, count_all{})
                              .from(ext_product{})
-                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
+                             .with_alias(sum_of<ext_product::price_val>{}, sql_alias{"total"})
                              .with_alias(count_all{}, sql_alias{"qty"})
                              .build_sql();
         expect(sql == "SELECT SUM(price_val) AS total, COUNT(*) AS qty FROM ext_product"s) << sql;
@@ -1782,9 +1792,9 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
         expect(sql == "SELECT id, ROW_NUMBER() OVER (PARTITION BY type ORDER BY id DESC) FROM ext_product"s) << sql;
     };
 
-    "window_func<sum> — SUM OVER (...)"_test = [] {
+    "window_func<sum_of> — SUM OVER (...)"_test = [] {
         auto const sql =
-            select(ext_product::id{}, window_func<sum<ext_product::price_val>, ext_product::type, ext_product::id>{})
+            select(ext_product::id{}, window_func<sum_of<ext_product::price_val>, ext_product::type, ext_product::id>{})
                 .from(ext_product{})
                 .build_sql();
         expect(sql == "SELECT id, SUM(price_val) OVER (PARTITION BY type ORDER BY id ASC) FROM ext_product"s) << sql;
@@ -1808,7 +1818,7 @@ suite<"DQL Window Functions"> dql_window_function_suite = [] {
     "window frame clauses — append frame SQL in OVER()"_test = [] {
         auto const sql = select(row_number_over<ext_product::type, ext_product::id, sort_order::asc,
                                                 rows_unbounded_preceding_to_current_row>{},
-                                window_func<sum<ext_product::price_val>, ext_product::type, ext_product::id,
+                                window_func<sum_of<ext_product::price_val>, ext_product::type, ext_product::id,
                                             sort_order::asc, rows_current_row_to_unbounded_following>{},
                                 lag_over<ext_product::price_val, ext_product::type, ext_product::id, 1, sort_order::asc,
                                          rows_unbounded_preceding_to_unbounded_following>{})
@@ -2013,11 +2023,11 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
         expect(sql == "SELECT type, COUNT(*) FROM ext_product GROUP BY type ORDER BY COUNT(*) DESC"s) << sql;
     };
 
-    "order_by<sum<Col>, desc>() — ORDER BY SUM(col)"_test = [] {
-        auto const sql = select(ext_product::type{}, sum<ext_product::price_val>{})
+    "order_by<sum_of<Col>, desc>() — ORDER BY SUM(col)"_test = [] {
+        auto const sql = select(ext_product::type{}, sum_of<ext_product::price_val>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .order_by(desc(sum<ext_product::price_val>{}))
+                             .order_by(desc(sum_of<ext_product::price_val>{}))
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) FROM ext_product GROUP BY type ORDER BY SUM(price_val) DESC"s)
             << sql;
@@ -2042,21 +2052,21 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
 
     // order_by_alias
     "order_by_alias — emits alias when with_alias is set"_test = [] {
-        auto const sql = select(ext_product::type{}, sum<ext_product::price_val>{})
+        auto const sql = select(ext_product::type{}, sum_of<ext_product::price_val>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"total"})
-                             .order_by_alias(sum<ext_product::price_val>{})
+                             .with_alias(sum_of<ext_product::price_val>{}, sql_alias{"total"})
+                             .order_by_alias(sum_of<ext_product::price_val>{})
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) AS total FROM ext_product GROUP BY type ORDER BY total ASC"s) << sql;
     };
 
     "order_by_alias desc — emits alias DESC"_test = [] {
-        auto const sql = select(ext_product::type{}, sum<ext_product::price_val>{})
+        auto const sql = select(ext_product::type{}, sum_of<ext_product::price_val>{})
                              .from(ext_product{})
                              .group_by(ext_product::type{})
-                             .with_alias(sum<ext_product::price_val>{}, sql_alias{"revenue"})
-                             .order_by_alias(desc(sum<ext_product::price_val>{}))
+                             .with_alias(sum_of<ext_product::price_val>{}, sql_alias{"revenue"})
+                             .order_by_alias(desc(sum_of<ext_product::price_val>{}))
                              .build_sql();
         expect(sql == "SELECT type, SUM(price_val) AS revenue FROM ext_product GROUP BY type ORDER BY revenue DESC"s)
             << sql;
@@ -2210,7 +2220,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
     // order_by<qual<Col>> — case 7 (qualified join column)
     "order_by<qual<col<T,I>>> — qualified table.column for JOIN ORDER BY"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .order_by(qual<col<ext_category, 1>>{})
                              .build_sql();
@@ -2222,7 +2232,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
 
     "order_by<qual<col<T,I>>, desc> — qualified column DESC"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .order_by(desc(qual<col<ext_category, 1>>{}))
                              .build_sql();
@@ -2234,7 +2244,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
 
     "order_by<nulls_last<qual<col<T,I>>>> — NULL handling supports qualified columns"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .order_by(nulls_last<qual<col<ext_category, 1>>>{})
                              .build_sql();
@@ -2247,7 +2257,7 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
 
     "order_by<nulls_first<qual<col<T,I>>>, desc> — qualified NULL handling with DESC"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .order_by(desc(nulls_first<qual<col<ext_category, 1>>>{}))
                              .build_sql();
@@ -2315,7 +2325,7 @@ suite<"DQL GROUP BY ROLLUP"> dql_group_by_rollup_suite = [] {
 suite<"DQL JOIN Features"> dql_join_features_suite = [] {
     "full_join — generates FULL OUTER JOIN ON"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .full_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product FULL OUTER JOIN ext_category ON category_id = id"s) << sql;
@@ -2323,7 +2333,7 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
 
     "cross_join — generates CROSS JOIN (no ON)"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .cross_join(ext_category{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product CROSS JOIN ext_category"s) << sql;
@@ -2332,7 +2342,7 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
     "inner_join_on with compound ON — generates INNER JOIN ... ON (a AND b)"_test = [] {
         auto const on = (col_ref<ext_product::category_id> == 1u) & is_not_null<ext_product::category_id>();
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join(ext_category{}, std::move(on))
                              .build_sql();
         expect(
@@ -2344,23 +2354,21 @@ suite<"DQL JOIN Features"> dql_join_features_suite = [] {
     "left_join_on — generates LEFT JOIN ... ON compound"_test = [] {
         auto const on = col_ref<ext_product::category_id> == 2u;
         auto const sql =
-            select(ext_product::sku{}).from(joined<ext_product>{}).left_join(ext_category{}, std::move(on)).build_sql();
+            select(ext_product::sku{}).from(ext_product{}).left_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN ext_category ON category_id = 2"s) << sql;
     };
 
     "right_join_on — generates RIGHT JOIN ... ON compound"_test = [] {
         auto const on = col_ref<ext_product::category_id> == 3u;
-        auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
-                             .right_join(ext_category{}, std::move(on))
-                             .build_sql();
+        auto const sql =
+            select(ext_product::sku{}).from(ext_product{}).right_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product RIGHT JOIN ext_category ON category_id = 3"s) << sql;
     };
 
     "full_join_on — generates FULL OUTER JOIN ... ON compound"_test = [] {
         auto const on = col_ref<ext_product::category_id> == 4u;
         auto const sql =
-            select(ext_product::sku{}).from(joined<ext_product>{}).full_join(ext_category{}, std::move(on)).build_sql();
+            select(ext_product::sku{}).from(ext_product{}).full_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product FULL OUTER JOIN ext_category ON category_id = 4"s) << sql;
     };
 };
@@ -2374,7 +2382,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "natural_join — generates NATURAL JOIN"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .natural_join(ext_category{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product NATURAL JOIN ext_category"s) << sql;
@@ -2382,7 +2390,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "natural_left_join — generates NATURAL LEFT JOIN"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .natural_left_join(ext_category{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product NATURAL LEFT JOIN ext_category"s) << sql;
@@ -2390,7 +2398,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "natural_right_join — generates NATURAL RIGHT JOIN"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .natural_right_join(ext_category{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product NATURAL RIGHT JOIN ext_category"s) << sql;
@@ -2398,7 +2406,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "natural_join chained with WHERE — natural join composes with WHERE"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .natural_join(ext_category{})
                              .where(is_not_null<ext_product::name>())
                              .build_sql();
@@ -2409,7 +2417,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "inner_join_using single col — generates INNER JOIN ... USING (col)"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join_using(ext_category{}, ext_product::category_id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product INNER JOIN ext_category USING (category_id)"s) << sql;
@@ -2417,7 +2425,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "left_join_using — generates LEFT JOIN ... USING (col)"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .left_join_using(ext_category{}, ext_product::category_id{})
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN ext_category USING (category_id)"s) << sql;
@@ -2425,7 +2433,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "right_join_using — generates RIGHT JOIN ... USING (col)"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .right_join_using(ext_category{}, ext_product::category_id{})
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product RIGHT JOIN ext_category USING (category_id)"s) << sql;
@@ -2433,7 +2441,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "full_join_using — generates FULL OUTER JOIN ... USING (col)"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .full_join_using(ext_category{}, ext_product::category_id{})
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product FULL OUTER JOIN ext_category USING (category_id)"s) << sql;
@@ -2441,7 +2449,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "inner_join_using multiple cols — generates INNER JOIN ... USING (col1, col2)"_test = [] {
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .inner_join_using(ext_category{}, ext_product::category_id{}, ext_product::id{})
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product INNER JOIN ext_category USING (category_id, id)"s) << sql;
@@ -2451,15 +2459,14 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "lateral_join — generates JOIN LATERAL (subquery) AS alias"_test = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
-        auto const sql =
-            select(ext_product::sku{}).from(joined<ext_product>{}).lateral_join(sub, sql_alias{"lat"}).build_sql();
+        auto const sql = select(ext_product::sku{}).from(ext_product{}).lateral_join(sub, sql_alias{"lat"}).build_sql();
         expect(sql == "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s) << sql;
     };
 
     "left_lateral_join — generates LEFT JOIN LATERAL (subquery) AS alias"_test = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
         auto const sql =
-            select(ext_product::sku{}).from(joined<ext_product>{}).left_lateral_join(sub, sql_alias{"lat"}).build_sql();
+            select(ext_product::sku{}).from(ext_product{}).left_lateral_join(sub, sql_alias{"lat"}).build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat"s) << sql;
     };
 
@@ -2467,7 +2474,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
         auto const on = col_ref<ext_product::id> == 1u;
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 1"s)
@@ -2478,7 +2485,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
         auto const sub = select(ext_product::sku{}).from(ext_product{});
         auto const on = col_ref<ext_product::id> == 2u;
         auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .left_lateral_join_on(sub, sql_alias{"lat"}, std::move(on))
                              .build_sql();
         expect(sql == "SELECT sku FROM ext_product LEFT JOIN LATERAL (SELECT sku FROM ext_product) AS lat ON id = 2"s)
@@ -2489,7 +2496,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "straight_join — generates STRAIGHT_JOIN ... ON col1 = col2"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .straight_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .build_sql();
         expect(sql == "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON category_id = id"s) << sql;
@@ -2497,7 +2504,7 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "straight_join with qualified col descriptors — generates table-qualified ON"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
-                             .from(joined<ext_product>{})
+                             .from(ext_product{})
                              .straight_join(ext_category{}, col<ext_product, 1>{}, col<ext_category, 0>{})
                              .build_sql();
         expect(
@@ -2508,10 +2515,8 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
 
     "straight_join_on — generates STRAIGHT_JOIN ... ON compound condition"_test = [] {
         auto const on = col_ref<ext_product::category_id> == 5u;
-        auto const sql = select(ext_product::sku{})
-                             .from(joined<ext_product>{})
-                             .straight_join(ext_category{}, std::move(on))
-                             .build_sql();
+        auto const sql =
+            select(ext_product::sku{}).from(ext_product{}).straight_join(ext_category{}, std::move(on)).build_sql();
         expect(sql == "SELECT sku FROM ext_product STRAIGHT_JOIN ext_category ON category_id = 5"s) << sql;
     };
 };
