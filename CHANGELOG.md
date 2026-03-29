@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.4.0] – 2026-03-29
+
 ### Added
 
 - Instance-based overloads for `mysql_connection::validate_table` and `validate_database` — e.g. `db->validate_table(trade{})` and `db->validate_database(trade_db{})` as alternatives to the template-only forms
@@ -341,7 +345,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.0...HEAD
+[4.4.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.0.0...v4.1.0
