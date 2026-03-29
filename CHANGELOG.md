@@ -12,10 +12,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `procedure_id<"name">` — compile-time stored procedure name type
 - `savepoint_id<"name">` — compile-time savepoint name type
+- `Collation` enum — common MySQL collations (`utf8mb4_general_ci`, `utf8mb4_unicode_ci`, `utf8mb4_bin`, `utf8_general_ci`, `utf8_unicode_ci`, `utf8_bin`, `latin1_swedish_ci`, `latin1_general_ci`, `latin1_bin`, `ascii_general_ci`, `ascii_bin`); `collate()` now accepts both `Collation` enum and `std::string_view`
+- `stats_auto_recalc_default()` / `stats_persistent_default()` — explicit methods for emitting `STATS_AUTO_RECALC=DEFAULT` / `STATS_PERSISTENT=DEFAULT`
+- Comprehensive unit tests for all `create_table` fluent table options (`avg_row_length`, `checksum`, `comment`, `compression`, `connection`, `data_directory`, `index_directory`, `delay_key_write`, `encryption`, `insert_method`, `key_block_size`, `max_rows`, `min_rows`, `pack_keys`, `password`, `row_format`, `stats_auto_recalc`, `stats_persistent`, `stats_sample_pages`, `tablespace`, `union_tables`)
 
 ### Removed
 
 - `table_constraint::foreign_key` — unused vestigial function superseded by `fk_attr` column attributes
+- `StatsPolicy` enum — replaced by `bool` overloads on `stats_auto_recalc`/`stats_persistent` and explicit `_default()` methods
 
 ### Changed
 
@@ -25,6 +29,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Savepoint builder classes are now strongly typed** — templated on `fixed_string Name` with constructors taking `savepoint_id<Name>`, eliminating `std::string` name members
 - `ddl_continuation` chaining methods (`.then().create_table(T{})`, `.then().use(DB{})`, etc.) are now instance-based only
 - Moved all `*_id` types from `sql_ddl.hpp` to `sql_core.hpp` so they are available to both DDL and DML headers
+- `union_tables` now takes variadic `ValidTable` instances instead of `std::vector<std::string>` — e.g. `.union_tables(table_a{}, table_b{})` with type safety and compile-time table name resolution
+- `stats_auto_recalc` / `stats_persistent` now take `bool` instead of `StatsPolicy` enum — `true`/`false` for 1/0, with `_default()` methods for DEFAULT
+- `checksum` and `delay_key_write` — removed redundant `std::size_t` overloads, `bool` is the only accepted type
 
 ### Removed
 

@@ -718,6 +718,17 @@ suite<"DDL"> ddl_suite = [] {
             << sql;
     };
 
+    "create_table.collate(Collation) - emits COLLATE with enum value"_test = [] {
+        auto const sql = create_table(test_table{}).collate(Collation::utf8mb4_unicode_ci).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COLLATE=utf8mb4_unicode_ci;\n"s)
+            << sql;
+    };
+
     "create_table with table_constraints trait - emits table-level PRIMARY KEY and KEY"_test = [] {
         auto const sql = create_table(symbol_with_indexes{})
                              .engine(Engine::InnoDB)
@@ -829,6 +840,540 @@ suite<"DDL"> ddl_suite = [] {
                "DROP TABLE IF EXISTS new_table;\n"
                "CREATE TABLE new_table AS SELECT id, name FROM test_table;\n"s)
             << sql;
+    };
+
+    // -------------------------------------------------------------------
+    // create_table fluent table options (create_table_attributes_mixin)
+    // -------------------------------------------------------------------
+
+    "create_table.avg_row_length - emits AVG_ROW_LENGTH"_test = [] {
+        auto const sql = create_table(test_table{}).avg_row_length(512).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") AVG_ROW_LENGTH=512;\n"s)
+            << sql;
+    };
+
+    "create_table.checksum(bool) - emits CHECKSUM=1"_test = [] {
+        auto const sql = create_table(test_table{}).checksum(true).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") CHECKSUM=1;\n"s)
+            << sql;
+    };
+
+    "create_table.checksum(bool false) - emits CHECKSUM=0"_test = [] {
+        auto const sql = create_table(test_table{}).checksum(false).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") CHECKSUM=0;\n"s)
+            << sql;
+    };
+
+    "create_table.comment - emits COMMENT='...'"_test = [] {
+        auto const sql = create_table(test_table{}).comment("my table comment").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMMENT='my table comment';\n"s)
+            << sql;
+    };
+
+    "create_table.comment with single quotes - escapes quotes"_test = [] {
+        auto const sql = create_table(test_table{}).comment("it's a table").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMMENT='it''s a table';\n"s)
+            << sql;
+    };
+
+    "create_table.compression(Compression) - emits COMPRESSION enum values"_test = [] {
+        auto const sql_zlib = create_table(test_table{}).compression(Compression::Zlib).build_sql();
+        expect(sql_zlib ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMPRESSION='ZLIB';\n"s)
+            << sql_zlib;
+
+        auto const sql_lz4 = create_table(test_table{}).compression(Compression::Lz4).build_sql();
+        expect(sql_lz4 ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMPRESSION='LZ4';\n"s)
+            << sql_lz4;
+
+        auto const sql_none = create_table(test_table{}).compression(Compression::None).build_sql();
+        expect(sql_none ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMPRESSION='NONE';\n"s)
+            << sql_none;
+    };
+
+    "create_table.compression(string_view) - emits COMPRESSION with custom value"_test = [] {
+        auto const sql = create_table(test_table{}).compression("LZ4").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") COMPRESSION='LZ4';\n"s)
+            << sql;
+    };
+
+    "create_table.connection - emits CONNECTION='...'"_test = [] {
+        auto const sql = create_table(test_table{}).connection("mysql://remote/db/table").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") CONNECTION='mysql://remote/db/table';\n"s)
+            << sql;
+    };
+
+    "create_table.data_directory - emits DATA DIRECTORY='...'"_test = [] {
+        auto const sql = create_table(test_table{}).data_directory("/var/lib/mysql/data").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") DATA DIRECTORY='/var/lib/mysql/data';\n"s)
+            << sql;
+    };
+
+    "create_table.index_directory - emits INDEX DIRECTORY='...'"_test = [] {
+        auto const sql = create_table(test_table{}).index_directory("/var/lib/mysql/index").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") INDEX DIRECTORY='/var/lib/mysql/index';\n"s)
+            << sql;
+    };
+
+    "create_table.delay_key_write(bool) - emits DELAY_KEY_WRITE=1/0"_test = [] {
+        auto const sql_on = create_table(test_table{}).delay_key_write(true).build_sql();
+        expect(sql_on ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") DELAY_KEY_WRITE=1;\n"s)
+            << sql_on;
+
+        auto const sql_off = create_table(test_table{}).delay_key_write(false).build_sql();
+        expect(sql_off ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") DELAY_KEY_WRITE=0;\n"s)
+            << sql_off;
+    };
+
+    "create_table.encryption(Encryption) - emits ENCRYPTION='Y'/'N'"_test = [] {
+        auto const sql_y = create_table(test_table{}).encryption(Encryption::Y).build_sql();
+        expect(sql_y ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENCRYPTION='Y';\n"s)
+            << sql_y;
+
+        auto const sql_n = create_table(test_table{}).encryption(Encryption::N).build_sql();
+        expect(sql_n ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENCRYPTION='N';\n"s)
+            << sql_n;
+    };
+
+    "create_table.encryption(string_view) - emits ENCRYPTION with custom value"_test = [] {
+        auto const sql = create_table(test_table{}).encryption("Y").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENCRYPTION='Y';\n"s)
+            << sql;
+    };
+
+    "create_table.insert_method(InsertMethod) - emits INSERT_METHOD enum values"_test = [] {
+        auto const sql_no = create_table(test_table{}).insert_method(InsertMethod::No).build_sql();
+        expect(sql_no ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") INSERT_METHOD=NO;\n"s)
+            << sql_no;
+
+        auto const sql_first = create_table(test_table{}).insert_method(InsertMethod::First).build_sql();
+        expect(sql_first ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") INSERT_METHOD=FIRST;\n"s)
+            << sql_first;
+
+        auto const sql_last = create_table(test_table{}).insert_method(InsertMethod::Last).build_sql();
+        expect(sql_last ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") INSERT_METHOD=LAST;\n"s)
+            << sql_last;
+    };
+
+    "create_table.insert_method(string_view) - emits INSERT_METHOD with custom value"_test = [] {
+        auto const sql = create_table(test_table{}).insert_method("FIRST").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") INSERT_METHOD=FIRST;\n"s)
+            << sql;
+    };
+
+    "create_table.key_block_size - emits KEY_BLOCK_SIZE=N"_test = [] {
+        auto const sql = create_table(test_table{}).key_block_size(8).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") KEY_BLOCK_SIZE=8;\n"s)
+            << sql;
+    };
+
+    "create_table.max_rows - emits MAX_ROWS=N"_test = [] {
+        auto const sql = create_table(test_table{}).max_rows(1000000).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") MAX_ROWS=1000000;\n"s)
+            << sql;
+    };
+
+    "create_table.min_rows - emits MIN_ROWS=N"_test = [] {
+        auto const sql = create_table(test_table{}).min_rows(100).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") MIN_ROWS=100;\n"s)
+            << sql;
+    };
+
+    "create_table.pack_keys(PackKeys) - emits PACK_KEYS enum values"_test = [] {
+        auto const sql_default = create_table(test_table{}).pack_keys(PackKeys::Default).build_sql();
+        expect(sql_default ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") PACK_KEYS=DEFAULT;\n"s)
+            << sql_default;
+
+        auto const sql_zero = create_table(test_table{}).pack_keys(PackKeys::Zero).build_sql();
+        expect(sql_zero ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") PACK_KEYS=0;\n"s)
+            << sql_zero;
+
+        auto const sql_one = create_table(test_table{}).pack_keys(PackKeys::One).build_sql();
+        expect(sql_one ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") PACK_KEYS=1;\n"s)
+            << sql_one;
+    };
+
+    "create_table.pack_keys(string_view) - emits PACK_KEYS with custom value"_test = [] {
+        auto const sql = create_table(test_table{}).pack_keys("1").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") PACK_KEYS=1;\n"s)
+            << sql;
+    };
+
+    "create_table.password - emits PASSWORD='...'"_test = [] {
+        auto const sql = create_table(test_table{}).password("secret").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") PASSWORD='secret';\n"s)
+            << sql;
+    };
+
+    "create_table.row_format(RowFormat) - emits ROW_FORMAT enum values"_test = [] {
+        auto const sql_dynamic = create_table(test_table{}).row_format(RowFormat::Dynamic).build_sql();
+        expect(sql_dynamic ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=DYNAMIC;\n"s)
+            << sql_dynamic;
+
+        auto const sql_compressed = create_table(test_table{}).row_format(RowFormat::Compressed).build_sql();
+        expect(sql_compressed ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=COMPRESSED;\n"s)
+            << sql_compressed;
+
+        auto const sql_compact = create_table(test_table{}).row_format(RowFormat::Compact).build_sql();
+        expect(sql_compact ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=COMPACT;\n"s)
+            << sql_compact;
+
+        auto const sql_fixed = create_table(test_table{}).row_format(RowFormat::Fixed).build_sql();
+        expect(sql_fixed ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=FIXED;\n"s)
+            << sql_fixed;
+
+        auto const sql_redundant = create_table(test_table{}).row_format(RowFormat::Redundant).build_sql();
+        expect(sql_redundant ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=REDUNDANT;\n"s)
+            << sql_redundant;
+
+        auto const sql_default = create_table(test_table{}).row_format(RowFormat::Default).build_sql();
+        expect(sql_default ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ROW_FORMAT=DEFAULT;\n"s)
+            << sql_default;
+    };
+
+    "create_table.stats_auto_recalc(bool) - emits STATS_AUTO_RECALC=1/0"_test = [] {
+        auto const sql_on = create_table(test_table{}).stats_auto_recalc(true).build_sql();
+        expect(sql_on ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_AUTO_RECALC=1;\n"s)
+            << sql_on;
+
+        auto const sql_off = create_table(test_table{}).stats_auto_recalc(false).build_sql();
+        expect(sql_off ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_AUTO_RECALC=0;\n"s)
+            << sql_off;
+    };
+
+    "create_table.stats_auto_recalc_default - emits STATS_AUTO_RECALC=DEFAULT"_test = [] {
+        auto const sql = create_table(test_table{}).stats_auto_recalc_default().build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_AUTO_RECALC=DEFAULT;\n"s)
+            << sql;
+    };
+
+    "create_table.stats_persistent(bool) - emits STATS_PERSISTENT=1/0"_test = [] {
+        auto const sql_on = create_table(test_table{}).stats_persistent(true).build_sql();
+        expect(sql_on ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_PERSISTENT=1;\n"s)
+            << sql_on;
+
+        auto const sql_off = create_table(test_table{}).stats_persistent(false).build_sql();
+        expect(sql_off ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_PERSISTENT=0;\n"s)
+            << sql_off;
+    };
+
+    "create_table.stats_persistent_default - emits STATS_PERSISTENT=DEFAULT"_test = [] {
+        auto const sql = create_table(test_table{}).stats_persistent_default().build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_PERSISTENT=DEFAULT;\n"s)
+            << sql;
+    };
+
+    "create_table.stats_sample_pages - emits STATS_SAMPLE_PAGES=N"_test = [] {
+        auto const sql = create_table(test_table{}).stats_sample_pages(200).build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") STATS_SAMPLE_PAGES=200;\n"s)
+            << sql;
+    };
+
+    "create_table.tablespace - emits TABLESPACE=value"_test = [] {
+        auto const sql = create_table(test_table{}).tablespace("innodb_system").build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") TABLESPACE=innodb_system;\n"s)
+            << sql;
+    };
+
+    "create_table.union_tables - emits UNION=(t1,t2,t3)"_test = [] {
+        auto const sql =
+            create_table(test_table{})
+                .union_tables(test_table{}, new_table{}, table_with_attrs{})
+                .build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") UNION=(test_table,new_table,table_with_attrs);\n"s)
+            << sql;
+    };
+
+    "create_table with multiple options - emits all in order"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .engine(Engine::InnoDB)
+                             .auto_increment(100)
+                             .default_charset(Charset::utf8mb4)
+                             .collate("utf8mb4_unicode_ci")
+                             .comment("main table")
+                             .row_format(RowFormat::Dynamic)
+                             .compression(Compression::Zlib)
+                             .key_block_size(4)
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci "
+               "COMMENT='main table' ROW_FORMAT=DYNAMIC COMPRESSION='ZLIB' KEY_BLOCK_SIZE=4;\n"s)
+            << sql;
+    };
+
+    "create_table duplicate option key - later call replaces earlier"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .engine(Engine::InnoDB)
+                             .engine(Engine::MyISAM)
+                             .build_sql();
+        expect(sql ==
+               "CREATE TABLE test_table (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL,\n"
+               "    tag VARCHAR(64)\n"
+               ") ENGINE=MyISAM;\n"s)
+            << sql;
+    };
+
+    "create_table.engine all enum values - emits correct strings"_test = [] {
+        auto check_engine = [](Engine e, std::string_view expected_name) {
+            auto const sql = create_table(new_table{}).engine(e).build_sql();
+            auto const expected = "CREATE TABLE new_table (\n"
+                                  "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                                  ") ENGINE=" +
+                                  std::string(expected_name) + ";\n";
+            expect(sql == expected) << sql;
+        };
+        check_engine(Engine::InnoDB, "InnoDB");
+        check_engine(Engine::MyISAM, "MyISAM");
+        check_engine(Engine::Memory, "MEMORY");
+        check_engine(Engine::Ndb, "NDB");
+        check_engine(Engine::Archive, "ARCHIVE");
+        check_engine(Engine::Csv, "CSV");
+        check_engine(Engine::Merge, "MERGE");
+        check_engine(Engine::Blackhole, "BLACKHOLE");
+        check_engine(Engine::Federated, "FEDERATED");
+    };
+
+    "create_table.default_charset all enum values - emits correct strings"_test = [] {
+        auto check_charset = [](Charset c, std::string_view expected_name) {
+            auto const sql = create_table(new_table{}).default_charset(c).build_sql();
+            auto const expected = "CREATE TABLE new_table (\n"
+                                  "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                                  ") DEFAULT CHARSET=" +
+                                  std::string(expected_name) + ";\n";
+            expect(sql == expected) << sql;
+        };
+        check_charset(Charset::utf8mb4, "utf8mb4");
+        check_charset(Charset::utf8, "utf8");
+        check_charset(Charset::latin1, "latin1");
+        check_charset(Charset::ascii, "ascii");
+        check_charset(Charset::ucs2, "ucs2");
+        check_charset(Charset::utf16, "utf16");
+        check_charset(Charset::utf32, "utf32");
     };
 };
 

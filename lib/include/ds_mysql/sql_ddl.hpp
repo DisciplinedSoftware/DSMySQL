@@ -47,10 +47,18 @@ enum class PackKeys {
     One,
 };
 
-enum class StatsPolicy {
-    Default,
-    Zero,
-    One,
+enum class Collation {
+    utf8mb4_general_ci,
+    utf8mb4_unicode_ci,
+    utf8mb4_bin,
+    utf8_general_ci,
+    utf8_unicode_ci,
+    utf8_bin,
+    latin1_swedish_ci,
+    latin1_general_ci,
+    latin1_bin,
+    ascii_general_ci,
+    ascii_bin,
 };
 
 enum class Compression {
@@ -297,16 +305,32 @@ namespace ddl_detail {
     return "DEFAULT";
 }
 
-[[nodiscard]] inline std::string to_sql_stats_policy(StatsPolicy value) {
+[[nodiscard]] inline std::string to_sql_collation(Collation value) {
     switch (value) {
-        case StatsPolicy::Default:
-            return "DEFAULT";
-        case StatsPolicy::Zero:
-            return "0";
-        case StatsPolicy::One:
-            return "1";
+        case Collation::utf8mb4_general_ci:
+            return "utf8mb4_general_ci";
+        case Collation::utf8mb4_unicode_ci:
+            return "utf8mb4_unicode_ci";
+        case Collation::utf8mb4_bin:
+            return "utf8mb4_bin";
+        case Collation::utf8_general_ci:
+            return "utf8_general_ci";
+        case Collation::utf8_unicode_ci:
+            return "utf8_unicode_ci";
+        case Collation::utf8_bin:
+            return "utf8_bin";
+        case Collation::latin1_swedish_ci:
+            return "latin1_swedish_ci";
+        case Collation::latin1_general_ci:
+            return "latin1_general_ci";
+        case Collation::latin1_bin:
+            return "latin1_bin";
+        case Collation::ascii_general_ci:
+            return "ascii_general_ci";
+        case Collation::ascii_bin:
+            return "ascii_bin";
     }
-    return "DEFAULT";
+    return "utf8mb4_general_ci";
 }
 
 [[nodiscard]] inline std::string to_sql_compression(Compression value) {
@@ -435,14 +459,12 @@ inline constexpr std::string_view union_key = "UNION";
     return out;
 }
 
-[[nodiscard]] inline std::string union_tables_value(std::vector<std::string> const& table_names) {
+template <ValidTable... Tables>
+    requires(sizeof...(Tables) > 0)
+[[nodiscard]] inline std::string union_tables_value() {
     std::string sql = "UNION=(";
-    for (std::size_t i = 0; i < table_names.size(); ++i) {
-        if (i > 0) {
-            sql += ",";
-        }
-        sql += table_names[i];
-    }
+    bool first = true;
+    ((sql += (first ? "" : ","), sql += table_name_for<Tables>::value().to_string_view(), first = false), ...);
     sql += ")";
     return sql;
 }
@@ -452,17 +474,6 @@ inline constexpr std::string_view union_key = "UNION";
 }  // namespace ddl_detail
 
 struct create_table_option {
-    void set(std::string key, std::string value_sql) {
-        auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
-            return kv.first == key;
-        });
-        if (it != options.end()) {
-            it->second = std::move(value_sql);
-        } else {
-            options.emplace_back(std::move(key), std::move(value_sql));
-        }
-    }
-
     [[nodiscard]] std::string to_sql() const {
         std::string out;
         for (auto const& [_, value_sql] : options) {
@@ -505,6 +516,10 @@ struct create_table_option {
         return *this;
     }
 
+    create_table_option& collate(Collation value) {
+        return collate(ddl_detail::to_sql_collation(value));
+    }
+
     create_table_option& collate(std::string_view value) {
         set(std::string{ddl_detail::table_option_sql::collate_key},
             ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::collate_prefix, value));
@@ -514,12 +529,6 @@ struct create_table_option {
     create_table_option& checksum(bool enabled) {
         set(std::string{ddl_detail::table_option_sql::checksum_key},
             ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::checksum_prefix, enabled));
-        return *this;
-    }
-
-    create_table_option& checksum(std::size_t value) {
-        set(std::string{ddl_detail::table_option_sql::checksum_key},
-            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::checksum_prefix, value));
         return *this;
     }
 
@@ -560,12 +569,6 @@ struct create_table_option {
     create_table_option& delay_key_write(bool enabled) {
         set(std::string{ddl_detail::table_option_sql::delay_key_write_key},
             ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::delay_key_write_prefix, enabled));
-        return *this;
-    }
-
-    create_table_option& delay_key_write(std::size_t value) {
-        set(std::string{ddl_detail::table_option_sql::delay_key_write_key},
-            ddl_detail::table_option_sql::assign_numeric(ddl_detail::table_option_sql::delay_key_write_prefix, value));
         return *this;
     }
 
@@ -633,23 +636,27 @@ struct create_table_option {
         return *this;
     }
 
-    create_table_option& stats_auto_recalc(StatsPolicy value) {
-        return stats_auto_recalc(ddl_detail::to_sql_stats_policy(value));
-    }
-
-    create_table_option& stats_auto_recalc(std::string_view value) {
+    create_table_option& stats_auto_recalc(bool enabled) {
         set(std::string{ddl_detail::table_option_sql::stats_auto_recalc_key},
-            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_auto_recalc_prefix, value));
+            ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::stats_auto_recalc_prefix, enabled));
         return *this;
     }
 
-    create_table_option& stats_persistent(StatsPolicy value) {
-        return stats_persistent(ddl_detail::to_sql_stats_policy(value));
+    create_table_option& stats_auto_recalc_default() {
+        set(std::string{ddl_detail::table_option_sql::stats_auto_recalc_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_auto_recalc_prefix, "DEFAULT"));
+        return *this;
     }
 
-    create_table_option& stats_persistent(std::string_view value) {
+    create_table_option& stats_persistent(bool enabled) {
         set(std::string{ddl_detail::table_option_sql::stats_persistent_key},
-            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_persistent_prefix, value));
+            ddl_detail::table_option_sql::assign_bool(ddl_detail::table_option_sql::stats_persistent_prefix, enabled));
+        return *this;
+    }
+
+    create_table_option& stats_persistent_default() {
+        set(std::string{ddl_detail::table_option_sql::stats_persistent_key},
+            ddl_detail::table_option_sql::assign(ddl_detail::table_option_sql::stats_persistent_prefix, "DEFAULT"));
         return *this;
     }
 
@@ -666,10 +673,24 @@ struct create_table_option {
         return *this;
     }
 
-    create_table_option& union_tables(std::vector<std::string> table_names) {
+    template <ValidTable... Tables>
+        requires(sizeof...(Tables) > 0)
+    create_table_option& union_tables(Tables const&...) {
         set(std::string{ddl_detail::table_option_sql::union_key},
-            ddl_detail::table_option_sql::union_tables_value(table_names));
+            ddl_detail::table_option_sql::union_tables_value<Tables...>());
         return *this;
+    }
+
+private:
+    void set(std::string key, std::string value_sql) {
+        auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
+            return kv.first == key;
+        });
+        if (it != options.end()) {
+            it->second = std::move(value_sql);
+        } else {
+            options.emplace_back(std::move(key), std::move(value_sql));
+        }
     }
 
     std::vector<std::pair<std::string, std::string>> options;
@@ -681,85 +702,83 @@ template <typename Derived>
 class create_table_attributes_mixin {
 public:
     Derived& engine(Engine value) {
-        return engine(to_sql_engine(value));
+        options_.engine(value);
+        return derived();
     }
 
     Derived& engine(std::string_view value) {
-        return set(std::string{table_option_sql::engine_key},
-                   table_option_sql::assign(table_option_sql::engine_prefix, value));
+        options_.engine(value);
+        return derived();
     }
 
     Derived& auto_increment(std::size_t value) {
-        return set(std::string{table_option_sql::auto_increment_key},
-                   table_option_sql::assign_numeric(table_option_sql::auto_increment_prefix, value));
+        options_.auto_increment(value);
+        return derived();
     }
 
     Derived& avg_row_length(std::size_t value) {
-        return set(std::string{table_option_sql::avg_row_length_key},
-                   table_option_sql::assign_numeric(table_option_sql::avg_row_length_prefix, value));
+        options_.avg_row_length(value);
+        return derived();
     }
 
     Derived& default_charset(Charset value) {
-        return default_charset(to_sql_charset(value));
+        options_.default_charset(value);
+        return derived();
     }
 
     Derived& default_charset(std::string_view value) {
-        return set(std::string{table_option_sql::default_charset_key},
-                   table_option_sql::assign(table_option_sql::default_charset_prefix, value));
+        options_.default_charset(value);
+        return derived();
+    }
+
+    Derived& collate(Collation value) {
+        options_.collate(value);
+        return derived();
     }
 
     Derived& collate(std::string_view value) {
-        return set(std::string{table_option_sql::collate_key},
-                   table_option_sql::assign(table_option_sql::collate_prefix, value));
+        options_.collate(value);
+        return derived();
     }
 
     Derived& checksum(bool enabled) {
-        return set(std::string{table_option_sql::checksum_key},
-                   table_option_sql::assign_bool(table_option_sql::checksum_prefix, enabled));
-    }
-
-    Derived& checksum(std::size_t value) {
-        return set(std::string{table_option_sql::checksum_key},
-                   table_option_sql::assign_numeric(table_option_sql::checksum_prefix, value));
+        options_.checksum(enabled);
+        return derived();
     }
 
     Derived& comment(std::string_view value) {
-        return set(std::string{table_option_sql::comment_key},
-                   table_option_sql::assign_quoted(table_option_sql::comment_prefix, value));
+        options_.comment(value);
+        return derived();
     }
 
     Derived& compression(Compression value) {
-        return compression(to_sql_compression(value));
+        options_.compression(value);
+        return derived();
     }
 
     Derived& compression(std::string_view value) {
-        return set(std::string{table_option_sql::compression_key},
-                   table_option_sql::assign_quoted(table_option_sql::compression_prefix, value));
+        options_.compression(value);
+        return derived();
     }
 
     Derived& connection(std::string_view value) {
-        return set(std::string{table_option_sql::connection_key},
-                   table_option_sql::assign_quoted(table_option_sql::connection_prefix, value));
+        options_.connection(value);
+        return derived();
     }
 
     Derived& data_directory(std::string_view value) {
-        return set(std::string{table_option_sql::data_directory_key},
-                   table_option_sql::assign_quoted(table_option_sql::data_directory_prefix, value));
+        options_.data_directory(value);
+        return derived();
     }
 
     Derived& index_directory(std::string_view value) {
-        return set(std::string{table_option_sql::index_directory_key},
-                   table_option_sql::assign_quoted(table_option_sql::index_directory_prefix, value));
+        options_.index_directory(value);
+        return derived();
     }
 
     Derived& delay_key_write(bool enabled) {
-        return set(std::string{table_option_sql::delay_key_write_key},
-                   table_option_sql::assign_bool(table_option_sql::delay_key_write_prefix, enabled));
-    }
-
-    Derived& delay_key_write(std::size_t value) {
-        return set(std::string{table_option_sql::delay_key_write_key},
-                   table_option_sql::assign_numeric(table_option_sql::delay_key_write_prefix, value));
+        options_.delay_key_write(enabled);
+        return derived();
     }
 
     Derived& encryption(Encryption value) {
@@ -767,8 +786,8 @@ public:
     }
 
     Derived& encryption(std::string_view value) {
-        return set(std::string{table_option_sql::encryption_key},
-                   table_option_sql::assign_quoted(table_option_sql::encryption_prefix, value));
+        options_.encryption(value);
+        return derived();
     }
 
     Derived& insert_method(InsertMethod value) {
@@ -776,90 +795,101 @@ public:
     }
 
     Derived& insert_method(std::string_view value) {
-        return set(std::string{table_option_sql::insert_method_key},
-                   table_option_sql::assign(table_option_sql::insert_method_prefix, value));
+        options_.insert_method(value);
+        return derived();
     }
 
     Derived& key_block_size(std::size_t value) {
-        return set(std::string{table_option_sql::key_block_size_key},
-                   table_option_sql::assign_numeric(table_option_sql::key_block_size_prefix, value));
+        options_.key_block_size(value);
+        return derived();
     }
 
     Derived& max_rows(std::size_t value) {
-        return set(std::string{table_option_sql::max_rows_key},
-                   table_option_sql::assign_numeric(table_option_sql::max_rows_prefix, value));
+        options_.max_rows(value);
+        return derived();
     }
 
     Derived& min_rows(std::size_t value) {
-        return set(std::string{table_option_sql::min_rows_key},
-                   table_option_sql::assign_numeric(table_option_sql::min_rows_prefix, value));
+        options_.min_rows(value);
+        return derived();
     }
 
     Derived& pack_keys(PackKeys value) {
-        return pack_keys(to_sql_pack_keys(value));
+        options_.pack_keys(value);
+        return derived();
     }
 
     Derived& pack_keys(std::string_view value) {
-        return set(std::string{table_option_sql::pack_keys_key},
-                   table_option_sql::assign(table_option_sql::pack_keys_prefix, value));
+        options_.pack_keys(value);
+        return derived();
     }
 
     Derived& password(std::string_view value) {
-        return set(std::string{table_option_sql::password_key},
-                   table_option_sql::assign_quoted(table_option_sql::password_prefix, value));
+        options_.password(value);
+        return derived();
     }
 
     Derived& row_format(RowFormat value) {
-        return row_format(to_sql_row_format(value));
+        options_.row_format(value);
+        return derived();
     }
 
     Derived& row_format(std::string_view value) {
-        return set(std::string{table_option_sql::row_format_key},
-                   table_option_sql::assign(table_option_sql::row_format_prefix, value));
+        options_.row_format(value);
+        return derived();
     }
 
-    Derived& stats_auto_recalc(StatsPolicy value) {
-        return stats_auto_recalc(to_sql_stats_policy(value));
+    Derived& stats_auto_recalc(bool enabled) {
+        options_.stats_auto_recalc(enabled);
+        return derived();
     }
 
-    Derived& stats_auto_recalc(std::string_view value) {
-        return set(std::string{table_option_sql::stats_auto_recalc_key},
-                   table_option_sql::assign(table_option_sql::stats_auto_recalc_prefix, value));
+    Derived& stats_auto_recalc_default() {
+        options_.stats_auto_recalc_default();
+        return derived();
     }
 
-    Derived& stats_persistent(StatsPolicy value) {
-        return stats_persistent(to_sql_stats_policy(value));
+    Derived& stats_persistent(bool enabled) {
+        options_.stats_persistent(enabled);
+        return derived();
     }
 
-    Derived& stats_persistent(std::string_view value) {
-        return set(std::string{table_option_sql::stats_persistent_key},
-                   table_option_sql::assign(table_option_sql::stats_persistent_prefix, value));
+    Derived& stats_persistent_default() {
+        options_.stats_persistent_default();
+        return derived();
     }
 
     Derived& stats_sample_pages(std::size_t value) {
-        return set(std::string{table_option_sql::stats_sample_pages_key},
-                   table_option_sql::assign_numeric(table_option_sql::stats_sample_pages_prefix, value));
+        options_.stats_sample_pages(value);
+        return derived();
     }
 
     Derived& tablespace(std::string_view value) {
-        return set(std::string{table_option_sql::tablespace_key},
-                   table_option_sql::assign(table_option_sql::tablespace_prefix, value));
+        options_.tablespace(value);
+        return derived();
     }
 
-    Derived& union_tables(std::vector<std::string> table_names) {
-        return set(std::string{table_option_sql::union_key}, table_option_sql::union_tables_value(table_names));
+    template <ValidTable... Tables>
+        requires(sizeof...(Tables) > 0)
+    Derived& union_tables(Tables const&...) {
+        options_.union_tables(Tables{}...);
+        return derived();
     }
 
 protected:
-    Derived& set(std::string key, std::string value_sql) {
-        derived().set_table_option(std::move(key), std::move(value_sql));
-        return derived();
+    explicit create_table_attributes_mixin(create_table_option options = {}) : options_(std::move(options)) {
+    }
+
+    create_table_option const& table_options() const {
+        return options_;
     }
 
 private:
     [[nodiscard]] Derived& derived() {
         return static_cast<Derived&>(*this);
     }
+
+    create_table_option options_;
 };
 
 namespace database_option_sql {
@@ -1597,7 +1627,9 @@ public:
     using ddl_tag_type = void;
 
     create_table_cond_builder(std::string create_prefix, std::string cols, create_table_option options = {})
-        : create_prefix_(std::move(create_prefix)), column_defs_(std::move(cols)), options_(std::move(options)) {
+        : create_table_attributes_mixin<create_table_cond_builder<T>>(std::move(options)),
+          create_prefix_(std::move(create_prefix)),
+          column_defs_(std::move(cols)) {
     }
 
     [[nodiscard]] auto then() const {
@@ -1612,10 +1644,6 @@ public:
         return create_table_like_builder<T, SourceT>{create_prefix_ + "IF NOT EXISTS "};
     }
 
-    void set_table_option(std::string key, std::string value_sql) {
-        options_.set(std::move(key), std::move(value_sql));
-    }
-
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
         std::string s;
@@ -1626,7 +1654,7 @@ public:
         s += " (\n";
         s += column_defs_;
         s += "\n)";
-        s += options_.to_sql();
+        s += create_table_attributes_mixin<create_table_cond_builder<T>>::table_options().to_sql();
         s += ";\n";
         return s;
     }
@@ -1634,7 +1662,6 @@ public:
 private:
     std::string create_prefix_;
     std::string column_defs_;
-    create_table_option options_;
 };
 
 }  // namespace ddl_detail
@@ -1663,28 +1690,28 @@ public:
     using ddl_tag_type = void;
 
     explicit create_table_builder(bool temporary = false, Prior prior = {})
-        : prior_(std::move(prior)),
+        : create_table_attributes_mixin<create_table_builder<T, Prior>>(table_attributes<T>::get()),
+          prior_(std::move(prior)),
           is_temporary_(temporary),
-          column_defs_(ddl_detail::make_column_defs<T>()),
-          options_(table_attributes<T>::get()) {
+          column_defs_(ddl_detail::make_column_defs<T>()) {
     }
 
     [[nodiscard]] create_table_cond_builder<T> if_not_exists() const {
-        return create_table_cond_builder<T>{build_create_prefix(), column_defs_, options_};
+        return create_table_cond_builder<T>{
+            build_create_prefix(), column_defs_,
+            create_table_attributes_mixin<create_table_builder<T, Prior>>::table_options()};
     }
 
     template <SqlBuilder SelectQuery>
     [[nodiscard]] create_table_as_builder<T> as(SelectQuery const& query) const {
-        return create_table_as_builder<T>{build_create_prefix(), query.build_sql(), false, options_};
+        return create_table_as_builder<T>{
+            build_create_prefix(), query.build_sql(), false,
+            create_table_attributes_mixin<create_table_builder<T, Prior>>::table_options()};
     }
 
     template <typename SourceT>
     [[nodiscard]] create_table_like_builder<T, SourceT> like() const {
         return create_table_like_builder<T, SourceT>{build_create_prefix()};
-    }
-
-    void set_table_option(std::string key, std::string value_sql) {
-        options_.set(std::move(key), std::move(value_sql));
     }
 
     [[nodiscard]] auto then() const {
@@ -1701,7 +1728,7 @@ public:
         s += " (\n";
         s += column_defs_;
         s += "\n)";
-        s += options_.to_sql();
+        s += create_table_attributes_mixin<create_table_builder<T, Prior>>::table_options().to_sql();
         s += ";\n";
         return s;
     }
@@ -1714,7 +1741,6 @@ private:
     Prior prior_;
     bool is_temporary_;
     std::string column_defs_;
-    create_table_option options_;
 };
 
 // ---------------------------------------------------------------
@@ -2195,18 +2221,14 @@ public:
 
     create_table_as_builder(std::string create_prefix, std::string select_sql, bool if_not_exists,
                             create_table_option options = {})
-        : create_prefix_(std::move(create_prefix)),
+        : create_table_attributes_mixin<create_table_as_builder<T>>(std::move(options)),
+          create_prefix_(std::move(create_prefix)),
           select_sql_(std::move(select_sql)),
-          if_not_exists_(if_not_exists),
-          options_(std::move(options)) {
+          if_not_exists_(if_not_exists) {
     }
 
     [[nodiscard]] auto then() const {
         return ddl_continuation<sql_string_builder>{sql_string_builder{build_sql()}};
-    }
-
-    void set_table_option(std::string key, std::string value_sql) {
-        options_.set(std::move(key), std::move(value_sql));
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -2217,7 +2239,7 @@ public:
         s += create_prefix_;
         s += cond;
         s += table_name;
-        s += options_.to_sql();
+        s += create_table_attributes_mixin<create_table_as_builder<T>>::table_options().to_sql();
         s += " AS ";
         s += select_sql_;
         s += ";\n";
@@ -2228,14 +2250,14 @@ private:
     std::string create_prefix_;
     std::string select_sql_;
     bool if_not_exists_;
-    create_table_option options_;
 };
 
 // Out-of-line .as() definition for create_table_cond_builder (needs create_table_as_builder to be complete)
 template <typename T>
 template <SqlBuilder SelectQuery>
 [[nodiscard]] create_table_as_builder<T> create_table_cond_builder<T>::as(SelectQuery const& query) const {
-    return create_table_as_builder<T>{create_prefix_, query.build_sql(), true, options_};
+    return create_table_as_builder<T>{create_prefix_, query.build_sql(), true,
+                                      create_table_attributes_mixin<create_table_cond_builder<T>>::table_options()};
 }
 
 }  // namespace ddl_detail
