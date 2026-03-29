@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.4.1] – 2026-03-29
+
 ### Changed
 
 - `mysql_connection::execute()` error messages now include the failing SQL statement for easier debugging of multi-statement operations like `create_all_tables`
@@ -349,7 +353,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.1...HEAD
+[4.4.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.1.0...v4.2.0
