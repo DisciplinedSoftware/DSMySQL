@@ -47,7 +47,7 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 ### Header Layout (`lib/include/ds_mysql/`)
 
 - `ds_mysql.hpp` — umbrella include; users include only this
-- `mysql_connection.hpp` — `mysql_config`, `connect_options`, and `mysql_connection` classes; `.query()` returns `std::expected<ResultType, std::string>`, `.execute()` returns `std::expected<uint64_t, std::string>` (affected row count); also provides `last_insert_id()`, `ping()`, `commit()`, `rollback()`, `autocommit()`, `select_db()`, `reset_connection()`, `escape_string()`, `warning_count()`, `info()`, `server_version()`, `server_info()`, `stat()`, `thread_id()`, `character_set()`, `set_character_set()`
+- `mysql_connection.hpp` — `mysql_config`, `connect_options`, and `mysql_connection` classes; `.query()` returns `std::expected<ResultType, std::string>`, `.execute()` returns `std::expected<uint64_t, std::string>` (affected row count; errors include the failing SQL statement); also provides `last_insert_id()`, `ping()`, `commit()`, `rollback()`, `autocommit()`, `select_db()`, `reset_connection()`, `escape_string()`, `warning_count()`, `info()`, `server_version()`, `server_info()`, `stat()`, `thread_id()`, `character_set()`, `set_character_set()`
 - `sql_ddl.hpp` — `create_table(T{})`, `drop_table(T{})`, `create_database(DB{})`, `create_all_tables(DB{})`
 - `sql_dml.hpp` — `insert_into(T{})`, `update(T{})`, `delete_from(T{})`, `truncate_table(T{})`
 - `sql_dql.hpp` — `select(col1{}, col2{})`, `count(T{})`, `describe(T{})`

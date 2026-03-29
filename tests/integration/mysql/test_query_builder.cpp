@@ -1017,6 +1017,49 @@ suite<"Execute Failure"> execute_failure_suite = [] {
 
         expect(db->execute(drop_table(trade{}).if_exists()).has_value());
     };
+
+    "execute error includes the failing SQL statement"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(trade{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        auto const fail = db->execute(create_table(trade{}));
+        expect(!fail.has_value()) << "Should fail: table already exists";
+        expect(fail.has_value() || fail.error().find("Statement:") != std::string::npos)
+            << "Error should include the failing statement — got: " + (fail.has_value() ? "" : fail.error());
+        expect(fail.has_value() || fail.error().find("CREATE TABLE") != std::string::npos)
+            << "Error should include the CREATE TABLE SQL — got: " + (fail.has_value() ? "" : fail.error());
+    };
+
+    "execute error on multi-statement SQL identifies the failing table"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(trade{}).if_exists()));
+            (void)(db->execute(drop_table(account{}).if_exists()));
+        }};
+
+        // Create trade so that create_all_tables for multi_table_db fails on trade.
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(drop_table(account{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        auto const fail = db->execute(create_all_tables(multi_table_db{}));
+        expect(!fail.has_value()) << "Should fail: trade table already exists";
+        expect(fail.has_value() || fail.error().find("trade") != std::string::npos)
+            << "Error should name the failing table — got: " + (fail.has_value() ? "" : fail.error());
+    };
 };
 
 // ===================================================================

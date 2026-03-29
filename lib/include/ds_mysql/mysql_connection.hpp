@@ -239,8 +239,9 @@ public:
             auto const semi = remaining.find(';');
             auto const fragment = (semi != std::string_view::npos) ? remaining.substr(0, semi) : remaining;
             if (fragment.find_first_not_of(" \t\n\r") != std::string_view::npos) {
-                if (mysql_query(connection_.get(), std::string{fragment}.c_str()) != 0) {
-                    return std::unexpected(last_error());
+                std::string const statement{fragment};
+                if (mysql_query(connection_.get(), statement.c_str()) != 0) {
+                    return std::unexpected(last_error() + "\n  Statement: " + statement);
                 }
                 total_affected += mysql_affected_rows(connection_.get());
             }

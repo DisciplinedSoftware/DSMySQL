@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `mysql_connection::execute()` error messages now include the failing SQL statement for easier debugging of multi-statement operations like `create_all_tables`
+
 ---
 
 ## [4.4.0] – 2026-03-29
