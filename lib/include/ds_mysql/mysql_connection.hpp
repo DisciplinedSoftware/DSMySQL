@@ -256,7 +256,7 @@ public:
     // On mismatch, the error string lists every discrepancy found.
     template <ValidTable T>
     [[nodiscard]] std::expected<void, std::string> validate_table() const {
-        auto describe_result = query(describe<T>());
+        auto describe_result = query(describe(T{}));
         if (!describe_result) {
             return std::unexpected("Failed to describe table '" +
                                    std::string(table_name_for<T>::value().to_string_view()) +

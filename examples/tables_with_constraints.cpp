@@ -63,7 +63,7 @@ struct ds_mysql::table_constraints<symbol> {
             ds_mysql::table_constraint::primary_key<symbol::id>(),
 
             // Define secondary index on exchange_id
-            ds_mysql::table_constraint::key<ds_mysql::index_id<"index_exchange_id">, symbol::exchange_id>(),
+            ds_mysql::table_constraint::key<symbol::exchange_id>(ds_mysql::index_id<"index_exchange_id">{}),
 
             // Optional: add a unique index on ticker
             // ds_mysql::table_constraint::unique_key<symbol::ticker>("uq_ticker"),
@@ -88,16 +88,16 @@ struct ds_mysql::table_constraints<order_detail> {
             ds_mysql::table_constraint::primary_key<order_detail::id>(),
 
             // Define unique constraint on (order_id, line_number)
-            ds_mysql::table_constraint::unique_key<ds_mysql::index_id<"uq_order_line">, order_detail::order_id,
-                                                   order_detail::line_number>(),
+            ds_mysql::table_constraint::unique_key<order_detail::order_id, order_detail::line_number>(
+                ds_mysql::index_id<"uq_order_line">{}),
 
             // Define CHECK constraint: quantity > 0
-            ds_mysql::table_constraint::check<ds_mysql::check_id<"chk_positive_quantity">>(
-                ds_mysql::greater_than<order_detail::quantity>(0u)),
+            ds_mysql::table_constraint::check(ds_mysql::check_id<"chk_positive_quantity">{},
+                                              ds_mysql::greater_than<order_detail::quantity>(0u)),
 
             // Define CHECK constraint: unit_price >= 0
-            ds_mysql::table_constraint::check<ds_mysql::check_id<"chk_non_negative_price">>(
-                ds_mysql::greater_than_or_equal<order_detail::unit_price>(0.0)),
+            ds_mysql::table_constraint::check(ds_mysql::check_id<"chk_non_negative_price">{},
+                                              ds_mysql::greater_than_or_equal<order_detail::unit_price>(0.0)),
         };
     }
 };
@@ -114,12 +114,12 @@ int main() {
     std::println("===============================================");
     std::println(
         "{}",
-        create_table<symbol>().engine(Engine::InnoDB).auto_increment(1).default_charset(Charset::utf8).build_sql());
+        create_table(symbol{}).engine(Engine::InnoDB).auto_increment(1).default_charset(Charset::utf8).build_sql());
 
     std::println("\n==================================================");
     std::println("Order detail table with UNIQUE and CHECK constraints");
     std::println("==================================================");
-    std::println("{}", create_table<order_detail>()
+    std::println("{}", create_table(order_detail{})
                            .engine(Engine::InnoDB)
                            .auto_increment(1)
                            .default_charset(Charset::utf8)

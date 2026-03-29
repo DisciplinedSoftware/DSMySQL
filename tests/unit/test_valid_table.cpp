@@ -355,12 +355,12 @@ suite<"column_belongs_to_table_v"> col_belongs_suite = [] {
 
 suite<"ValidTable entry points"> entry_points_suite = [] {
     "create_table compiles for valid table"_test = [] {
-        auto const sql = create_table<table_with_macro>().build_sql();
+        auto const sql = create_table(table_with_macro{}).build_sql();
         expect(sql.find("table_with_macro") != std::string::npos);
     };
 
     "drop_table compiles for valid table"_test = [] {
-        auto const sql = drop_table<table_with_macro>().build_sql();
+        auto const sql = drop_table(table_with_macro{}).build_sql();
         expect(sql.find("table_with_macro") != std::string::npos);
     };
 
@@ -369,7 +369,7 @@ suite<"ValidTable entry points"> entry_points_suite = [] {
         row.id_ = 1u;
         row.quantity_ = 10u;
         row.price_ = 9.99;
-        auto const sql = insert_into<table_with_macro>().values(row).build_sql();
+        auto const sql = insert_into(table_with_macro{}).values(row).build_sql();
         expect(sql.find("INSERT INTO") != std::string::npos);
         expect(sql.find("table_with_macro") != std::string::npos);
     };
@@ -381,12 +381,12 @@ suite<"ValidTable entry points"> entry_points_suite = [] {
     };
 
     "count<Table> compiles for valid table"_test = [] {
-        auto const sql = count<table_with_macro>().build_sql();
+        auto const sql = count(table_with_macro{}).build_sql();
         expect(sql.find("COUNT(*)") != std::string::npos);
     };
 
     "truncate_table compiles for valid table"_test = [] {
-        auto const sql = truncate_table<table_with_macro>().build_sql();
+        auto const sql = truncate_table(table_with_macro{}).build_sql();
         expect(sql.find("TRUNCATE") != std::string::npos);
     };
 };

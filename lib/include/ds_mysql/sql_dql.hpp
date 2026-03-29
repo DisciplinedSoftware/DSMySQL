@@ -4055,28 +4055,18 @@ template <AnyProjection... Projs>
  *   auto rows = db.query(count<symbol>().where(equal<symbol::ticker>("AAPL")));
  */
 template <ValidTable T>
-[[nodiscard]] detail::select_query_builder<T, count_all> count() {
-    return {};
-}
-
-template <ValidTable T>
 [[nodiscard]] detail::select_query_builder<T, count_all> count(T const&) {
     return {};
 }
 
 /**
- * truncate_table<T>() — TRUNCATE TABLE <table>.
+ * truncate_table(T{}) — TRUNCATE TABLE <table>.
  *
  * Removes all rows from the table. Faster than DELETE FROM with no WHERE.
  *
  * Example:
- *   db.execute(truncate_table<symbol>());
+ *   db.execute(truncate_table(symbol{}));
  */
-template <ValidTable T>
-[[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table() {
-    return {};
-}
-
 template <ValidTable T>
 [[nodiscard]] dml_detail::truncate_table_builder<T> truncate_table(T const&) {
     return {};
@@ -4453,48 +4443,26 @@ private:
 
 }  // namespace dml_detail
 
-// insert_ignore_into<T>() — INSERT IGNORE INTO <table> (...) VALUES (...)
-template <ValidTable T>
-[[nodiscard]] dml_detail::insert_ignore_into_builder<T> insert_ignore_into() {
-    return {};
-}
-
+// insert_ignore_into(T{}) — INSERT IGNORE INTO <table> (...) VALUES (...)
 template <ValidTable T>
 [[nodiscard]] dml_detail::insert_ignore_into_builder<T> insert_ignore_into(T const&) {
     return {};
 }
 
-// insert_into_select<T>(query) — INSERT INTO <table> (...) SELECT ...
-template <ValidTable T, SqlBuilder Query>
-[[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(Query&& query) {
-    return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
-}
-
+// insert_into_select(T{}, query) — INSERT INTO <table> (...) SELECT ...
 template <ValidTable T, SqlBuilder Query>
 [[nodiscard]] dml_detail::insert_into_select_builder<T, std::decay_t<Query>> insert_into_select(T const&,
                                                                                                 Query&& query) {
     return dml_detail::insert_into_select_builder<T, std::decay_t<Query>>{std::forward<Query>(query)};
 }
 
-// replace_into<T>() — REPLACE INTO <table> (...) VALUES (...)
-template <ValidTable T>
-[[nodiscard]] dml_detail::replace_into_builder<T> replace_into() {
-    return {};
-}
-
+// replace_into(T{}) — REPLACE INTO <table> (...) VALUES (...)
 template <ValidTable T>
 [[nodiscard]] dml_detail::replace_into_builder<T> replace_into(T const&) {
     return {};
 }
 
-// update_join<T1, T2>() — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
-template <ValidTable T1, ValidTable T2, ColumnDescriptor LeftCol, ColumnDescriptor RightCol>
-[[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join() {
-    std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +
-                              detail::qualified_col_name<LeftCol>() + " = " + detail::qualified_col_name<RightCol>();
-    return dml_detail::update_join_builder<T1, T2>{std::move(join_clause)};
-}
-
+// update_join(T1{}, T2{}) — UPDATE T1 JOIN T2 ON ... SET ... [WHERE ...]
 template <ColumnDescriptor LeftCol, ColumnDescriptor RightCol, ValidTable T1, ValidTable T2>
 [[nodiscard]] dml_detail::update_join_builder<T1, T2> update_join(T1 const&, T2 const&) {
     std::string join_clause = " INNER JOIN " + std::string(table_name_for<T2>::value().to_string_view()) + " ON " +

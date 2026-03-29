@@ -10,9 +10,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `procedure_id<"name">` — compile-time stored procedure name type (satisfies `NamedIdType`)
-- `savepoint_id<"name">` — compile-time savepoint name type (satisfies `NamedIdType`)
-- Instance-based overloads for procedure and savepoint entry-point functions — e.g. `savepoint(savepoint_id<"sp1">{})`, `drop_procedure(procedure_id<"usp_hello">{})`
+- `procedure_id<"name">` — compile-time stored procedure name type
+- `savepoint_id<"name">` — compile-time savepoint name type
 
 ### Removed
 
@@ -20,11 +19,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Instance-based overloads for procedure and savepoint functions now use specific id types (`procedure_id<Name>`, `savepoint_id<Name>`) instead of generic `NamedIdType` — enables direct `fixed_string` deduction from the argument
-- `create_procedure`, `drop_procedure`, `call_procedure` now take `NamedIdType` template parameter instead of `std::string` — e.g. `create_procedure<procedure_id<"usp_hello">>(params, body)`
-- `savepoint`, `release_savepoint`, `rollback_to_savepoint` now take `NamedIdType` template parameter instead of `std::string` — e.g. `savepoint<savepoint_id<"sp1">>()`
-- Savepoint builders are now templated on their `NamedIdType` and carry no `std::string` member
-- Moved `NamedIdType` concept and all `*_id` types from `sql_ddl.hpp` to `sql_core.hpp` so they are available to both DDL and DML headers
+- **All public entry-point functions now require instance-based calls** — template-only overloads (`create_table<T>()`, `insert_into<T>()`, etc.) have been removed in favour of `create_table(T{})`, `insert_into(T{})`, etc. This applies uniformly to all `ValidTable`, `Database`, and id-type APIs for consistency and better IDE discoverability
+- **Id-type functions enforce specific id types** — `savepoint(savepoint_id<"sp1">{})`, `create_procedure(procedure_id<"usp_hello">{}, ...)`, `create_index_on<cols...>(index_id<"idx">{}, table{})`, `table_constraint::check(check_id<"chk">{}, expr)`, etc. — replacing the generic `NamedIdType` concept which has been removed
+- **Procedure and trigger builder classes are now strongly typed** — templated on `fixed_string Name` with constructors taking the specific id type (`procedure_id<Name>`, `trigger_id<Name>`), eliminating `std::string` name members
+- **Savepoint builder classes are now strongly typed** — templated on `fixed_string Name` with constructors taking `savepoint_id<Name>`, eliminating `std::string` name members
+- `ddl_continuation` chaining methods (`.then().create_table(T{})`, `.then().use(DB{})`, etc.) are now instance-based only
+- Moved all `*_id` types from `sql_ddl.hpp` to `sql_core.hpp` so they are available to both DDL and DML headers
+
+### Removed
+
+- `NamedIdType` concept — no longer needed; each function enforces the correct id type directly
 
 ---
 

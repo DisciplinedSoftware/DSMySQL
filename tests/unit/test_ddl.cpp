@@ -242,7 +242,7 @@ struct ds_mysql::table_constraints<symbol_with_indexes> {
     static std::vector<std::string> get() {
         return {
             table_constraint::primary_key<symbol_with_indexes::id>(),
-            table_constraint::key<index_id<"index_exchange_id">, symbol_with_indexes::exchange_id>(),
+            table_constraint::key<symbol_with_indexes::exchange_id>(index_id<"index_exchange_id">{}),
         };
     }
 };
@@ -332,7 +332,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with integer wrapper types - emits INT/BIGINT definitions"_test = [] {
-        auto const sql = create_table<integer_column_table>().build_sql();
+        auto const sql = create_table(integer_column_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE integer_column_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -356,7 +356,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql_type_for<bigint_type_default>() == "BIGINT"s);
         expect(sql_type_for<bigint_unsigned_type_default>() == "BIGINT UNSIGNED"s);
 
-        auto const sql = create_table<tagged_integer_alias_table>().build_sql();
+        auto const sql = create_table(tagged_integer_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_integer_alias_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -369,7 +369,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table temporal types - emits DATETIME and TIMESTAMP definitions"_test = [] {
-        auto const sql = create_table<temporal_table>().build_sql();
+        auto const sql = create_table(temporal_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE temporal_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -380,7 +380,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table time type - emits TIME definitions"_test = [] {
-        auto const sql = create_table<time_table>().build_sql();
+        auto const sql = create_table(time_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE time_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -409,7 +409,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with templated temporal FSP columns - emits types with precision"_test = [] {
-        auto const sql = create_table<fsp_temporal_table>().build_sql();
+        auto const sql = create_table(fsp_temporal_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE fsp_temporal_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -427,7 +427,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql_type_for<timestamp_type_default>() == "TIMESTAMP"s);
         expect(sql_type_for<time_type_default>() == "TIME"s);
 
-        auto const sql = create_table<tagged_temporal_alias_table>().build_sql();
+        auto const sql = create_table(tagged_temporal_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_temporal_alias_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -443,7 +443,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql_type_for<double_type_default>() == "DOUBLE"s);
         expect(sql_type_for<decimal_type_default>() == "DECIMAL"s);
 
-        auto const sql = create_table<tagged_numeric_alias_table>().build_sql();
+        auto const sql = create_table(tagged_numeric_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_numeric_alias_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -455,7 +455,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with numeric sql formatting options - emits FLOAT/DOUBLE/DECIMAL definitions"_test = [] {
-        auto const sql = create_table<numeric_format_table>().build_sql();
+        auto const sql = create_table(numeric_format_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE numeric_format_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -467,7 +467,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with formatted numeric wrapper types - emits inferred FLOAT/DOUBLE/DECIMAL definitions"_test = [] {
-        auto const sql = create_table<formatted_numeric_column_table>().build_sql();
+        auto const sql = create_table(formatted_numeric_column_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE formatted_numeric_column_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -488,7 +488,7 @@ suite<"DDL"> ddl_suite = [] {
     // -------------------------------------------------------------------
 
     "create_table - generates CREATE TABLE"_test = [] {
-        auto const sql = create_table<test_table>().build_sql();
+        auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -499,7 +499,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table.if_not_exists - generates CREATE TABLE IF NOT EXISTS"_test = [] {
-        auto const sql = create_table<test_table>().if_not_exists().build_sql();
+        auto const sql = create_table(test_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -510,7 +510,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table - SQL contains first column as PRIMARY KEY"_test = [] {
-        auto const sql = create_table<test_table>().build_sql();
+        auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -525,12 +525,12 @@ suite<"DDL"> ddl_suite = [] {
     // -------------------------------------------------------------------
 
     "drop_table - generates DROP TABLE"_test = [] {
-        auto const sql = drop_table<test_table>().build_sql();
+        auto const sql = drop_table(test_table{}).build_sql();
         expect(sql == "DROP TABLE test_table;\n"s) << sql;
     };
 
     "drop_table.if_exists - generates DROP TABLE IF EXISTS"_test = [] {
-        auto const sql = drop_table<test_table>().if_exists().build_sql();
+        auto const sql = drop_table(test_table{}).if_exists().build_sql();
         expect(sql == "DROP TABLE IF EXISTS test_table;\n"s) << sql;
     };
 
@@ -540,7 +540,7 @@ suite<"DDL"> ddl_suite = [] {
 
     "drop_table.if_exists.then.create_table - generates both statements"_test = [] {
         auto const sql =
-            drop_table<test_table>().if_exists().then().create_table<test_table>().if_not_exists().build_sql();
+            drop_table(test_table{}).if_exists().then().create_table(test_table{}).if_not_exists().build_sql();
         expect(sql ==
                "DROP TABLE IF EXISTS test_table;\n"
                "CREATE TABLE IF NOT EXISTS test_table (\n"
@@ -552,7 +552,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "drop_table.then.create_table - bare DROP then bare CREATE"_test = [] {
-        auto const sql = drop_table<test_table>().then().create_table<test_table>().build_sql();
+        auto const sql = drop_table(test_table{}).then().create_table(test_table{}).build_sql();
         expect(sql ==
                "DROP TABLE test_table;\n"
                "CREATE TABLE test_table (\n"
@@ -568,7 +568,7 @@ suite<"DDL"> ddl_suite = [] {
     // -------------------------------------------------------------------
 
     "create_temporary_table - generates CREATE TEMPORARY TABLE"_test = [] {
-        auto const sql = create_temporary_table<test_table>().build_sql();
+        auto const sql = create_temporary_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TEMPORARY TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -579,7 +579,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_temporary_table.if_not_exists - generates CREATE TEMPORARY TABLE IF NOT EXISTS"_test = [] {
-        auto const sql = create_temporary_table<test_table>().if_not_exists().build_sql();
+        auto const sql = create_temporary_table(test_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TEMPORARY TABLE IF NOT EXISTS test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -594,12 +594,12 @@ suite<"DDL"> ddl_suite = [] {
     // -------------------------------------------------------------------
 
     "drop_temporary_table - generates DROP TEMPORARY TABLE"_test = [] {
-        auto const sql = drop_temporary_table<test_table>().build_sql();
+        auto const sql = drop_temporary_table(test_table{}).build_sql();
         expect(sql == "DROP TEMPORARY TABLE test_table;\n"s) << sql;
     };
 
     "drop_temporary_table.if_exists - generates DROP TEMPORARY TABLE IF EXISTS"_test = [] {
-        auto const sql = drop_temporary_table<test_table>().if_exists().build_sql();
+        auto const sql = drop_temporary_table(test_table{}).if_exists().build_sql();
         expect(sql == "DROP TEMPORARY TABLE IF EXISTS test_table;\n"s) << sql;
     };
 
@@ -608,10 +608,10 @@ suite<"DDL"> ddl_suite = [] {
     // -------------------------------------------------------------------
 
     "drop_temporary_table.if_exists.then.create_temporary_table - generates both statements"_test = [] {
-        auto const sql = drop_temporary_table<test_table>()
+        auto const sql = drop_temporary_table(test_table{})
                              .if_exists()
                              .then()
-                             .create_temporary_table<test_table>()
+                             .create_temporary_table(test_table{})
                              .if_not_exists()
                              .build_sql();
         expect(sql ==
@@ -625,7 +625,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "drop_temporary_table.then.create_temporary_table - bare DROP TEMPORARY then bare CREATE TEMPORARY"_test = [] {
-        auto const sql = drop_temporary_table<test_table>().then().create_temporary_table<test_table>().build_sql();
+        auto const sql = drop_temporary_table(test_table{}).then().create_temporary_table(test_table{}).build_sql();
         expect(sql ==
                "DROP TEMPORARY TABLE test_table;\n"
                "CREATE TEMPORARY TABLE test_table (\n"
@@ -637,17 +637,17 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     // -------------------------------------------------------------------
-    // create_table<T>().as(select_query)
+    // create_table(T{}).as(select_query)
     // -------------------------------------------------------------------
 
     "create_table.as(select) - generates CREATE TABLE AS SELECT"_test = [] {
         auto const sql =
-            create_table<new_table>().as(select(test_table::id{}, test_table::name{}).from(test_table{})).build_sql();
+            create_table(new_table{}).as(select(test_table::id{}, test_table::name{}).from(test_table{})).build_sql();
         expect(sql == "CREATE TABLE new_table AS SELECT id, name FROM test_table;\n"s) << sql;
     };
 
     "create_table.if_not_exists.as(select) - generates CREATE TABLE IF NOT EXISTS AS SELECT"_test = [] {
-        auto const sql = create_table<new_table>()
+        auto const sql = create_table(new_table{})
                              .if_not_exists()
                              .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
@@ -655,7 +655,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_temporary_table.as(select) - generates CREATE TEMPORARY TABLE AS SELECT"_test = [] {
-        auto const sql = create_temporary_table<new_table>()
+        auto const sql = create_temporary_table(new_table{})
                              .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
         expect(sql == "CREATE TEMPORARY TABLE new_table AS SELECT id, name FROM test_table;\n"s) << sql;
@@ -663,7 +663,7 @@ suite<"DDL"> ddl_suite = [] {
 
     "create_temporary_table.if_not_exists.as(select) - generates CREATE TEMPORARY TABLE IF NOT EXISTS AS SELECT"_test =
         [] {
-            auto const sql = create_temporary_table<new_table>()
+            auto const sql = create_temporary_table(new_table{})
                                  .if_not_exists()
                                  .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                                  .build_sql();
@@ -672,7 +672,7 @@ suite<"DDL"> ddl_suite = [] {
         };
 
     "create_table.as(select).with_where - generates CREATE TABLE AS SELECT WHERE"_test = [] {
-        auto const sql = create_table<new_table>()
+        auto const sql = create_table(new_table{})
                              .as(select(test_table::id{}, test_table::name{})
                                      .from(test_table{})
                                      .where(equal<test_table::name>("name")))
@@ -681,7 +681,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table.as(select).with_where(is_not_null) - generates CREATE TABLE AS SELECT WHERE"_test = [] {
-        auto const sql = create_table<new_table>()
+        auto const sql = create_table(new_table{})
                              .as(select(test_table::id{}, test_table::name{})
                                      .from(test_table{})
                                      .where(is_not_null<test_table::tag>()))
@@ -690,7 +690,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table.as(select) with fluent table attributes"_test = [] {
-        auto const sql = create_table<new_table>()
+        auto const sql = create_table(new_table{})
                              .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .engine(Engine::InnoDB)
                              .auto_increment(1)
@@ -703,7 +703,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with string overload attributes"_test = [] {
-        auto const sql = create_table<test_table>()
+        auto const sql = create_table(test_table{})
                              .engine("MyCustomEngine")
                              .default_charset("koi8r")
                              .row_format("DYNAMIC")
@@ -719,7 +719,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with table_constraints trait - emits table-level PRIMARY KEY and KEY"_test = [] {
-        auto const sql = create_table<symbol_with_indexes>()
+        auto const sql = create_table(symbol_with_indexes{})
                              .engine(Engine::InnoDB)
                              .auto_increment(1)
                              .default_charset(Charset::utf8)
@@ -742,17 +742,17 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint helper SQL fragments - renders UNIQUE/FULLTEXT/SPATIAL"_test = [] {
-        expect(table_constraint::unique_key<index_id<"uq_test_name">, test_table::name>() ==
+        expect(table_constraint::unique_key<test_table::name>(index_id<"uq_test_name">{}) ==
                "UNIQUE KEY uq_test_name (name)"s);
-        expect(table_constraint::fulltext_key<index_id<"ft_test_name">, test_table::name>() ==
+        expect(table_constraint::fulltext_key<test_table::name>(index_id<"ft_test_name">{}) ==
                "FULLTEXT KEY ft_test_name (name)"s);
-        expect(table_constraint::spatial_key<index_id<"sp_test_id">, test_table::id>() ==
+        expect(table_constraint::spatial_key<test_table::id>(index_id<"sp_test_id">{}) ==
                "SPATIAL KEY sp_test_id (id)"s);
     };
 
     "table_constraint::check - typed predicate with check_id"_test = [] {
         // Simple comparison predicate
-        auto const sql = table_constraint::check<check_id<"chk_positive_id">>(greater_than<test_table::id>(0u));
+        auto const sql = table_constraint::check(check_id<"chk_positive_id">{}, greater_than<test_table::id>(0u));
         expect(sql == "CONSTRAINT chk_positive_id CHECK (id > 0)"s) << sql;
     };
 
@@ -762,19 +762,20 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "table_constraint::check - compound predicate with & operator"_test = [] {
-        auto const sql = table_constraint::check<check_id<"chk_id_range">>(greater_than<test_table::id>(0u) &
-                                                                           less_than_or_equal<test_table::id>(100u));
+        auto const sql = table_constraint::check(check_id<"chk_id_range">{},
+                                                  greater_than<test_table::id>(0u) &
+                                                      less_than_or_equal<test_table::id>(100u));
         expect(sql == "CONSTRAINT chk_id_range CHECK ((id > 0 AND id <= 100))"s) << sql;
     };
 
     "table_constraint::check - nullable column predicate"_test = [] {
         // Using a nullable column (std::optional<varchar_type<64>>)
-        auto const sql = table_constraint::check<check_id<"chk_tag_present">>(is_not_null<test_table::tag>());
+        auto const sql = table_constraint::check(check_id<"chk_tag_present">{}, is_not_null<test_table::tag>());
         expect(sql == "CONSTRAINT chk_tag_present CHECK (tag IS NOT NULL)"s) << sql;
     };
 
     "create_table with column_attributes - emits AUTO_INCREMENT, COMMENT, DEFAULT, ON UPDATE"_test = [] {
-        auto const sql = create_table<audit_log>().default_charset(Charset::utf8).build_sql();
+        auto const sql = create_table(audit_log{}).default_charset(Charset::utf8).build_sql();
         expect(sql ==
                "CREATE TABLE audit_log (\n"
                "    id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n"
@@ -788,7 +789,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with table_attributes trait - emits default ENGINE and CHARSET"_test = [] {
-        auto const sql = create_table<table_with_attrs>().build_sql();
+        auto const sql = create_table(table_with_attrs{}).build_sql();
         expect(sql ==
                "CREATE TABLE table_with_attrs (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -798,7 +799,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with table_attributes trait + fluent override - fluent replaces default"_test = [] {
-        auto const sql = create_table<table_with_attrs>().engine(Engine::MyISAM).build_sql();
+        auto const sql = create_table(table_with_attrs{}).engine(Engine::MyISAM).build_sql();
         expect(sql ==
                "CREATE TABLE table_with_attrs (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -808,7 +809,7 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "create_table with table_attributes trait + if_not_exists - propagates defaults"_test = [] {
-        auto const sql = create_table<table_with_attrs>().if_not_exists().build_sql();
+        auto const sql = create_table(table_with_attrs{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS table_with_attrs (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -818,10 +819,10 @@ suite<"DDL"> ddl_suite = [] {
     };
 
     "drop_table.then.create_table.as(select) - chains DROP and CREATE AS SELECT"_test = [] {
-        auto const sql = drop_table<new_table>()
+        auto const sql = drop_table(new_table{})
                              .if_exists()
                              .then()
-                             .create_table<new_table>()
+                             .create_table(new_table{})
                              .as(select(test_table::id{}, test_table::name{}).from(test_table{}))
                              .build_sql();
         expect(sql ==
@@ -854,7 +855,7 @@ struct child_table_cascade {
 
 suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
     "create_table with FK - emits FOREIGN KEY constraint"_test = [] {
-        auto const sql = create_table<child_table>().build_sql();
+        auto const sql = create_table(child_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE child_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -865,7 +866,7 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
     };
 
     "create_table with FK CASCADE - emits ON DELETE CASCADE ON UPDATE CASCADE"_test = [] {
-        auto const sql = create_table<child_table_cascade>().build_sql();
+        auto const sql = create_table(child_table_cascade{}).build_sql();
         expect(sql ==
                "CREATE TABLE child_table_cascade (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -876,7 +877,7 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
     };
 
     "create_table without FK - no FOREIGN KEY clause"_test = [] {
-        auto const sql = create_table<test_table>().build_sql();
+        auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -906,25 +907,25 @@ static_assert(SqlBuilder<ddl_detail::create_table_as_builder<test_table>>,
 
 suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
     "create_database - generates CREATE DATABASE"_test = [] {
-        auto const sql = create_database<test_db>().build_sql();
+        auto const sql = create_database(test_db{}).build_sql();
         expect(sql == "CREATE DATABASE test_db;\n"s) << sql;
     };
 
     "create_database.if_not_exists - generates CREATE DATABASE IF NOT EXISTS"_test = [] {
-        auto const sql = create_database<test_db>().if_not_exists().build_sql();
+        auto const sql = create_database(test_db{}).if_not_exists().build_sql();
         expect(sql == "CREATE DATABASE IF NOT EXISTS test_db;\n"s) << sql;
     };
 
     "database_name_for custom specialization - uses override name"_test = [] {
-        auto const sql = create_database<custom_named_db>().build_sql();
+        auto const sql = create_database(custom_named_db{}).build_sql();
         expect(sql == "CREATE DATABASE my_custom_db;\n"s) << sql;
     };
 
     "create_database.then.create_table - chains CREATE DATABASE and CREATE TABLE"_test = [] {
-        auto const sql = create_database<test_db>()
+        auto const sql = create_database(test_db{})
                              .if_not_exists()
                              .then()
-                             .create_table<test_db::symbol>()
+                             .create_table(test_db::symbol{})
                              .if_not_exists()
                              .build_sql();
         expect(sql ==
@@ -936,10 +937,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
     };
 
     "create_database.then.create_all_tables - chains CREATE DATABASE and CREATE TABLE for all DB tables"_test = [] {
-        auto const sql = create_database<schema_bootstrap_db>()
+        auto const sql = create_database(schema_bootstrap_db{})
                              .if_not_exists()
                              .then()
-                             .create_all_tables<schema_bootstrap_db>()
+                             .create_all_tables(schema_bootstrap_db{})
                              .build_sql();
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
@@ -953,10 +954,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
     };
 
     "create_database.then.create_all_tables.if_not_exists - emits IF NOT EXISTS for each table"_test = [] {
-        auto const sql = create_database<schema_bootstrap_db>()
+        auto const sql = create_database(schema_bootstrap_db{})
                              .if_not_exists()
                              .then()
-                             .create_all_tables<schema_bootstrap_db>()
+                             .create_all_tables(schema_bootstrap_db{})
                              .if_not_exists()
                              .build_sql();
         expect(sql ==
@@ -982,12 +983,12 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         };
 
     "create_database with fluent charset - uses fluent API to set DEFAULT CHARACTER SET"_test = [] {
-        auto const sql = create_database<test_db>().default_charset(Charset::utf8mb4).build_sql();
+        auto const sql = create_database(test_db{}).default_charset(Charset::utf8mb4).build_sql();
         expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET utf8mb4;\n"s) << sql;
     };
 
     "create_database.if_not_exists with fluent charset and default_collate - chains both attributes"_test = [] {
-        auto const sql = create_database<test_db>()
+        auto const sql = create_database(test_db{})
                              .default_charset(Charset::utf8mb4)
                              .default_collate("utf8mb4_unicode_ci")
                              .if_not_exists()
@@ -999,7 +1000,7 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
     };
 
     "create_database with string overload default_charset - accepts string_view charset"_test = [] {
-        auto const sql = create_database<test_db>().default_charset("koi8r").build_sql();
+        auto const sql = create_database(test_db{}).default_charset("koi8r").build_sql();
         expect(sql == "CREATE DATABASE test_db DEFAULT CHARACTER SET koi8r;\n"s) << sql;
     };
 
@@ -1018,12 +1019,12 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
 
 suite<"DDL DROP DATABASE"> ddl_drop_database_suite = [] {
     "drop_database - generates DROP DATABASE"_test = [] {
-        auto const sql = drop_database<test_db>().build_sql();
+        auto const sql = drop_database(test_db{}).build_sql();
         expect(sql == "DROP DATABASE test_db;\n"s) << sql;
     };
 
     "drop_database.if_exists - generates DROP DATABASE IF EXISTS"_test = [] {
-        auto const sql = drop_database<test_db>().if_exists().build_sql();
+        auto const sql = drop_database(test_db{}).if_exists().build_sql();
         expect(sql == "DROP DATABASE IF EXISTS test_db;\n"s) << sql;
     };
 
@@ -1038,7 +1039,7 @@ suite<"DDL DROP DATABASE"> ddl_drop_database_suite = [] {
     };
 
     "drop_database.then.create_database - chains DROP DATABASE and CREATE DATABASE"_test = [] {
-        auto const sql = drop_database<test_db>().if_exists().then().create_database<test_db>().build_sql();
+        auto const sql = drop_database(test_db{}).if_exists().then().create_database(test_db{}).build_sql();
         expect(sql ==
                "DROP DATABASE IF EXISTS test_db;\n"
                "CREATE DATABASE test_db;\n"s)
@@ -1048,7 +1049,7 @@ suite<"DDL DROP DATABASE"> ddl_drop_database_suite = [] {
 
 suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
     "create_all_tables - emits CREATE TABLE for every table in DB"_test = [] {
-        auto const sql = create_all_tables<schema_bootstrap_db>().build_sql();
+        auto const sql = create_all_tables(schema_bootstrap_db{}).build_sql();
         expect(sql ==
                "CREATE TABLE schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
@@ -1060,7 +1061,7 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
     };
 
     "create_all_tables.if_not_exists - emits IF NOT EXISTS for each table"_test = [] {
-        auto const sql = create_all_tables<schema_bootstrap_db>().if_not_exists().build_sql();
+        auto const sql = create_all_tables(schema_bootstrap_db{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
@@ -1073,7 +1074,7 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
 
     "create_all_tables.then - chains into further DDL"_test = [] {
         auto const sql =
-            create_all_tables<schema_bootstrap_db>().then().create_database<schema_bootstrap_db>().build_sql();
+            create_all_tables(schema_bootstrap_db{}).then().create_database(schema_bootstrap_db{}).build_sql();
         expect(sql ==
                "CREATE TABLE schema_bootstrap_db.account (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
@@ -1088,46 +1089,46 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
 
 suite<"DDL Features"> ddl_features_suite = [] {
     "create_view.as(select) - generates CREATE VIEW AS SELECT"_test = [] {
-        auto const sql = create_view<new_table>().as(select(test_table::id{}).from(test_table{})).build_sql();
+        auto const sql = create_view(new_table{}).as(select(test_table::id{}).from(test_table{})).build_sql();
         expect(sql == "CREATE VIEW new_table AS SELECT id FROM test_table;\n"s) << sql;
     };
 
     "create_view.or_replace.as(select) - generates CREATE OR REPLACE VIEW"_test = [] {
         auto const sql =
-            create_view<new_table>().or_replace().as(select(test_table::id{}).from(test_table{})).build_sql();
+            create_view(new_table{}).or_replace().as(select(test_table::id{}).from(test_table{})).build_sql();
         expect(sql == "CREATE OR REPLACE VIEW new_table AS SELECT id FROM test_table;\n"s) << sql;
     };
 
     "drop_view.if_exists - generates DROP VIEW IF EXISTS"_test = [] {
-        auto const sql = drop_view<new_table>().if_exists().build_sql();
+        auto const sql = drop_view(new_table{}).if_exists().build_sql();
         expect(sql == "DROP VIEW IF EXISTS new_table;\n"s) << sql;
     };
 
     "rename_table - generates RENAME TABLE old TO new"_test = [] {
-        auto const sql = rename_table<test_table, renamed_table>().build_sql();
+        auto const sql = rename_table(test_table{}, renamed_table{}).build_sql();
         expect(sql == "RENAME TABLE test_table TO renamed_table;\n"s) << sql;
     };
 
     "create_index_on - generates CREATE INDEX"_test = [] {
         auto const sql =
-            create_index_on<index_id<"idx_test_table_id_name">, test_table, test_table::id, test_table::name>()
+            create_index_on<test_table::id, test_table::name>(index_id<"idx_test_table_id_name">{}, test_table{})
                 .build_sql();
         expect(sql == "CREATE INDEX idx_test_table_id_name ON test_table (id, name);\n"s) << sql;
     };
 
     "create_index_on.unique - generates CREATE UNIQUE INDEX"_test = [] {
         auto const sql =
-            create_index_on<index_id<"uq_test_table_name">, test_table, test_table::name>().unique().build_sql();
+            create_index_on<test_table::name>(index_id<"uq_test_table_name">{}, test_table{}).unique().build_sql();
         expect(sql == "CREATE UNIQUE INDEX uq_test_table_name ON test_table (name);\n"s) << sql;
     };
 
     "drop_index_on - generates DROP INDEX ON table"_test = [] {
-        auto const sql = drop_index_on<index_id<"idx_test_table_id_name">, test_table>().build_sql();
+        auto const sql = drop_index_on(index_id<"idx_test_table_id_name">{}, test_table{}).build_sql();
         expect(sql == "DROP INDEX idx_test_table_id_name ON test_table;\n"s) << sql;
     };
 
     "alter_table - generates combined ALTER TABLE actions"_test = [] {
-        auto const sql = alter_table<test_table>()
+        auto const sql = alter_table(test_table{})
                              .add_column<test_table::name>()
                              .modify_column<test_table::name>()
                              .rename_column<test_table::name, column_field<"display_name", varchar_type<255>>>()
@@ -1141,7 +1142,7 @@ suite<"DDL Features"> ddl_features_suite = [] {
     };
 
     "alter_table constraint helpers - add/drop constraint and drop fk"_test = [] {
-        auto const sql = alter_table<test_table>()
+        auto const sql = alter_table(test_table{})
                              .add_constraint("fk_test_table_related FOREIGN KEY (id) REFERENCES related_table(id)")
                              .drop_constraint("chk_test_table_name")
                              .drop_foreign_key("fk_test_table_related")
@@ -1159,7 +1160,7 @@ suite<"DDL Features"> ddl_features_suite = [] {
 
 suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
     "alter_table.change_column - renames and retypes a column"_test = [] {
-        auto const sql = alter_table<test_table>()
+        auto const sql = alter_table(test_table{})
                              .change_column<test_table::name, column_field<"display_name", varchar_type<512>>>()
                              .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512) NOT NULL;\n"s) << sql;
@@ -1167,7 +1168,7 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
 
     "alter_table.change_column nullable - std::optional makes column nullable"_test = [] {
         auto const sql =
-            alter_table<test_table>()
+            alter_table(test_table{})
                 .change_column<test_table::name, column_field<"display_name", std::optional<varchar_type<512>>>>()
                 .build_sql();
         expect(sql == "ALTER TABLE test_table CHANGE COLUMN name display_name VARCHAR(512);\n"s) << sql;
@@ -1175,52 +1176,52 @@ suite<"DDL alter_table extended"> alter_table_extended_suite = [] {
 
     "alter_table.add_index - generates ADD INDEX"_test = [] {
         auto const sql =
-            alter_table<test_table>().add_index<index_id<"idx_test_table_name">, test_table::name>().build_sql();
+            alter_table(test_table{}).add_index<test_table::name>(index_id<"idx_test_table_name">{}).build_sql();
         expect(sql == "ALTER TABLE test_table ADD INDEX idx_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.add_unique_index - generates ADD UNIQUE INDEX"_test = [] {
         auto const sql =
-            alter_table<test_table>().add_unique_index<index_id<"uq_test_table_name">, test_table::name>().build_sql();
+            alter_table(test_table{}).add_unique_index<test_table::name>(index_id<"uq_test_table_name">{}).build_sql();
         expect(sql == "ALTER TABLE test_table ADD UNIQUE INDEX uq_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.add_fulltext_index - generates ADD FULLTEXT INDEX"_test = [] {
-        auto const sql = alter_table<test_table>()
-                             .add_fulltext_index<index_id<"ft_test_table_name">, test_table::name>()
+        auto const sql = alter_table(test_table{})
+                             .add_fulltext_index<test_table::name>(index_id<"ft_test_table_name">{})
                              .build_sql();
         expect(sql == "ALTER TABLE test_table ADD FULLTEXT INDEX ft_test_table_name (name);\n"s) << sql;
     };
 
     "alter_table.enable_keys - generates ENABLE KEYS"_test = [] {
-        auto const sql = alter_table<test_table>().enable_keys().build_sql();
+        auto const sql = alter_table(test_table{}).enable_keys().build_sql();
         expect(sql == "ALTER TABLE test_table ENABLE KEYS;\n"s) << sql;
     };
 
     "alter_table.disable_keys - generates DISABLE KEYS"_test = [] {
-        auto const sql = alter_table<test_table>().disable_keys().build_sql();
+        auto const sql = alter_table(test_table{}).disable_keys().build_sql();
         expect(sql == "ALTER TABLE test_table DISABLE KEYS;\n"s) << sql;
     };
 
     "alter_table.convert_to_charset - generates CONVERT TO CHARACTER SET"_test = [] {
-        auto const sql = alter_table<test_table>().convert_to_charset(Charset::utf8mb4).build_sql();
+        auto const sql = alter_table(test_table{}).convert_to_charset(Charset::utf8mb4).build_sql();
         expect(sql == "ALTER TABLE test_table CONVERT TO CHARACTER SET utf8mb4;\n"s) << sql;
     };
 
     "alter_table.set_engine - generates ENGINE = ..."_test = [] {
-        auto const sql = alter_table<test_table>().set_engine(Engine::InnoDB).build_sql();
+        auto const sql = alter_table(test_table{}).set_engine(Engine::InnoDB).build_sql();
         expect(sql == "ALTER TABLE test_table ENGINE = InnoDB;\n"s) << sql;
     };
 
     "alter_table.set_auto_increment - generates AUTO_INCREMENT = n"_test = [] {
-        auto const sql = alter_table<test_table>().set_auto_increment(1000).build_sql();
+        auto const sql = alter_table(test_table{}).set_auto_increment(1000).build_sql();
         expect(sql == "ALTER TABLE test_table AUTO_INCREMENT = 1000;\n"s) << sql;
     };
 
     "alter_table - combines multiple new actions"_test = [] {
-        auto const sql = alter_table<test_table>()
+        auto const sql = alter_table(test_table{})
                              .change_column<test_table::name, column_field<"label", text_type<>>>()
-                             .add_index<index_id<"idx_label">, test_table::name>()
+                             .add_index<test_table::name>(index_id<"idx_label">{})
                              .set_engine(Engine::MyISAM)
                              .set_auto_increment(500)
                              .build_sql();
@@ -1270,7 +1271,7 @@ struct text_table {
 
 suite<"DDL text_type types"> ddl_text_type_suite = [] {
     "create_table with text_type - emits TEXT column"_test = [] {
-        auto const sql = create_table<text_table>().build_sql();
+        auto const sql = create_table(text_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE text_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -1283,7 +1284,7 @@ suite<"DDL text_type types"> ddl_text_type_suite = [] {
     };
 
     "create_table.if_not_exists with text columns - emits IF NOT EXISTS"_test = [] {
-        auto const sql = create_table<text_table>().if_not_exists().build_sql();
+        auto const sql = create_table(text_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS text_table (\n"
                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
@@ -1302,17 +1303,17 @@ suite<"DDL text_type types"> ddl_text_type_suite = [] {
 
 suite<"DDL USE"> ddl_use_suite = [] {
     "use - generates USE"_test = [] {
-        auto const sql = use<test_db>().build_sql();
+        auto const sql = use(test_db{}).build_sql();
         expect(sql == "USE test_db;\n"s) << sql;
     };
 
     "use with custom name - uses override name"_test = [] {
-        auto const sql = use<custom_named_db>().build_sql();
+        auto const sql = use(custom_named_db{}).build_sql();
         expect(sql == "USE my_custom_db;\n"s) << sql;
     };
 
     "create_database.then.use - chains CREATE DATABASE and USE"_test = [] {
-        auto const sql = create_database<test_db>().if_not_exists().then().use<test_db>().build_sql();
+        auto const sql = create_database(test_db{}).if_not_exists().then().use(test_db{}).build_sql();
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS test_db;\n"
                "USE test_db;\n"s)
@@ -1320,12 +1321,12 @@ suite<"DDL USE"> ddl_use_suite = [] {
     };
 
     "create_database.then.use.then.create_table - full setup chain"_test = [] {
-        auto const sql = create_database<test_db>()
+        auto const sql = create_database(test_db{})
                              .if_not_exists()
                              .then()
-                             .use<test_db>()
+                             .use(test_db{})
                              .then()
-                             .create_table<test_db::symbol>()
+                             .create_table(test_db::symbol{})
                              .if_not_exists()
                              .build_sql();
         expect(sql ==
@@ -1356,12 +1357,12 @@ suite<"DDL SHOW"> ddl_show_suite = [] {
     };
 
     "show_columns - generates SHOW COLUMNS FROM table"_test = [] {
-        auto const sql = show_columns<test_table>().build_sql();
+        auto const sql = show_columns(test_table{}).build_sql();
         expect(sql == "SHOW COLUMNS FROM test_table"s) << sql;
     };
 
     "show_create_table - generates SHOW CREATE TABLE"_test = [] {
-        auto const sql = show_create_table<test_table>().build_sql();
+        auto const sql = show_create_table(test_table{}).build_sql();
         expect(sql == "SHOW CREATE TABLE test_table"s) << sql;
     };
 };
@@ -1372,56 +1373,32 @@ suite<"DDL SHOW"> ddl_show_suite = [] {
 
 suite<"DDL procedures"> ddl_procedure_suite = [] {
     "create_procedure - generates CREATE PROCEDURE"_test = [] {
-        auto const sql = create_procedure<procedure_id<"usp_hello">>("", "SELECT 1;").build_sql();
-        expect(sql == "CREATE PROCEDURE usp_hello()\nBEGIN\nSELECT 1;\nEND"s) << sql;
-    };
-
-    "create_procedure with params - includes params"_test = [] {
-        auto const sql = create_procedure<procedure_id<"usp_add">>("IN a INT, IN b INT", "SELECT a + b;").build_sql();
-        expect(sql == "CREATE PROCEDURE usp_add(IN a INT, IN b INT)\nBEGIN\nSELECT a + b;\nEND"s) << sql;
-    };
-
-    "drop_procedure - generates DROP PROCEDURE"_test = [] {
-        auto const sql = drop_procedure<procedure_id<"usp_hello">>().build_sql();
-        expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
-    };
-
-    "drop_procedure.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
-        auto const sql = drop_procedure<procedure_id<"usp_hello">>().if_exists().build_sql();
-        expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
-    };
-
-    "call_procedure no args - generates CALL name()"_test = [] {
-        auto const sql = call_procedure<procedure_id<"usp_hello">>().build_sql();
-        expect(sql == "CALL usp_hello()"s) << sql;
-    };
-
-    "call_procedure with args - generates CALL name(args)"_test = [] {
-        auto const sql = call_procedure<procedure_id<"usp_add">>("1, 2").build_sql();
-        expect(sql == "CALL usp_add(1, 2)"s) << sql;
-    };
-
-    "create_procedure instance-based - generates CREATE PROCEDURE"_test = [] {
         auto const sql = create_procedure(procedure_id<"usp_hello">{}, "", "SELECT 1;").build_sql();
         expect(sql == "CREATE PROCEDURE usp_hello()\nBEGIN\nSELECT 1;\nEND"s) << sql;
     };
 
-    "drop_procedure instance-based - generates DROP PROCEDURE"_test = [] {
+    "create_procedure with params - includes params"_test = [] {
+        auto const sql =
+            create_procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;").build_sql();
+        expect(sql == "CREATE PROCEDURE usp_add(IN a INT, IN b INT)\nBEGIN\nSELECT a + b;\nEND"s) << sql;
+    };
+
+    "drop_procedure - generates DROP PROCEDURE"_test = [] {
         auto const sql = drop_procedure(procedure_id<"usp_hello">{}).build_sql();
         expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
     };
 
-    "drop_procedure instance-based.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
+    "drop_procedure.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
         auto const sql = drop_procedure(procedure_id<"usp_hello">{}).if_exists().build_sql();
         expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
     };
 
-    "call_procedure instance-based no args - generates CALL name()"_test = [] {
+    "call_procedure no args - generates CALL name()"_test = [] {
         auto const sql = call_procedure(procedure_id<"usp_hello">{}).build_sql();
         expect(sql == "CALL usp_hello()"s) << sql;
     };
 
-    "call_procedure instance-based with args - generates CALL name(args)"_test = [] {
+    "call_procedure with args - generates CALL name(args)"_test = [] {
         auto const sql = call_procedure(procedure_id<"usp_add">{}, "1, 2").build_sql();
         expect(sql == "CALL usp_add(1, 2)"s) << sql;
     };
@@ -1453,8 +1430,8 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 
 suite<"DDL triggers"> ddl_trigger_suite = [] {
     "create_trigger BEFORE INSERT - generates correct SQL"_test = [] {
-        auto const sql = create_trigger<trigger_id<"trg_before_insert">, test_table>(
-                             TriggerTiming::Before, TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
+        auto const sql = create_trigger<test_table>(trigger_id<"trg_before_insert">{}, TriggerTiming::Before,
+                                                    TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
                              .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_before_insert BEFORE INSERT ON test_table FOR EACH ROW\n"
@@ -1463,10 +1440,10 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "create_trigger AFTER UPDATE - generates correct SQL"_test = [] {
-        auto const sql =
-            create_trigger<trigger_id<"trg_after_update">, test_table>(TriggerTiming::After, TriggerEvent::Update,
-                                                                       "INSERT INTO audit_log VALUES (OLD.id, NOW());")
-                .build_sql();
+        auto const sql = create_trigger<test_table>(trigger_id<"trg_after_update">{}, TriggerTiming::After,
+                                                    TriggerEvent::Update,
+                                                    "INSERT INTO audit_log VALUES (OLD.id, NOW());")
+                             .build_sql();
         expect(sql ==
                "CREATE TRIGGER trg_after_update AFTER UPDATE ON test_table FOR EACH ROW\n"
                "INSERT INTO audit_log VALUES (OLD.id, NOW());"s)
@@ -1474,12 +1451,12 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
     };
 
     "drop_trigger - generates DROP TRIGGER"_test = [] {
-        auto const sql = drop_trigger<trigger_id<"trg_before_insert">, test_table>().build_sql();
+        auto const sql = drop_trigger<test_table>(trigger_id<"trg_before_insert">{}).build_sql();
         expect(sql == "DROP TRIGGER trg_before_insert"s) << sql;
     };
 
     "drop_trigger.if_exists - generates DROP TRIGGER IF EXISTS"_test = [] {
-        auto const sql = drop_trigger<trigger_id<"trg_before_insert">, test_table>().if_exists().build_sql();
+        auto const sql = drop_trigger<test_table>(trigger_id<"trg_before_insert">{}).if_exists().build_sql();
         expect(sql == "DROP TRIGGER IF EXISTS trg_before_insert"s) << sql;
     };
 };

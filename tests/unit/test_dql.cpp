@@ -122,7 +122,7 @@ suite<"DQL"> dql_suite = [] {
 
     "select<count_all> and count<T> produce identical SQL"_test = [] {
         auto const via_select = select(count_all{}).from(product{}).build_sql();
-        auto const via_count = count<product>().build_sql();
+        auto const via_count = count(product{}).build_sql();
         expect(via_select == via_count) << "select<count_all> and count<T> must produce the same SQL";
     };
 };
@@ -2619,7 +2619,7 @@ suite<"DML Features"> dml_features_suite = [] {
         p.name_ = std::nullopt;
         p.price_val_ = 9.99;
 
-        auto const sql = insert_ignore_into<ext_product>().values(p).build_sql();
+        auto const sql = insert_ignore_into(ext_product{}).values(p).build_sql();
         expect(sql.substr(0, 19) == "INSERT IGNORE INTO "s) << sql.substr(0, 19);
         expect(
             sql ==
@@ -2637,7 +2637,7 @@ suite<"DML Features"> dml_features_suite = [] {
         p.name_ = std::nullopt;
         p.price_val_ = 9.99;
 
-        auto const sql = replace_into<ext_product>().values(p).build_sql();
+        auto const sql = replace_into(ext_product{}).values(p).build_sql();
         expect(sql.substr(0, 13) == "REPLACE INTO "s) << sql.substr(0, 13);
         expect(sql ==
                "REPLACE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES (1, NULL, 'WIDGET', "
@@ -2654,7 +2654,7 @@ suite<"DML Features"> dml_features_suite = [] {
         p.name_ = std::nullopt;
         p.price_val_ = 19.99;
 
-        auto const sql = replace_into<ext_product>().values(p).build_sql();
+        auto const sql = replace_into(ext_product{}).values(p).build_sql();
         expect(sql ==
                "REPLACE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES (2, 3, 'SKU2', 'type2', "
                "NULL, 19.990000)")
@@ -2666,7 +2666,7 @@ suite<"DML Features"> dml_features_suite = [] {
                                      ext_product::type{}, ext_product::name{}, ext_product::price_val{})
                                   .from(ext_product{})
                                   .where(equal<ext_product::type>(ext_product::type{"widget"}));
-        auto const sql = insert_into_select<ext_product>(select_q).build_sql();
+        auto const sql = insert_into_select(ext_product{}, select_q).build_sql();
         expect(
             sql ==
             "INSERT INTO ext_product (id, category_id, sku, type, name, price_val) SELECT id, category_id, sku, type, "
@@ -2675,14 +2675,14 @@ suite<"DML Features"> dml_features_suite = [] {
     };
 
     "update_join — generates UPDATE T1 JOIN T2 ON ... SET ..."_test = [] {
-        auto const sql = update_join<ext_product, ext_category, ext_product::category_id, ext_category::id>()
+        auto const sql = update_join<ext_product::category_id, ext_category::id>(ext_product{}, ext_category{})
                              .set(ext_product::sku{"UPDATED"})
                              .build_sql();
         expect(sql == "UPDATE ext_product INNER JOIN ext_category ON category_id = id SET sku = 'UPDATED'") << sql;
     };
 
     "update_join with WHERE — generates UPDATE JOIN WHERE SQL"_test = [] {
-        auto const sql = update_join<ext_product, ext_category, ext_product::category_id, ext_category::id>()
+        auto const sql = update_join<ext_product::category_id, ext_category::id>(ext_product{}, ext_category{})
                              .set(ext_product::sku{"NEW_SKU"})
                              .where(equal<ext_product::id>(ext_product::id{42u}))
                              .build_sql();
@@ -2692,7 +2692,7 @@ suite<"DML Features"> dml_features_suite = [] {
     };
 
     "update_join set multiple columns — generates comma-separated SET"_test = [] {
-        auto const sql = update_join<ext_product, ext_category, ext_product::category_id, ext_category::id>()
+        auto const sql = update_join<ext_product::category_id, ext_category::id>(ext_product{}, ext_category{})
                              .set(ext_product::sku{"SKU1"}, ext_product::type{"gadget"})
                              .build_sql();
         expect(sql ==
@@ -2711,7 +2711,7 @@ suite<"DML Features"> dml_features_suite = [] {
         p2.sku_ = "SKU2";
         p2.type_ = "type2";
         p2.price_val_ = 2.0;
-        auto const sql = insert_ignore_into<ext_product>().values(std::initializer_list{p1, p2}).build_sql();
+        auto const sql = insert_ignore_into(ext_product{}).values(std::initializer_list{p1, p2}).build_sql();
         expect(sql ==
                "INSERT IGNORE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES (1, NULL, 'SKU1', "
                "'type1', NULL, 1.000000), (2, NULL, 'SKU2', 'type2', NULL, 2.000000)")
@@ -2729,7 +2729,7 @@ suite<"DML Features"> dml_features_suite = [] {
         p2.sku_ = "RSKU2";
         p2.type_ = "rtype2";
         p2.price_val_ = 20.0;
-        auto const sql = replace_into<ext_product>().values(std::initializer_list<ext_product>{p1, p2}).build_sql();
+        auto const sql = replace_into(ext_product{}).values(std::initializer_list<ext_product>{p1, p2}).build_sql();
         expect(sql ==
                "REPLACE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES (1, NULL, 'RSKU1', "
                "'rtype1', "
@@ -2738,12 +2738,12 @@ suite<"DML Features"> dml_features_suite = [] {
     };
 
     "insert_ignore_into empty vector — returns column list with empty values"_test = [] {
-        auto const sql = insert_ignore_into<ext_product>().values(std::initializer_list<ext_product>{}).build_sql();
+        auto const sql = insert_ignore_into(ext_product{}).values(std::initializer_list<ext_product>{}).build_sql();
         expect(sql == "INSERT IGNORE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES ()") << sql;
     };
 
     "replace_into empty vector — returns column list with empty values"_test = [] {
-        auto const sql = replace_into<ext_product>().values(std::initializer_list<ext_product>{}).build_sql();
+        auto const sql = replace_into(ext_product{}).values(std::initializer_list<ext_product>{}).build_sql();
         expect(sql == "REPLACE INTO ext_product (id, category_id, sku, type, name, price_val) VALUES ()") << sql;
     };
 };

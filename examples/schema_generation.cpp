@@ -92,14 +92,14 @@ int main() {
     std::println("=== Generated CREATE TABLE SQL ===\n");
 
     std::println("-- database:");
-    std::println("{}\n", ds_mysql::create_database<example_db>().if_not_exists().build_sql());
+    std::println("{}\n", ds_mysql::create_database(example_db{}).if_not_exists().build_sql());
 
     // Generate CREATE TABLE SQL for each table
     std::println("-- user table:");
-    std::println("{}\n", ds_mysql::create_table<user>().if_not_exists().build_sql());
+    std::println("{}\n", ds_mysql::create_table(user{}).if_not_exists().build_sql());
 
     std::println("-- order_row table:");
-    std::println("{}\n", ds_mysql::create_table<order_row>().if_not_exists().build_sql());
+    std::println("{}\n", ds_mysql::create_table(order_row{}).if_not_exists().build_sql());
 
     // Show SELECT query SQL
     std::println("=== SELECT query SQL ===\n");

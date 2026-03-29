@@ -71,7 +71,7 @@ int main() {
     std::println("Connected to {}:{}", host, port);
 
     // --- Create table ---
-    if (auto r = db.execute(ds_mysql::create_table<product>().if_not_exists()); !r) {
+    if (auto r = db.execute(ds_mysql::create_table(product{}).if_not_exists()); !r) {
         std::println(stderr, "CREATE TABLE failed: {}", r.error());
         return 1;
     }
@@ -94,7 +94,7 @@ int main() {
     row.description_ = product::description{std::nullopt};
     row.created_at_ = product::created_at{ds_mysql::sql_now};
 
-    if (auto r = db.execute(ds_mysql::insert_into<product>().values(row)); !r) {
+    if (auto r = db.execute(ds_mysql::insert_into(product{}).values(row)); !r) {
         std::println(stderr, "INSERT failed: {}", r.error());
         return 1;
     }
@@ -115,7 +115,7 @@ int main() {
     }
 
     // --- Count rows ---
-    auto cnt = db.query(ds_mysql::count<product>());
+    auto cnt = db.query(ds_mysql::count(product{}));
     if (cnt && !cnt->empty()) {
         std::println("\nTotal products: {}", std::get<0>(cnt->front()));
     }

@@ -108,28 +108,28 @@ template <ColumnDescriptor... Cols>
     return "PRIMARY KEY " + columns_sql<Cols...>();
 }
 
-template <NamedIdType IndexId, ColumnDescriptor... Cols>
+template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string key() {
-    return "KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
+[[nodiscard]] inline std::string key(index_id<Name> const&) {
+    return "KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <NamedIdType IndexId, ColumnDescriptor... Cols>
+template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string unique_key() {
-    return "UNIQUE KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
+[[nodiscard]] inline std::string unique_key(index_id<Name> const&) {
+    return "UNIQUE KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <NamedIdType IndexId, ColumnDescriptor... Cols>
+template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string fulltext_key() {
-    return "FULLTEXT KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
+[[nodiscard]] inline std::string fulltext_key(index_id<Name> const&) {
+    return "FULLTEXT KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <NamedIdType IndexId, ColumnDescriptor... Cols>
+template <ColumnDescriptor... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string spatial_key() {
-    return "SPATIAL KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
+[[nodiscard]] inline std::string spatial_key(index_id<Name> const&) {
+    return "SPATIAL KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
 // Accepts a check_expr predicate; column name, operator, and value are all
@@ -139,16 +139,16 @@ template <NamedIdType IndexId, ColumnDescriptor... Cols>
 //   table_constraint::check(greater_than<my_table::price>(0.0))
 //   // → CHECK (price > 0)
 //
-// With constraint name as template parameter:
-//   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
+// With constraint name as function parameter:
+//   table_constraint::check(check_id<"chk_positive_price">{}, greater_than<my_table::price>(0.0))
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
 [[nodiscard]] inline std::string check(check_expr const& expr) {
     return "CHECK (" + expr.build_sql() + ')';
 }
 
-template <NamedIdType CId>
-[[nodiscard]] inline std::string check(check_expr const& expr) {
-    return "CONSTRAINT " + std::string(CId::name()) + " CHECK (" + expr.build_sql() + ')';
+template <fixed_string Name>
+[[nodiscard]] inline std::string check(check_id<Name> const&, check_expr const& expr) {
+    return "CONSTRAINT " + std::string(Name) + " CHECK (" + expr.build_sql() + ')';
 }
 
 [[nodiscard]] inline std::string raw(std::string sql_fragment) {
@@ -180,8 +180,8 @@ template <NamedIdType CId>
 //   create_table<NewT>().if_not_exists().like<SourceT>()          — CREATE TABLE IF NOT EXISTS NewT LIKE SourceT
 //
 // Commands can be sequenced with .then():
-//   create_database<DB>().then().create_table<T>().if_not_exists()
-//   drop_table<T>().if_exists().then().create_table<T>().if_not_exists()
+//   create_database(DB{}).then().create_table(T{}).if_not_exists()
+//   drop_table(T{}).if_exists().then().create_table(T{}).if_not_exists()
 //
 // All stages terminate with .build_sql() -> std::string.
 // Note: use<DB>() sets the default database for the session.
@@ -1170,44 +1170,44 @@ public:
     }
 
     template <typename T>
-    [[nodiscard]] auto create_table() const;
+    [[nodiscard]] auto create_table(T const&) const;
 
     template <typename T>
-    [[nodiscard]] auto create_temporary_table() const;
+    [[nodiscard]] auto create_temporary_table(T const&) const;
 
     template <typename T>
-    [[nodiscard]] auto drop_table() const;
+    [[nodiscard]] auto drop_table(T const&) const;
 
     template <typename T>
-    [[nodiscard]] auto drop_temporary_table() const;
+    [[nodiscard]] auto drop_temporary_table(T const&) const;
 
     template <Database T>
-    [[nodiscard]] auto create_database() const;
+    [[nodiscard]] auto create_database(T const&) const;
 
     [[nodiscard]] auto create_database(database_name name) const;
 
     template <Database T>
-    [[nodiscard]] auto drop_database() const;
+    [[nodiscard]] auto drop_database(T const&) const;
 
     [[nodiscard]] auto drop_database(database_name name) const;
 
     // USE <database> — sets default database for the session.
     template <Database T>
-    [[nodiscard]] auto use() const;
+    [[nodiscard]] auto use(T const&) const;
 
     [[nodiscard]] auto use(database_name name) const;
 
     template <typename T>
-    [[nodiscard]] auto create_view() const;
+    [[nodiscard]] auto create_view(T const&) const;
 
     template <typename T>
-    [[nodiscard]] auto drop_view() const;
+    [[nodiscard]] auto drop_view(T const&) const;
 
     template <typename From, typename To>
-    [[nodiscard]] auto rename_table() const;
+    [[nodiscard]] auto rename_table(From const&, To const&) const;
 
     template <Database DB>
-    [[nodiscard]] auto create_all_tables() const;
+    [[nodiscard]] auto create_all_tables(DB const&) const;
 
 private:
     Prior builder_;
@@ -1498,31 +1498,31 @@ public:
     }
 
     // ADD INDEX name (col1, col2, ...)
-    template <NamedIdType IndexId, ColumnDescriptor... Cols>
+    template <ColumnDescriptor... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_index() const {
+    [[nodiscard]] alter_table_builder add_index(index_id<Name> const&) const {
         auto copy = *this;
-        copy.actions_.push_back("ADD INDEX " + std::string(IndexId::name()) + " " +
+        copy.actions_.push_back("ADD INDEX " + std::string(Name) + " " +
                                 table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
     // ADD UNIQUE INDEX name (col1, col2, ...)
-    template <NamedIdType IndexId, ColumnDescriptor... Cols>
+    template <ColumnDescriptor... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_unique_index() const {
+    [[nodiscard]] alter_table_builder add_unique_index(index_id<Name> const&) const {
         auto copy = *this;
-        copy.actions_.push_back("ADD UNIQUE INDEX " + std::string(IndexId::name()) + " " +
+        copy.actions_.push_back("ADD UNIQUE INDEX " + std::string(Name) + " " +
                                 table_constraint::columns_sql<Cols...>());
         return copy;
     }
 
     // ADD FULLTEXT INDEX name (col1, col2, ...)
-    template <NamedIdType IndexId, ColumnDescriptor... Cols>
+    template <ColumnDescriptor... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] alter_table_builder add_fulltext_index() const {
+    [[nodiscard]] alter_table_builder add_fulltext_index(index_id<Name> const&) const {
         auto copy = *this;
-        copy.actions_.push_back("ADD FULLTEXT INDEX " + std::string(IndexId::name()) + " " +
+        copy.actions_.push_back("ADD FULLTEXT INDEX " + std::string(Name) + " " +
                                 table_constraint::columns_sql<Cols...>());
         return copy;
     }
@@ -2116,31 +2116,31 @@ private:
 // Out-of-line definitions for ddl_continuation<Prior>
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::create_table() const {
+[[nodiscard]] auto ddl_continuation<Prior>::create_table(T const&) const {
     return create_table_builder<T, ddl_continuation<Prior>>{false, *this};
 }
 
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::create_temporary_table() const {
+[[nodiscard]] auto ddl_continuation<Prior>::create_temporary_table(T const&) const {
     return create_table_builder<T, ddl_continuation<Prior>>{true, *this};
 }
 
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::drop_table() const {
+[[nodiscard]] auto ddl_continuation<Prior>::drop_table(T const&) const {
     return drop_table_builder<T, ddl_continuation<Prior>>{false, *this};
 }
 
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::drop_temporary_table() const {
+[[nodiscard]] auto ddl_continuation<Prior>::drop_temporary_table(T const&) const {
     return drop_table_builder<T, ddl_continuation<Prior>>{true, *this};
 }
 
 template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] auto ddl_continuation<Prior>::create_database() const {
+[[nodiscard]] auto ddl_continuation<Prior>::create_database(T const&) const {
     return create_database_builder<T, ddl_continuation<Prior>>{*this};
 }
 
@@ -2151,7 +2151,7 @@ template <SqlBuilder Prior>
 
 template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] auto ddl_continuation<Prior>::drop_database() const {
+[[nodiscard]] auto ddl_continuation<Prior>::drop_database(T const&) const {
     return drop_database_builder<T, ddl_continuation<Prior>>{*this};
 }
 
@@ -2162,25 +2162,25 @@ template <SqlBuilder Prior>
 
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::create_view() const {
+[[nodiscard]] auto ddl_continuation<Prior>::create_view(T const&) const {
     return create_view_builder<T, ddl_continuation<Prior>>{*this};
 }
 
 template <SqlBuilder Prior>
 template <typename T>
-[[nodiscard]] auto ddl_continuation<Prior>::drop_view() const {
+[[nodiscard]] auto ddl_continuation<Prior>::drop_view(T const&) const {
     return drop_view_builder<T, ddl_continuation<Prior>>{*this};
 }
 
 template <SqlBuilder Prior>
 template <typename From, typename To>
-[[nodiscard]] auto ddl_continuation<Prior>::rename_table() const {
+[[nodiscard]] auto ddl_continuation<Prior>::rename_table(From const&, To const&) const {
     return rename_table_builder<From, To, ddl_continuation<Prior>>{*this};
 }
 
 template <SqlBuilder Prior>
 template <Database DB>
-[[nodiscard]] auto ddl_continuation<Prior>::create_all_tables() const {
+[[nodiscard]] auto ddl_continuation<Prior>::create_all_tables(DB const&) const {
     return create_all_tables_builder<DB, ddl_continuation<Prior>>{*this};
 }
 
@@ -2241,18 +2241,8 @@ template <SqlBuilder SelectQuery>
 }  // namespace ddl_detail
 
 template <ValidTable T>
-[[nodiscard]] ddl_detail::create_table_builder<T> create_table() {
-    return ddl_detail::create_table_builder<T>{};
-}
-
-template <ValidTable T>
 [[nodiscard]] ddl_detail::create_table_builder<T> create_table(T const&) {
     return ddl_detail::create_table_builder<T>{};
-}
-
-template <ValidTable T>
-[[nodiscard]] ddl_detail::create_table_builder<T> create_temporary_table() {
-    return ddl_detail::create_table_builder<T>{true};
 }
 
 template <ValidTable T>
@@ -2261,18 +2251,8 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
-[[nodiscard]] ddl_detail::drop_table_builder<T> drop_table() {
-    return ddl_detail::drop_table_builder<T>{};
-}
-
-template <ValidTable T>
 [[nodiscard]] ddl_detail::drop_table_builder<T> drop_table(T const&) {
     return ddl_detail::drop_table_builder<T>{};
-}
-
-template <ValidTable T>
-[[nodiscard]] ddl_detail::drop_table_builder<T> drop_temporary_table() {
-    return ddl_detail::drop_table_builder<T>{true};
 }
 
 template <ValidTable T>
@@ -2281,18 +2261,8 @@ template <ValidTable T>
 }
 
 template <ValidTable T>
-[[nodiscard]] ddl_detail::create_view_builder<T> create_view() {
-    return ddl_detail::create_view_builder<T>{};
-}
-
-template <ValidTable T>
 [[nodiscard]] ddl_detail::create_view_builder<T> create_view(T const&) {
     return ddl_detail::create_view_builder<T>{};
-}
-
-template <ValidTable T>
-[[nodiscard]] ddl_detail::drop_view_builder<T> drop_view() {
-    return ddl_detail::drop_view_builder<T>{};
 }
 
 template <ValidTable T>
@@ -2301,38 +2271,18 @@ template <ValidTable T>
 }
 
 template <ValidTable From, ValidTable To>
-[[nodiscard]] ddl_detail::rename_table_builder<From, To> rename_table() {
-    return ddl_detail::rename_table_builder<From, To>{};
-}
-
-template <ValidTable From, ValidTable To>
 [[nodiscard]] ddl_detail::rename_table_builder<From, To> rename_table(From const&, To const&) {
     return ddl_detail::rename_table_builder<From, To>{};
 }
 
-template <NamedIdType IndexId, ValidTable Table, ColumnDescriptor... Cols>
-[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on() {
-    return ddl_detail::create_index_builder<Table, Cols...>{std::string(IndexId::name())};
+template <ColumnDescriptor... Cols, fixed_string Name, ValidTable Table>
+[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(index_id<Name> const&, Table const&) {
+    return ddl_detail::create_index_builder<Table, Cols...>{std::string(Name)};
 }
 
-template <NamedIdType IndexId, ColumnDescriptor... Cols, ValidTable Table>
-[[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(Table const&) {
-    return ddl_detail::create_index_builder<Table, Cols...>{std::string(IndexId::name())};
-}
-
-template <NamedIdType IndexId, ValidTable Table>
-[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on() {
-    return ddl_detail::drop_index_builder<Table>{std::string(IndexId::name())};
-}
-
-template <NamedIdType IndexId, ValidTable Table>
-[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(Table const&) {
-    return ddl_detail::drop_index_builder<Table>{std::string(IndexId::name())};
-}
-
-template <ValidTable Table>
-[[nodiscard]] ddl_detail::alter_table_builder<Table> alter_table() {
-    return ddl_detail::alter_table_builder<Table>{};
+template <fixed_string Name, ValidTable Table>
+[[nodiscard]] ddl_detail::drop_index_builder<Table> drop_index_on(index_id<Name> const&, Table const&) {
+    return ddl_detail::drop_index_builder<Table>{std::string(Name)};
 }
 
 template <ValidTable Table>
@@ -2341,7 +2291,7 @@ template <ValidTable Table>
 }
 
 /**
- * create_database<DB>() — CREATE DATABASE <db> [IF NOT EXISTS].
+ * create_database(DB{}) — CREATE DATABASE <db> [IF NOT EXISTS].
  *
  * DB must inherit from database_schema.
  *
@@ -2350,12 +2300,12 @@ template <ValidTable Table>
  *       struct symbol { ... };
  *   };
  *
- *   db.execute(create_database<my_db>());
- *   db.execute(create_database<my_db>().if_not_exists());
- *   db.execute(create_database<my_db>().then().create_table<my_db::symbol>());
+ *   db.execute(create_database(my_db{}));
+ *   db.execute(create_database(my_db{}).if_not_exists());
+ *   db.execute(create_database(my_db{}).then().create_table(my_db::symbol{}));
  */
 template <Database T>
-[[nodiscard]] ddl_detail::create_database_builder<T> create_database() {
+[[nodiscard]] ddl_detail::create_database_builder<T> create_database(T const&) {
     using _ = typename database_tables<T>::type;
     (void)sizeof(_);
     return ddl_detail::create_database_builder<T>{};
@@ -2366,12 +2316,12 @@ template <Database T>
 }
 
 /**
- * drop_database<DB>() — DROP DATABASE <db> [IF EXISTS].
+ * drop_database(DB{}) — DROP DATABASE <db> [IF EXISTS].
  *
  * DB must inherit from database_schema.
  */
 template <Database T>
-[[nodiscard]] ddl_detail::drop_database_builder<T> drop_database() {
+[[nodiscard]] ddl_detail::drop_database_builder<T> drop_database(T const&) {
     using _ = typename database_tables<T>::type;
     (void)sizeof(_);
     return ddl_detail::drop_database_builder<T>{};
@@ -2382,17 +2332,16 @@ template <Database T>
 }
 
 /**
- * create_all_tables<DB>() — CREATE TABLE for every table in DB.
+ * create_all_tables(DB{}) — CREATE TABLE for every table in DB.
  *
  * DB must inherit from database_schema and define a `tables` tuple.
  *
  * Example:
- *   create_all_tables<my_db>().build_sql()
- *   create_all_tables<my_db>().if_not_exists().build_sql()
- *   create_all_tables<my_db>().then().create_table<my_db::t>()...
+ *   create_all_tables(my_db{}).build_sql()
+ *   create_all_tables(my_db{}).if_not_exists().build_sql()
  */
 template <Database DB>
-[[nodiscard]] ddl_detail::create_all_tables_builder<DB> create_all_tables() {
+[[nodiscard]] ddl_detail::create_all_tables_builder<DB> create_all_tables(DB const&) {
     using _ = typename database_tables<DB>::type;
     (void)sizeof(_);
     return ddl_detail::create_all_tables_builder<DB>{};
@@ -2428,29 +2377,29 @@ private:
     Prior prior_;
 };
 
-// Out-of-line definition for ddl_continuation<Prior>::use<T>()
+// Out-of-line definition for ddl_continuation<Prior>::use(T const&)
 // (declared in ddl_continuation; defined here after use_builder<T, Prior> is complete)
 template <SqlBuilder Prior>
 template <Database T>
-[[nodiscard]] auto ddl_continuation<Prior>::use() const {
+[[nodiscard]] auto ddl_continuation<Prior>::use(T const&) const {
     return use_builder<T, ddl_continuation<Prior>>{*this};
 }
 
 }  // namespace ddl_detail
 
 /**
- * use<DB>() — USE <database>.
+ * use(DB{}) — USE <database>.
  *
  * Sets the default database for the session.
  * DB must inherit from database_schema.
  *
  * Example:
- *   db.execute(use<my_db>());
- *   db.execute(create_database<my_db>().if_not_exists()
- *                  .then().use<my_db>());
+ *   db.execute(use(my_db{}));
+ *   db.execute(create_database(my_db{}).if_not_exists()
+ *                  .then().use(my_db{}));
  */
 template <Database T>
-[[nodiscard]] constexpr ddl_detail::use_builder<T> use() {
+[[nodiscard]] constexpr ddl_detail::use_builder<T> use(T const&) {
     return ddl_detail::use_builder<T>{};
 }
 
@@ -2502,7 +2451,7 @@ template <SqlBuilder Prior>
  *
  * Example:
  *   db.execute(use("my_db"));
- *   db.execute(create_database<my_db>().if_not_exists()
+ *   db.execute(create_database(my_db{}).if_not_exists()
  *                  .then().use("my_db"));
  */
 [[nodiscard]] inline ddl_detail::use_name_builder<> use(database_name name) {
@@ -2573,17 +2522,7 @@ public:
 }
 
 template <ValidTable T>
-[[nodiscard]] ddl_detail::show_columns_builder<T> show_columns() {
-    return {};
-}
-
-template <ValidTable T>
 [[nodiscard]] ddl_detail::show_columns_builder<T> show_columns(T const&) {
-    return {};
-}
-
-template <ValidTable T>
-[[nodiscard]] ddl_detail::show_create_table_builder<T> show_create_table() {
     return {};
 }
 
@@ -2596,115 +2535,96 @@ template <ValidTable T>
 // Stored Procedures
 //
 // Entry points (executeable via db.execute()):
-//   create_procedure<procedure_id<"name">>(params, body)   — CREATE PROCEDURE name(params) BEGIN body END
-//   drop_procedure<procedure_id<"name">>()                 — DROP PROCEDURE name
-//   drop_procedure<procedure_id<"name">>().if_exists()     — DROP PROCEDURE IF EXISTS name
-//   call_procedure<procedure_id<"name">>()                 — CALL name()
-//   call_procedure<procedure_id<"name">>(args)             — CALL name(args)
+//   create_procedure(procedure_id<"name">{}, params, body) — CREATE PROCEDURE name(params) BEGIN body END
+//   drop_procedure(procedure_id<"name">{})                 — DROP PROCEDURE name
+//   drop_procedure(procedure_id<"name">{}).if_exists()     — DROP PROCEDURE IF EXISTS name
+//   call_procedure(procedure_id<"name">{})                 — CALL name()
+//   call_procedure(procedure_id<"name">{}, args)           — CALL name(args)
 // ===================================================================
 
 namespace ddl_detail {
 
+template <fixed_string Name>
 class drop_procedure_if_exists_builder {
 public:
-    explicit drop_procedure_if_exists_builder(std::string name) : name_(std::move(name)) {
+    explicit drop_procedure_if_exists_builder(procedure_id<Name> const&) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "DROP PROCEDURE IF EXISTS " + name_;
+        return "DROP PROCEDURE IF EXISTS " + std::string(Name);
     }
-
-private:
-    std::string name_;
 };
 
+template <fixed_string Name>
 class drop_procedure_builder {
 public:
-    explicit drop_procedure_builder(std::string name) : name_(std::move(name)) {
+    explicit drop_procedure_builder(procedure_id<Name> const&) {
     }
 
-    [[nodiscard]] drop_procedure_if_exists_builder if_exists() const {
-        return drop_procedure_if_exists_builder{name_};
+    [[nodiscard]] drop_procedure_if_exists_builder<Name> if_exists() const {
+        return drop_procedure_if_exists_builder<Name>{procedure_id<Name>{}};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "DROP PROCEDURE " + name_;
+        return "DROP PROCEDURE " + std::string(Name);
     }
-
-private:
-    std::string name_;
 };
 
+template <fixed_string Name>
 class create_procedure_builder {
 public:
-    create_procedure_builder(std::string name, std::string params, std::string body)
-        : name_(std::move(name)), params_(std::move(params)), body_(std::move(body)) {
+    create_procedure_builder(procedure_id<Name> const&, std::string params, std::string body)
+        : params_(std::move(params)), body_(std::move(body)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "CREATE PROCEDURE " + name_ + "(" + params_ + ")\nBEGIN\n" + body_ + "\nEND";
+        return "CREATE PROCEDURE " + std::string(Name) + "(" + params_ + ")\nBEGIN\n" + body_ + "\nEND";
     }
 
 private:
-    std::string name_;
     std::string params_;
     std::string body_;
 };
 
+template <fixed_string Name>
 class call_builder {
 public:
-    explicit call_builder(std::string name, std::string args = {}) : name_(std::move(name)), args_(std::move(args)) {
+    explicit call_builder(procedure_id<Name> const&, std::string args = {}) : args_(std::move(args)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "CALL " + name_ + "(" + args_ + ")";
+        return "CALL " + std::string(Name) + "(" + args_ + ")";
     }
 
 private:
-    std::string name_;
     std::string args_;
 };
 
 }  // namespace ddl_detail
 
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(std::string params, std::string body) {
-    return {std::string(ProcId::name()), std::move(params), std::move(body)};
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::create_procedure_builder<Name> create_procedure(procedure_id<Name> const& id,
+                                                                          std::string params, std::string body) {
+    return {id, std::move(params), std::move(body)};
 }
 
 template <fixed_string Name>
-[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(procedure_id<Name> const&, std::string params,
-                                                                    std::string body) {
-    return {std::string(Name), std::move(params), std::move(body)};
-}
-
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure() {
-    return ddl_detail::drop_procedure_builder{std::string(ProcId::name())};
+[[nodiscard]] ddl_detail::drop_procedure_builder<Name> drop_procedure(procedure_id<Name> const& id) {
+    return ddl_detail::drop_procedure_builder<Name>{id};
 }
 
 template <fixed_string Name>
-[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure(procedure_id<Name> const&) {
-    return ddl_detail::drop_procedure_builder{std::string(Name)};
-}
-
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::call_builder call_procedure(std::string args = {}) {
-    return ddl_detail::call_builder{std::string(ProcId::name()), std::move(args)};
-}
-
-template <fixed_string Name>
-[[nodiscard]] ddl_detail::call_builder call_procedure(procedure_id<Name> const&, std::string args = {}) {
-    return ddl_detail::call_builder{std::string(Name), std::move(args)};
+[[nodiscard]] ddl_detail::call_builder<Name> call_procedure(procedure_id<Name> const& id, std::string args = {}) {
+    return ddl_detail::call_builder<Name>{id, std::move(args)};
 }
 
 // ===================================================================
 // Triggers
 //
 // Entry points (executeable via db.execute()):
-//   create_trigger<T>(name, timing, event, body)  — CREATE TRIGGER name timing event ON table FOR EACH ROW body
-//   drop_trigger<T>(name)                          — DROP TRIGGER name
-//   drop_trigger<T>(name).if_exists()              — DROP TRIGGER IF EXISTS name
+//   create_trigger<T>(trigger_id<"name">{}, timing, event, body) — CREATE TRIGGER name timing event ON T FOR EACH ROW body
+//   drop_trigger<T>(trigger_id<"name">{})                        — DROP TRIGGER name
+//   drop_trigger<T>(trigger_id<"name">{}).if_exists()            — DROP TRIGGER IF EXISTS name
 // ===================================================================
 
 enum class TriggerTiming {
@@ -2736,53 +2656,46 @@ namespace ddl_detail {
     return "INSERT";
 }
 
-template <typename T>
+template <fixed_string Name, typename T>
 class drop_trigger_if_exists_builder {
 public:
-    explicit drop_trigger_if_exists_builder(std::string trigger_name) : trigger_name_(std::move(trigger_name)) {
+    explicit drop_trigger_if_exists_builder(trigger_id<Name> const&) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "DROP TRIGGER IF EXISTS " + trigger_name_;
+        return "DROP TRIGGER IF EXISTS " + std::string(Name);
     }
-
-private:
-    std::string trigger_name_;
 };
 
-template <typename T>
+template <fixed_string Name, typename T>
 class drop_trigger_builder {
 public:
-    explicit drop_trigger_builder(std::string trigger_name) : trigger_name_(std::move(trigger_name)) {
+    explicit drop_trigger_builder(trigger_id<Name> const&) {
     }
 
-    [[nodiscard]] drop_trigger_if_exists_builder<T> if_exists() const {
-        return drop_trigger_if_exists_builder<T>{trigger_name_};
+    [[nodiscard]] drop_trigger_if_exists_builder<Name, T> if_exists() const {
+        return drop_trigger_if_exists_builder<Name, T>{trigger_id<Name>{}};
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "DROP TRIGGER " + trigger_name_;
+        return "DROP TRIGGER " + std::string(Name);
     }
-
-private:
-    std::string trigger_name_;
 };
 
-template <typename T>
+template <fixed_string Name, typename T>
 class create_trigger_builder {
 public:
-    create_trigger_builder(std::string trigger_name, TriggerTiming timing, TriggerEvent event, std::string body)
-        : trigger_name_(std::move(trigger_name)), timing_(timing), event_(event), body_(std::move(body)) {
+    create_trigger_builder(trigger_id<Name> const&, TriggerTiming timing, TriggerEvent event, std::string body)
+        : timing_(timing), event_(event), body_(std::move(body)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
         const auto table_name = table_name_for<T>::value().to_string_view();
-        return "CREATE TRIGGER " + trigger_name_ + " " + to_sql_trigger_timing(timing_) + " " +
+        return "CREATE TRIGGER " + std::string(Name) + " " + to_sql_trigger_timing(timing_) + " " +
                to_sql_trigger_event(event_) + " ON " + std::string(table_name) + " FOR EACH ROW\n" + body_;
     }
 
 private:
-    std::string trigger_name_;
     TriggerTiming timing_;
     TriggerEvent event_;
     std::string body_;
@@ -2790,15 +2703,16 @@ private:
 
 }  // namespace ddl_detail
 
-template <NamedIdType TrigId, ValidTable T>
-[[nodiscard]] ddl_detail::create_trigger_builder<T> create_trigger(TriggerTiming timing, TriggerEvent event,
-                                                                   std::string body) {
-    return {std::string(TrigId::name()), timing, event, std::move(body)};
+template <ValidTable T, fixed_string Name>
+[[nodiscard]] ddl_detail::create_trigger_builder<Name, T> create_trigger(trigger_id<Name> const& id,
+                                                                         TriggerTiming timing, TriggerEvent event,
+                                                                         std::string body) {
+    return {id, timing, event, std::move(body)};
 }
 
-template <NamedIdType TrigId, ValidTable T>
-[[nodiscard]] ddl_detail::drop_trigger_builder<T> drop_trigger() {
-    return ddl_detail::drop_trigger_builder<T>{std::string(TrigId::name())};
+template <ValidTable T, fixed_string Name>
+[[nodiscard]] ddl_detail::drop_trigger_builder<Name, T> drop_trigger(trigger_id<Name> const& id) {
+    return ddl_detail::drop_trigger_builder<Name, T>{id};
 }
 
 }  // namespace ds_mysql

@@ -959,23 +959,23 @@ inline constexpr col_expr<Col> col_ref{};
 // procedure_id<"name"> — compile-time stored procedure name type.
 // savepoint_id<"name"> — compile-time savepoint name type.
 //
-// All satisfy NamedIdType: a static name() method returns the compile-time name.
-// User-defined tagged types also satisfy NamedIdType if they provide name().
+// Each type provides a static name() method returning the compile-time name.
+// Functions accept specific id types as parameters to enforce type safety.
 //
 // Examples:
-//   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
+//   table_constraint::check(check_id<"chk_positive_price">{}, greater_than<my_table::price>(0.0))
 //   // → CONSTRAINT chk_positive_price CHECK (price > 0)
 //
-//   create_index_on<index_id<"idx_foo">, my_table, my_table::col>()
+//   create_index_on<my_table, my_table::col>(index_id<"idx_foo">{})
 //   // → CREATE INDEX idx_foo ON my_table (col);
 //
-//   create_trigger<trigger_id<"trg_before_insert">, my_table>(TriggerTiming::Before, ...)
+//   create_trigger<my_table>(trigger_id<"trg_before_insert">{}, TriggerTiming::Before, ...)
 //   // → CREATE TRIGGER trg_before_insert BEFORE INSERT ON my_table FOR EACH ROW ...
 //
-//   create_procedure<procedure_id<"usp_hello">>("", "SELECT 1;")
+//   create_procedure(procedure_id<"usp_hello">{}, "", "SELECT 1;")
 //   // → CREATE PROCEDURE usp_hello() BEGIN SELECT 1; END
 //
-//   savepoint<savepoint_id<"sp1">>()
+//   savepoint(savepoint_id<"sp1">{})
 //   // → SAVEPOINT sp1
 // ===================================================================
 
@@ -1012,13 +1012,6 @@ struct savepoint_id {
     [[nodiscard]] static constexpr std::string_view name() noexcept {
         return Name;
     }
-};
-
-// NamedIdType — satisfied by check_id<N>, index_id<N>, trigger_id<N>, procedure_id<N>, savepoint_id<N>,
-// and any type with static name() → string_view.
-template <typename T>
-concept NamedIdType = requires {
-    { T::name() } -> std::convertible_to<std::string_view>;
 };
 
 }  // namespace ds_mysql

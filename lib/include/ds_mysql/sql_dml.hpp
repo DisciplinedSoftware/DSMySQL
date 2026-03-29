@@ -393,83 +393,63 @@ public:
 }  // namespace dml_detail
 
 /**
- * describe<T>() — DESCRIBE <table>.
+ * describe(T{}) — DESCRIBE <table>.
  */
-template <ValidTable T>
-[[nodiscard]] dml_detail::describe_builder<T> describe() {
-    return {};
-}
-
 template <ValidTable T>
 [[nodiscard]] dml_detail::describe_builder<T> describe(T const&) {
     return {};
 }
 
 /**
- * insert_into<T>() — INSERT INTO <table> (...) VALUES (...).
+ * insert_into(T{}) — INSERT INTO <table> (...) VALUES (...).
  *
  * Single-row insert:
- *   insert_into<T>().values(row).build_sql()
+ *   insert_into(symbol{}).values(row).build_sql()
  *
  * Bulk insert (multiple rows in one statement):
- *   insert_into<T>().values(rows).build_sql()   // rows is std::ranges::input_range<T>
+ *   insert_into(symbol{}).values(rows).build_sql()   // rows is std::ranges::input_range<T>
  *
  * Upsert (INSERT … ON DUPLICATE KEY UPDATE):
- *   insert_into<T>().values(row).on_duplicate_key_update(T::col1{v1}, T::col2{v2}, ...)
+ *   insert_into(symbol{}).values(row).on_duplicate_key_update(symbol::ticker{"AAPL"}, ...)
  *
  * Example:
  *   symbol row;
  *   row.ticker_     = "AAPL";
  *   row.instrument_ = "Stock";
- *   db.execute(insert_into<symbol>().values(row));
+ *   db.execute(insert_into(symbol{}).values(row));
  *
  *   // Upsert:
- *   db.execute(insert_into<symbol>().values(row)
+ *   db.execute(insert_into(symbol{}).values(row)
  *       .on_duplicate_key_update(symbol::ticker{"AAPL"}, symbol::instrument{"Stock"}));
  *
  *   // Bulk:
- *   db.execute(insert_into<symbol>().values(std::array{row1, row2}).build_sql());
+ *   db.execute(insert_into(symbol{}).values(std::array{row1, row2}).build_sql());
  */
-template <ValidTable T>
-[[nodiscard]] dml_detail::insert_into_builder<T> insert_into() {
-    return {};
-}
-
 template <ValidTable T>
 [[nodiscard]] dml_detail::insert_into_builder<T> insert_into(T const&) {
     return {};
 }
 
 /**
- * update<T>() — UPDATE <table> SET ... [WHERE ...].
+ * update(T{}) — UPDATE <table> SET ... [WHERE ...].
  *
  * Advance with .set(col1, col2, ...) supplying typed column field instances,
  * then optionally .where(cond).
  *
  * Example:
- *   db.execute(update<symbol>().set(symbol::ticker{"MSFT"}).where(equal<symbol::id>(1u)));
+ *   db.execute(update(symbol{}).set(symbol::ticker{"MSFT"}).where(equal<symbol::id>(1u)));
  */
-template <ValidTable T>
-[[nodiscard]] dml_detail::update_builder<T> update() {
-    return {};
-}
-
 template <ValidTable T>
 [[nodiscard]] dml_detail::update_builder<T> update(T const&) {
     return {};
 }
 
 /**
- * delete_from<T>() — DELETE FROM <table> [WHERE ...].
+ * delete_from(T{}) — DELETE FROM <table> [WHERE ...].
  *
  * Example:
- *   db.execute(delete_from<symbol>().where(equal<symbol::id>(1u)));
+ *   db.execute(delete_from(symbol{}).where(equal<symbol::id>(1u)));
  */
-template <ValidTable T>
-[[nodiscard]] dml_detail::delete_from_builder<T> delete_from() {
-    return {};
-}
-
 template <ValidTable T>
 [[nodiscard]] dml_detail::delete_from_builder<T> delete_from(T const&) {
     return {};
@@ -479,9 +459,9 @@ template <ValidTable T>
 // Transaction Control Statements
 //
 // Entry points (executeable via db.execute()):
-//   savepoint<savepoint_id<"name">>()                 — SAVEPOINT name
-//   release_savepoint<savepoint_id<"name">>()         — RELEASE SAVEPOINT name
-//   rollback_to_savepoint<savepoint_id<"name">>()     — ROLLBACK TO SAVEPOINT name
+//   savepoint(savepoint_id<"name">{})                  — SAVEPOINT name
+//   release_savepoint(savepoint_id<"name">{})          — RELEASE SAVEPOINT name
+//   rollback_to_savepoint(savepoint_id<"name">{})      — ROLLBACK TO SAVEPOINT name
 //   set_transaction_isolation_level(IsolationLevel)   — SET TRANSACTION ISOLATION LEVEL ...
 // ===================================================================
 
@@ -494,27 +474,36 @@ enum class IsolationLevel {
 
 namespace dml_detail {
 
-template <NamedIdType SpId>
+template <fixed_string Name>
 class savepoint_builder {
 public:
+    explicit savepoint_builder(savepoint_id<Name> const&) {
+    }
+
     [[nodiscard]] std::string build_sql() const {
-        return "SAVEPOINT " + std::string(SpId::name());
+        return "SAVEPOINT " + std::string(Name);
     }
 };
 
-template <NamedIdType SpId>
+template <fixed_string Name>
 class release_savepoint_builder {
 public:
+    explicit release_savepoint_builder(savepoint_id<Name> const&) {
+    }
+
     [[nodiscard]] std::string build_sql() const {
-        return "RELEASE SAVEPOINT " + std::string(SpId::name());
+        return "RELEASE SAVEPOINT " + std::string(Name);
     }
 };
 
-template <NamedIdType SpId>
+template <fixed_string Name>
 class rollback_to_savepoint_builder {
 public:
+    explicit rollback_to_savepoint_builder(savepoint_id<Name> const&) {
+    }
+
     [[nodiscard]] std::string build_sql() const {
-        return "ROLLBACK TO SAVEPOINT " + std::string(SpId::name());
+        return "ROLLBACK TO SAVEPOINT " + std::string(Name);
     }
 };
 
@@ -548,35 +537,19 @@ private:
 
 }  // namespace dml_detail
 
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::savepoint_builder<SpId> savepoint() {
-    return {};
+template <fixed_string Name>
+[[nodiscard]] dml_detail::savepoint_builder<Name> savepoint(savepoint_id<Name> const& sp) {
+    return dml_detail::savepoint_builder<Name>{sp};
 }
 
 template <fixed_string Name>
-[[nodiscard]] dml_detail::savepoint_builder<savepoint_id<Name>> savepoint(savepoint_id<Name> const&) {
-    return {};
-}
-
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::release_savepoint_builder<SpId> release_savepoint() {
-    return {};
+[[nodiscard]] dml_detail::release_savepoint_builder<Name> release_savepoint(savepoint_id<Name> const& sp) {
+    return dml_detail::release_savepoint_builder<Name>{sp};
 }
 
 template <fixed_string Name>
-[[nodiscard]] dml_detail::release_savepoint_builder<savepoint_id<Name>> release_savepoint(savepoint_id<Name> const&) {
-    return {};
-}
-
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::rollback_to_savepoint_builder<SpId> rollback_to_savepoint() {
-    return {};
-}
-
-template <fixed_string Name>
-[[nodiscard]] dml_detail::rollback_to_savepoint_builder<savepoint_id<Name>> rollback_to_savepoint(
-    savepoint_id<Name> const&) {
-    return {};
+[[nodiscard]] dml_detail::rollback_to_savepoint_builder<Name> rollback_to_savepoint(savepoint_id<Name> const& sp) {
+    return dml_detail::rollback_to_savepoint_builder<Name>{sp};
 }
 
 [[nodiscard]] inline dml_detail::set_transaction_isolation_level_builder set_transaction_isolation_level(

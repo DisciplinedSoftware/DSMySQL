@@ -55,7 +55,7 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "describe - generates correct SQL"_test = [] {
-        auto const sql = describe<asset>().build_sql();
+        auto const sql = describe(asset{}).build_sql();
         expect(sql == "DESCRIBE asset"s) << sql;
     };
 
@@ -99,7 +99,7 @@ suite<"DML"> dml_suite = [] {
         row.ticker_ = "AAPL";
         row.instrument_ = "Stock";
         // created_date_ and last_updated_date_ default to sql_now
-        auto const sql = insert_into<asset>().values(row).build_sql();
+        auto const sql = insert_into(asset{}).values(row).build_sql();
         expect(
             sql ==
             "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, last_updated_date) VALUES (0, 1, 'AAPL', 'Stock', NULL, NULL, NULL, NOW(), NOW())"s)
@@ -117,7 +117,7 @@ suite<"DML"> dml_suite = [] {
         row.currency_ = "currency";
         row.created_date_ = datetime_type<>{system_clock::time_point{sys_days{year{2024} / January / 1}}};
         row.last_updated_date_ = sql_now;
-        auto const sql = insert_into<asset>().values(row).build_sql();
+        auto const sql = insert_into(asset{}).values(row).build_sql();
         expect(
             sql ==
             "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, last_updated_date) VALUES (1, 2, 'ticker', 'instrument', 'name', NULL, 'currency', '2024-01-01 00:00:00', NOW())"s)
@@ -134,7 +134,7 @@ suite<"DML"> dml_suite = [] {
         row.created_date_ =
             datetime_type<>{system_clock::time_point{sys_days{year{2024} / January / 1}} + microseconds{123456}, 6};
         row.last_updated_date_ = sql_now;
-        auto const sql = insert_into<asset>().values(row).build_sql();
+        auto const sql = insert_into(asset{}).values(row).build_sql();
         expect(
             sql ==
             "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, last_updated_date) VALUES (42, 3, 'ticker', 'instrument', NULL, NULL, NULL, '2024-01-01 00:00:00.123456', NOW())"s)
@@ -249,7 +249,7 @@ suite<"DML"> dml_suite = [] {
         row.big_ = -9000000000LL;
         row.big_flags_ = 18000000000ULL;
 
-        auto const sql = insert_into<integer_typed_row>().values(row).build_sql();
+        auto const sql = insert_into(integer_typed_row{}).values(row).build_sql();
         expect(sql ==
                "INSERT INTO integer_typed_row (id, count, flags, big, big_flags) "
                "VALUES (1, 42, NULL, -9000000000, 18000000000)"s)
@@ -263,7 +263,7 @@ suite<"DML"> dml_suite = [] {
         row.value2_ = std::nullopt;
         row.value3_ = 99.5;
 
-        auto const sql = insert_into<formatted_numeric_asset>().values(row).build_sql();
+        auto const sql = insert_into(formatted_numeric_asset{}).values(row).build_sql();
         expect(sql ==
                "INSERT INTO formatted_numeric_asset (id, value1, value2, value3) VALUES (7, 12.500000, NULL, "
                "99.500000)"s)
@@ -275,17 +275,17 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - set only - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker>("MSFT").build_sql();
+        auto const sql = update(asset{}).set<asset::ticker>("MSFT").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT'"s) << sql;
     };
 
     "update - set with where - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
+        auto const sql = update(asset{}).set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE id = 1"s) << sql;
     };
 
     "update - set with complex where - generates correct SQL"_test = [] {
-        auto const sql = update<asset>()
+        auto const sql = update(asset{})
                              .set<asset::name>("Apple Inc")
                              .where(and_(equal<asset::ticker>(asset::ticker{"AAPL"}), equal<asset::exchange_id>(2u)))
                              .build_sql();
@@ -293,12 +293,12 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker>("MSFT").order_by(desc(asset::id{})).limit(1).build_sql();
+        auto const sql = update(asset{}).set<asset::ticker>("MSFT").order_by(desc(asset::id{})).limit(1).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' ORDER BY id DESC LIMIT 1"s) << sql;
     };
 
     "update - where + order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = update<asset>()
+        auto const sql = update(asset{})
                              .set<asset::ticker>("MSFT")
                              .where(is_not_null<asset::sector>())
                              .order_by(asset::id{})
@@ -312,30 +312,30 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "delete from - no where - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().build_sql();
+        auto const sql = delete_from(asset{}).build_sql();
         expect(sql == "DELETE FROM asset"s) << sql;
     };
 
     "delete from - with where - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().where(equal<asset::id>(1u)).build_sql();
+        auto const sql = delete_from(asset{}).where(equal<asset::id>(1u)).build_sql();
         expect(sql == "DELETE FROM asset WHERE id = 1"s) << sql;
     };
 
     "delete from - with complex where - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>()
+        auto const sql = delete_from(asset{})
                              .where(and_(equal<asset::ticker>(asset::ticker{"AAPL"}), equal<asset::exchange_id>(2u)))
                              .build_sql();
         expect(sql == "DELETE FROM asset WHERE (ticker = 'AAPL' AND exchange_id = 2)"s) << sql;
     };
 
     "delete from - order_by + limit - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().order_by(desc(asset::id{})).limit(2).build_sql();
+        auto const sql = delete_from(asset{}).order_by(desc(asset::id{})).limit(2).build_sql();
         expect(sql == "DELETE FROM asset ORDER BY id DESC LIMIT 2"s) << sql;
     };
 
     "delete from - where + order_by + limit - generates correct SQL"_test = [] {
         auto const sql =
-            delete_from<asset>().where(is_not_null<asset::sector>()).order_by(asset::id{}).limit(10).build_sql();
+            delete_from(asset{}).where(is_not_null<asset::sector>()).order_by(asset::id{}).limit(10).build_sql();
         expect(sql == "DELETE FROM asset WHERE sector IS NOT NULL ORDER BY id ASC LIMIT 10"s) << sql;
     };
 
@@ -344,18 +344,18 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "count - no where - generates correct SQL"_test = [] {
-        auto const sql = count<asset>().build_sql();
+        auto const sql = count(asset{}).build_sql();
         expect(sql == "SELECT COUNT(*) FROM asset"s) << sql;
     };
 
     "count - with where - generates correct SQL"_test = [] {
-        auto const sql = count<asset>().where(equal<asset::ticker>(asset::ticker{"AAPL"})).build_sql();
+        auto const sql = count(asset{}).where(equal<asset::ticker>(asset::ticker{"AAPL"})).build_sql();
         expect(sql == "SELECT COUNT(*) FROM asset WHERE ticker = 'AAPL'"s) << sql;
     };
 
     "count - with complex where - generates correct SQL"_test = [] {
         auto const sql =
-            count<asset>().where(and_(equal<asset::exchange_id>(1u), is_not_null<asset::sector>())).build_sql();
+            count(asset{}).where(and_(equal<asset::exchange_id>(1u), is_not_null<asset::sector>())).build_sql();
         expect(sql == "SELECT COUNT(*) FROM asset WHERE (exchange_id = 1 AND sector IS NOT NULL)"s) << sql;
     };
 
@@ -434,28 +434,28 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - typed where with equal - generates correct SQL"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
+        auto const sql = update(asset{}).set<asset::ticker>("MSFT").where(equal<asset::id>(1u)).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT' WHERE id = 1"s) << sql;
     };
 
     "delete_from - typed where with equal - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().where(equal<asset::id>(1u)).build_sql();
+        auto const sql = delete_from(asset{}).where(equal<asset::id>(1u)).build_sql();
         expect(sql == "DELETE FROM asset WHERE id = 1"s) << sql;
     };
 
     "count - typed where with is_null - generates correct SQL"_test = [] {
-        auto const sql = count<asset>().where(is_null<asset::sector>()).build_sql();
+        auto const sql = count(asset{}).where(is_null<asset::sector>()).build_sql();
         expect(sql == "SELECT COUNT(*) FROM asset WHERE sector IS NULL"s) << sql;
     };
 
     "count - compound typed where - generates correct SQL"_test = [] {
         auto const sql =
-            count<asset>().where(and_(equal<asset::exchange_id>(1u), is_not_null<asset::sector>())).build_sql();
+            count(asset{}).where(and_(equal<asset::exchange_id>(1u), is_not_null<asset::sector>())).build_sql();
         expect(sql == "SELECT COUNT(*) FROM asset WHERE (exchange_id = 1 AND sector IS NOT NULL)"s) << sql;
     };
 
     "delete - typed where with numeric literal - generates correct SQL"_test = [] {
-        auto const sql = delete_from<asset>().where(equal<asset::id>(42u)).build_sql();
+        auto const sql = delete_from(asset{}).where(equal<asset::id>(42u)).build_sql();
         expect(sql == "DELETE FROM asset WHERE id = 42"s) << sql;
     };
 
@@ -464,7 +464,7 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "truncate_table - generates TRUNCATE TABLE"_test = [] {
-        auto const sql = truncate_table<asset>().build_sql();
+        auto const sql = truncate_table(asset{}).build_sql();
         expect(sql == "TRUNCATE TABLE asset"s) << sql;
     };
 
@@ -481,7 +481,7 @@ suite<"DML"> dml_suite = [] {
         r2.exchange_id_ = 2u;
         r2.ticker_ = "MSFT";
         r2.instrument_ = "Stock";
-        auto const sql = insert_into<asset>().values(std::vector{r1, r2}).build_sql();
+        auto const sql = insert_into(asset{}).values(std::vector{r1, r2}).build_sql();
         expect(sql ==
                "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, "
                "last_updated_date) VALUES "
@@ -499,7 +499,7 @@ suite<"DML"> dml_suite = [] {
         row.exchange_id_ = 1u;
         row.ticker_ = "AAPL";
         row.instrument_ = "Stock";
-        auto const sql = insert_into<asset>()
+        auto const sql = insert_into(asset{})
                              .values(row)
                              .on_duplicate_key_update(asset::ticker{"AAPL"}, asset::instrument{"Stock"})
                              .build_sql();
@@ -516,7 +516,7 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "insert_into - empty vector - generates INSERT with empty VALUES"_test = [] {
-        auto const sql = insert_into<asset>().values(std::vector<asset>{}).build_sql();
+        auto const sql = insert_into(asset{}).values(std::vector<asset>{}).build_sql();
         expect(sql ==
                "INSERT INTO asset (id, exchange_id, ticker, instrument, name, sector, currency, created_date, "
                "last_updated_date) VALUES ()"s)
@@ -528,12 +528,12 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - set multiple columns - generates comma-separated SET"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker, asset::instrument>("MSFT", "Software").build_sql();
+        auto const sql = update(asset{}).set<asset::ticker, asset::instrument>("MSFT", "Software").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 
     "update - set three columns - generates all columns in SET"_test = [] {
-        auto const sql = update<asset>()
+        auto const sql = update(asset{})
                              .set<asset::ticker, asset::instrument, asset::currency>("AMZN", "E-Commerce", "USD")
                              .build_sql();
         expect(sql == "UPDATE asset SET ticker = 'AMZN', instrument = 'E-Commerce', currency = 'USD'"s) << sql;
@@ -544,17 +544,17 @@ suite<"DML"> dml_suite = [] {
     // -------------------------------------------------------------------
 
     "update - chained set (template form) - generates same SQL as single set call"_test = [] {
-        auto const sql = update<asset>().set<asset::ticker>("MSFT").set<asset::instrument>("Software").build_sql();
+        auto const sql = update(asset{}).set<asset::ticker>("MSFT").set<asset::instrument>("Software").build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 
     "update - chained set (instance form) - generates same SQL as single set call"_test = [] {
-        auto const sql = update<asset>().set(asset::ticker{"MSFT"}).set(asset::instrument{"Software"}).build_sql();
+        auto const sql = update(asset{}).set(asset::ticker{"MSFT"}).set(asset::instrument{"Software"}).build_sql();
         expect(sql == "UPDATE asset SET ticker = 'MSFT', instrument = 'Software'"s) << sql;
     };
 
     "update - three chained set calls - accumulates all columns"_test = [] {
-        auto const sql = update<asset>()
+        auto const sql = update(asset{})
                              .set<asset::ticker>("AMZN")
                              .set<asset::instrument>("E-Commerce")
                              .set<asset::currency>("USD")
@@ -563,7 +563,7 @@ suite<"DML"> dml_suite = [] {
     };
 
     "update - chained set then where - generates correct SQL"_test = [] {
-        auto const sql = update<asset>()
+        auto const sql = update(asset{})
                              .set<asset::ticker>("MSFT")
                              .set<asset::instrument>("Software")
                              .where(equal<asset::id>(1u))
@@ -578,48 +578,33 @@ suite<"DML"> dml_suite = [] {
 
 suite<"DML transaction_control"> dml_transaction_control_suite = [] {
     "savepoint - generates SAVEPOINT name"_test = [] {
-        auto const sql = savepoint<savepoint_id<"sp1">>().build_sql();
-        expect(sql == "SAVEPOINT sp1"s) << sql;
-    };
-
-    "release_savepoint - generates RELEASE SAVEPOINT name"_test = [] {
-        auto const sql = release_savepoint<savepoint_id<"sp1">>().build_sql();
-        expect(sql == "RELEASE SAVEPOINT sp1"s) << sql;
-    };
-
-    "rollback_to_savepoint - generates ROLLBACK TO SAVEPOINT name"_test = [] {
-        auto const sql = rollback_to_savepoint<savepoint_id<"sp1">>().build_sql();
-        expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
-    };
-
-    "savepoint instance-based - generates SAVEPOINT name"_test = [] {
         auto const sql = savepoint(savepoint_id<"sp1">{}).build_sql();
         expect(sql == "SAVEPOINT sp1"s) << sql;
     };
 
-    "release_savepoint instance-based - generates RELEASE SAVEPOINT name"_test = [] {
+    "release_savepoint - generates RELEASE SAVEPOINT name"_test = [] {
         auto const sql = release_savepoint(savepoint_id<"sp1">{}).build_sql();
         expect(sql == "RELEASE SAVEPOINT sp1"s) << sql;
     };
 
-    "rollback_to_savepoint instance-based - generates ROLLBACK TO SAVEPOINT name"_test = [] {
+    "rollback_to_savepoint - generates ROLLBACK TO SAVEPOINT name"_test = [] {
         auto const sql = rollback_to_savepoint(savepoint_id<"sp1">{}).build_sql();
         expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
     };
 
-    "savepoint instance-based - deduces Name from named variable"_test = [] {
+    "savepoint - deduces Name from named variable"_test = [] {
         constexpr auto sp = savepoint_id<"tx_save">{};
         auto const sql = savepoint(sp).build_sql();
         expect(sql == "SAVEPOINT tx_save"s) << sql;
     };
 
-    "release_savepoint instance-based - deduces Name from named variable"_test = [] {
+    "release_savepoint - deduces Name from named variable"_test = [] {
         constexpr auto sp = savepoint_id<"tx_save">{};
         auto const sql = release_savepoint(sp).build_sql();
         expect(sql == "RELEASE SAVEPOINT tx_save"s) << sql;
     };
 
-    "rollback_to_savepoint instance-based - deduces Name from named variable"_test = [] {
+    "rollback_to_savepoint - deduces Name from named variable"_test = [] {
         constexpr auto sp = savepoint_id<"tx_save">{};
         auto const sql = rollback_to_savepoint(sp).build_sql();
         expect(sql == "ROLLBACK TO SAVEPOINT tx_save"s) << sql;
