@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `col_expr` `operator==` and `operator!=` overloads for named ID types (`index_id`, `check_id`, `trigger_id`, etc.) — e.g. `col_ref(statistics::index_name{}) == index_id<"uq_symbol_ticker">{}`
+
 ---
 
 ## [4.2.0] – 2026-03-29

@@ -756,6 +756,30 @@ suite<"DQL col_ref Operators"> dql_col_ref_suite = [] {
             << sql;
     };
 
+    // -------------------------------------------------------------------
+    // named ID types (index_id, check_id, trigger_id, etc.)
+    // -------------------------------------------------------------------
+
+    "col_ref == index_id — generates equal WHERE SQL with name()"_test = [] {
+        using statistics = mysql_metadata::information_schema::statistics;
+        auto const sql = select(statistics::index_name{})
+                             .from(statistics{})
+                             .where(col_ref(statistics::index_name{}) == index_id<"uq_symbol_ticker">{})
+                             .build_sql();
+        expect(sql == "SELECT index_name FROM information_schema.statistics WHERE index_name = 'uq_symbol_ticker'"s)
+            << sql;
+    };
+
+    "col_ref != index_id — generates not_equal WHERE SQL with name()"_test = [] {
+        using statistics = mysql_metadata::information_schema::statistics;
+        auto const sql = select(statistics::index_name{})
+                             .from(statistics{})
+                             .where(col_ref(statistics::index_name{}) != index_id<"uq_symbol_ticker">{})
+                             .build_sql();
+        expect(sql == "SELECT index_name FROM information_schema.statistics WHERE index_name != 'uq_symbol_ticker'"s)
+            << sql;
+    };
+
     // Without parens, & binds first: a | (b & c).
     // Verify the SQL differs so the test above is meaningful.
     "a | (b & c) — default precedence without parens"_test = [] {

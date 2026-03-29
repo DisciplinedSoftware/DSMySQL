@@ -1671,9 +1671,8 @@ suite<"DDL Features"> ddl_features_suite = [] {
     };
 
     "create_index_on instance-based.unique - generates CREATE UNIQUE INDEX"_test = [] {
-        auto const sql = create_index_on(index_id<"uq_test_table_name">{}, test_table{}, test_table::name{})
-                             .unique()
-                             .build_sql();
+        auto const sql =
+            create_index_on(index_id<"uq_test_table_name">{}, test_table{}, test_table::name{}).unique().build_sql();
         expect(sql == "CREATE UNIQUE INDEX uq_test_table_name ON test_table (name);\n"s) << sql;
     };
 

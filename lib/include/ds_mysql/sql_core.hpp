@@ -808,6 +808,23 @@ struct col_expr {
     [[nodiscard]] check_expr operator!=(value_type const& val) const {
         return not_equal<Col>(Col{val});
     }
+
+    template <typename T>
+        requires(!std::is_convertible_v<T, value_type> &&
+                 requires {
+                     { T::name() } -> std::convertible_to<std::string_view>;
+                 })
+    [[nodiscard]] check_expr operator==(T const&) const {
+        return equal<Col>(Col{value_type(T::name())});
+    }
+    template <typename T>
+        requires(!std::is_convertible_v<T, value_type> &&
+                 requires {
+                     { T::name() } -> std::convertible_to<std::string_view>;
+                 })
+    [[nodiscard]] check_expr operator!=(T const&) const {
+        return not_equal<Col>(Col{value_type(T::name())});
+    }
     [[nodiscard]] check_expr operator<(value_type const& val) const {
         return less_than<Col>(Col{val});
     }
