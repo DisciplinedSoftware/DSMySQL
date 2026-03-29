@@ -402,6 +402,11 @@ public:
     // Returns std::expected<void, std::string>.
     // On mismatch, the error string lists every discrepancy found.
     template <ValidTable T>
+    [[nodiscard]] std::expected<void, std::string> validate_table(T const&) const {
+        return validate_table<T>();
+    }
+
+    template <ValidTable T>
     [[nodiscard]] std::expected<void, std::string> validate_table() const {
         auto describe_result = query(describe(T{}));
         if (!describe_result) {
@@ -436,6 +441,11 @@ public:
     //
     // Returns std::expected<void, std::string>.
     // On mismatch, the error string aggregates every discrepancy across all tables.
+    template <Database DB>
+    [[nodiscard]] std::expected<void, std::string> validate_database(DB const&) const {
+        return validate_database<DB>();
+    }
+
     template <Database DB>
     [[nodiscard]] std::expected<void, std::string> validate_database() const {
         using tables_tuple = typename database_tables<DB>::type;

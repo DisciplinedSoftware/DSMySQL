@@ -792,6 +792,23 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
                                           (result.has_value() ? "" : result.error());
     };
 
+    "validate_table instance-based succeeds when table matches C++ struct"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(trade{}).if_exists()));
+        }};
+
+        expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
+
+        auto const result = db->validate_table(trade{});
+        expect(result.has_value()) << "validate_table(trade{}) should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+    };
+
     "validate_table fails when table does not exist"_test = [] {
         auto const config = mysql_config_from_env();
         expect(fatal(config.has_value()));
@@ -845,6 +862,23 @@ suite<"Schema Validation Integration"> schema_validation_suite = [] {
 
         auto const result = db->validate_database<trade_db>();
         expect(result.has_value()) << "validate_database<trade_db> should succeed — " +
+                                          (result.has_value() ? "" : result.error());
+    };
+
+    "validate_database instance-based succeeds when all registered tables match"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(trade{}).if_exists()));
+        }};
+
+        expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
+
+        auto const result = db->validate_database(trade_db{});
+        expect(result.has_value()) << "validate_database(trade_db{}) should succeed — " +
                                           (result.has_value() ? "" : result.error());
     };
 

@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Instance-based overloads for `mysql_connection::validate_table` and `validate_database` — e.g. `db->validate_table(trade{})` and `db->validate_database(trade_db{})` as alternatives to the template-only forms
+
 ---
 
 ## [4.3.0] – 2026-03-29

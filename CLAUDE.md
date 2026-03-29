@@ -67,7 +67,7 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 
 ### Schema Generation and Validation
 
-Tables are described as C++ structs. `schema_generator.hpp` reflects struct fields via Boost.PFR at compile time. To override the SQL type for a specific field, specialize `field_schema<T, I>`. `mysql_connection::validate_table<T>()` checks a live database schema against the C++ definition and returns detailed error messages on mismatch.
+Tables are described as C++ structs. `schema_generator.hpp` reflects struct fields via Boost.PFR at compile time. To override the SQL type for a specific field, specialize `field_schema<T, I>`. `mysql_connection::validate_table(T{})` / `validate_table<T>()` checks a live database schema against the C++ definition and returns detailed error messages on mismatch. `validate_database(DB{})` / `validate_database<DB>()` validates all tables in a database schema struct.
 
 ### Error Handling
 
