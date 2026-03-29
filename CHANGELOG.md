@@ -8,6 +8,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `procedure_id<"name">` — compile-time stored procedure name type (satisfies `NamedIdType`)
+- `savepoint_id<"name">` — compile-time savepoint name type (satisfies `NamedIdType`)
+- Instance-based overloads for procedure and savepoint entry-point functions — e.g. `savepoint(savepoint_id<"sp1">{})`, `drop_procedure(procedure_id<"usp_hello">{})`
+
+### Changed
+
+- `create_procedure`, `drop_procedure`, `call_procedure` now take `NamedIdType` template parameter instead of `std::string` — e.g. `create_procedure<procedure_id<"usp_hello">>(params, body)`
+- `savepoint`, `release_savepoint`, `rollback_to_savepoint` now take `NamedIdType` template parameter instead of `std::string` — e.g. `savepoint<savepoint_id<"sp1">>()`
+- Savepoint builders are now templated on their `NamedIdType` and carry no `std::string` member
+- Moved `NamedIdType` concept and all `*_id` types from `sql_ddl.hpp` to `sql_core.hpp` so they are available to both DDL and DML headers
+
 ---
 
 ## [3.2.0] – 2026-03-28

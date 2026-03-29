@@ -1372,32 +1372,57 @@ suite<"DDL SHOW"> ddl_show_suite = [] {
 
 suite<"DDL procedures"> ddl_procedure_suite = [] {
     "create_procedure - generates CREATE PROCEDURE"_test = [] {
-        auto const sql = create_procedure("usp_hello", "", "SELECT 1;").build_sql();
+        auto const sql = create_procedure<procedure_id<"usp_hello">>("", "SELECT 1;").build_sql();
         expect(sql == "CREATE PROCEDURE usp_hello()\nBEGIN\nSELECT 1;\nEND"s) << sql;
     };
 
     "create_procedure with params - includes params"_test = [] {
-        auto const sql = create_procedure("usp_add", "IN a INT, IN b INT", "SELECT a + b;").build_sql();
+        auto const sql = create_procedure<procedure_id<"usp_add">>("IN a INT, IN b INT", "SELECT a + b;").build_sql();
         expect(sql == "CREATE PROCEDURE usp_add(IN a INT, IN b INT)\nBEGIN\nSELECT a + b;\nEND"s) << sql;
     };
 
     "drop_procedure - generates DROP PROCEDURE"_test = [] {
-        auto const sql = drop_procedure("usp_hello").build_sql();
+        auto const sql = drop_procedure<procedure_id<"usp_hello">>().build_sql();
         expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
     };
 
     "drop_procedure.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
-        auto const sql = drop_procedure("usp_hello").if_exists().build_sql();
+        auto const sql = drop_procedure<procedure_id<"usp_hello">>().if_exists().build_sql();
         expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
     };
 
     "call_procedure no args - generates CALL name()"_test = [] {
-        auto const sql = call_procedure("usp_hello").build_sql();
+        auto const sql = call_procedure<procedure_id<"usp_hello">>().build_sql();
         expect(sql == "CALL usp_hello()"s) << sql;
     };
 
     "call_procedure with args - generates CALL name(args)"_test = [] {
-        auto const sql = call_procedure("usp_add", "1, 2").build_sql();
+        auto const sql = call_procedure<procedure_id<"usp_add">>("1, 2").build_sql();
+        expect(sql == "CALL usp_add(1, 2)"s) << sql;
+    };
+
+    "create_procedure instance-based - generates CREATE PROCEDURE"_test = [] {
+        auto const sql = create_procedure(procedure_id<"usp_hello">{}, "", "SELECT 1;").build_sql();
+        expect(sql == "CREATE PROCEDURE usp_hello()\nBEGIN\nSELECT 1;\nEND"s) << sql;
+    };
+
+    "drop_procedure instance-based - generates DROP PROCEDURE"_test = [] {
+        auto const sql = drop_procedure(procedure_id<"usp_hello">{}).build_sql();
+        expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
+    };
+
+    "drop_procedure instance-based.if_exists - generates DROP PROCEDURE IF EXISTS"_test = [] {
+        auto const sql = drop_procedure(procedure_id<"usp_hello">{}).if_exists().build_sql();
+        expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
+    };
+
+    "call_procedure instance-based no args - generates CALL name()"_test = [] {
+        auto const sql = call_procedure(procedure_id<"usp_hello">{}).build_sql();
+        expect(sql == "CALL usp_hello()"s) << sql;
+    };
+
+    "call_procedure instance-based with args - generates CALL name(args)"_test = [] {
+        auto const sql = call_procedure(procedure_id<"usp_add">{}, "1, 2").build_sql();
         expect(sql == "CALL usp_add(1, 2)"s) << sql;
     };
 };

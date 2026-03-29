@@ -479,9 +479,9 @@ template <ValidTable T>
 // Transaction Control Statements
 //
 // Entry points (executeable via db.execute()):
-//   savepoint(name)                                   — SAVEPOINT name
-//   release_savepoint(name)                           — RELEASE SAVEPOINT name
-//   rollback_to_savepoint(name)                       — ROLLBACK TO SAVEPOINT name
+//   savepoint<savepoint_id<"name">>()                 — SAVEPOINT name
+//   release_savepoint<savepoint_id<"name">>()         — RELEASE SAVEPOINT name
+//   rollback_to_savepoint<savepoint_id<"name">>()     — ROLLBACK TO SAVEPOINT name
 //   set_transaction_isolation_level(IsolationLevel)   — SET TRANSACTION ISOLATION LEVEL ...
 // ===================================================================
 
@@ -494,43 +494,28 @@ enum class IsolationLevel {
 
 namespace dml_detail {
 
+template <NamedIdType SpId>
 class savepoint_builder {
 public:
-    explicit savepoint_builder(std::string name) : name_(std::move(name)) {
-    }
-
     [[nodiscard]] std::string build_sql() const {
-        return "SAVEPOINT " + name_;
+        return "SAVEPOINT " + std::string(SpId::name());
     }
-
-private:
-    std::string name_;
 };
 
+template <NamedIdType SpId>
 class release_savepoint_builder {
 public:
-    explicit release_savepoint_builder(std::string name) : name_(std::move(name)) {
-    }
-
     [[nodiscard]] std::string build_sql() const {
-        return "RELEASE SAVEPOINT " + name_;
+        return "RELEASE SAVEPOINT " + std::string(SpId::name());
     }
-
-private:
-    std::string name_;
 };
 
+template <NamedIdType SpId>
 class rollback_to_savepoint_builder {
 public:
-    explicit rollback_to_savepoint_builder(std::string name) : name_(std::move(name)) {
-    }
-
     [[nodiscard]] std::string build_sql() const {
-        return "ROLLBACK TO SAVEPOINT " + name_;
+        return "ROLLBACK TO SAVEPOINT " + std::string(SpId::name());
     }
-
-private:
-    std::string name_;
 };
 
 class set_transaction_isolation_level_builder {
@@ -563,16 +548,34 @@ private:
 
 }  // namespace dml_detail
 
-[[nodiscard]] inline dml_detail::savepoint_builder savepoint(std::string name) {
-    return dml_detail::savepoint_builder{std::move(name)};
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::savepoint_builder<SpId> savepoint() {
+    return {};
 }
 
-[[nodiscard]] inline dml_detail::release_savepoint_builder release_savepoint(std::string name) {
-    return dml_detail::release_savepoint_builder{std::move(name)};
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::savepoint_builder<SpId> savepoint(SpId const&) {
+    return {};
 }
 
-[[nodiscard]] inline dml_detail::rollback_to_savepoint_builder rollback_to_savepoint(std::string name) {
-    return dml_detail::rollback_to_savepoint_builder{std::move(name)};
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::release_savepoint_builder<SpId> release_savepoint() {
+    return {};
+}
+
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::release_savepoint_builder<SpId> release_savepoint(SpId const&) {
+    return {};
+}
+
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::rollback_to_savepoint_builder<SpId> rollback_to_savepoint() {
+    return {};
+}
+
+template <NamedIdType SpId>
+[[nodiscard]] dml_detail::rollback_to_savepoint_builder<SpId> rollback_to_savepoint(SpId const&) {
+    return {};
 }
 
 [[nodiscard]] inline dml_detail::set_transaction_isolation_level_builder set_transaction_isolation_level(

@@ -65,52 +65,6 @@ enum class Encryption {
 };
 
 // ===================================================================
-// check_id<"name">   — compile-time CHECK constraint name type.
-// index_id<"name">   — compile-time index name type.
-// trigger_id<"name"> — compile-time trigger name type.
-//
-// All satisfy NamedIdType: a static name() method returns the compile-time name.
-// User-defined tagged types also satisfy NamedIdType if they provide name().
-//
-// Examples:
-//   table_constraint::check<check_id<"chk_positive_price">>(greater_than<my_table::price>(0.0))
-//   // → CONSTRAINT chk_positive_price CHECK (price > 0)
-//
-//   create_index_on<index_id<"idx_foo">, my_table, my_table::col>()
-//   // → CREATE INDEX idx_foo ON my_table (col);
-//
-//   create_trigger<trigger_id<"trg_before_insert">, my_table>(TriggerTiming::Before, ...)
-//   // → CREATE TRIGGER trg_before_insert BEFORE INSERT ON my_table FOR EACH ROW ...
-// ===================================================================
-
-template <fixed_string Name>
-struct check_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept {
-        return Name;
-    }
-};
-
-template <fixed_string Name>
-struct index_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept {
-        return Name;
-    }
-};
-
-template <fixed_string Name>
-struct trigger_id {
-    [[nodiscard]] static constexpr std::string_view name() noexcept {
-        return Name;
-    }
-};
-
-// NamedIdType — satisfied by check_id<N>, index_id<N>, trigger_id<N>, and any type with static name() → string_view.
-template <typename T>
-concept NamedIdType = requires {
-    { T::name() } -> std::convertible_to<std::string_view>;
-};
-
-// ===================================================================
 // CREATE TABLE constraint customization
 //
 // table_inline_primary_key<T>
@@ -2669,11 +2623,11 @@ template <ValidTable T>
 // Stored Procedures
 //
 // Entry points (executeable via db.execute()):
-//   create_procedure(name, params, body)   — CREATE PROCEDURE name(params) BEGIN body END
-//   drop_procedure(name)                   — DROP PROCEDURE name
-//   drop_procedure(name).if_exists()       — DROP PROCEDURE IF EXISTS name
-//   call_procedure(name)                   — CALL name()
-//   call_procedure(name, args)             — CALL name(args)
+//   create_procedure<procedure_id<"name">>(params, body)   — CREATE PROCEDURE name(params) BEGIN body END
+//   drop_procedure<procedure_id<"name">>()                 — DROP PROCEDURE name
+//   drop_procedure<procedure_id<"name">>().if_exists()     — DROP PROCEDURE IF EXISTS name
+//   call_procedure<procedure_id<"name">>()                 — CALL name()
+//   call_procedure<procedure_id<"name">>(args)             — CALL name(args)
 // ===================================================================
 
 namespace ddl_detail {
@@ -2740,17 +2694,35 @@ private:
 
 }  // namespace ddl_detail
 
-[[nodiscard]] inline ddl_detail::create_procedure_builder create_procedure(std::string name, std::string params,
-                                                                           std::string body) {
-    return {std::move(name), std::move(params), std::move(body)};
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(std::string params, std::string body) {
+    return {std::string(ProcId::name()), std::move(params), std::move(body)};
 }
 
-[[nodiscard]] inline ddl_detail::drop_procedure_builder drop_procedure(std::string name) {
-    return ddl_detail::drop_procedure_builder{std::move(name)};
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(ProcId const&, std::string params,
+                                                                    std::string body) {
+    return {std::string(ProcId::name()), std::move(params), std::move(body)};
 }
 
-[[nodiscard]] inline ddl_detail::call_builder call_procedure(std::string name, std::string args = {}) {
-    return ddl_detail::call_builder{std::move(name), std::move(args)};
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure() {
+    return ddl_detail::drop_procedure_builder{std::string(ProcId::name())};
+}
+
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure(ProcId const&) {
+    return ddl_detail::drop_procedure_builder{std::string(ProcId::name())};
+}
+
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::call_builder call_procedure(std::string args = {}) {
+    return ddl_detail::call_builder{std::string(ProcId::name()), std::move(args)};
+}
+
+template <NamedIdType ProcId>
+[[nodiscard]] ddl_detail::call_builder call_procedure(ProcId const&, std::string args = {}) {
+    return ddl_detail::call_builder{std::string(ProcId::name()), std::move(args)};
 }
 
 // ===================================================================

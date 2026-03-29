@@ -578,17 +578,32 @@ suite<"DML"> dml_suite = [] {
 
 suite<"DML transaction_control"> dml_transaction_control_suite = [] {
     "savepoint - generates SAVEPOINT name"_test = [] {
-        auto const sql = savepoint("sp1").build_sql();
+        auto const sql = savepoint<savepoint_id<"sp1">>().build_sql();
         expect(sql == "SAVEPOINT sp1"s) << sql;
     };
 
     "release_savepoint - generates RELEASE SAVEPOINT name"_test = [] {
-        auto const sql = release_savepoint("sp1").build_sql();
+        auto const sql = release_savepoint<savepoint_id<"sp1">>().build_sql();
         expect(sql == "RELEASE SAVEPOINT sp1"s) << sql;
     };
 
     "rollback_to_savepoint - generates ROLLBACK TO SAVEPOINT name"_test = [] {
-        auto const sql = rollback_to_savepoint("sp1").build_sql();
+        auto const sql = rollback_to_savepoint<savepoint_id<"sp1">>().build_sql();
+        expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
+    };
+
+    "savepoint instance-based - generates SAVEPOINT name"_test = [] {
+        auto const sql = savepoint(savepoint_id<"sp1">{}).build_sql();
+        expect(sql == "SAVEPOINT sp1"s) << sql;
+    };
+
+    "release_savepoint instance-based - generates RELEASE SAVEPOINT name"_test = [] {
+        auto const sql = release_savepoint(savepoint_id<"sp1">{}).build_sql();
+        expect(sql == "RELEASE SAVEPOINT sp1"s) << sql;
+    };
+
+    "rollback_to_savepoint instance-based - generates ROLLBACK TO SAVEPOINT name"_test = [] {
+        auto const sql = rollback_to_savepoint(savepoint_id<"sp1">{}).build_sql();
         expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
     };
 
