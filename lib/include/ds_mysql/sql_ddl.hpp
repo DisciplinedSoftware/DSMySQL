@@ -132,33 +132,6 @@ template <NamedIdType IndexId, ColumnDescriptor... Cols>
     return "SPATIAL KEY " + std::string(IndexId::name()) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
-    requires(sizeof...(Cols) > 0)
-[[nodiscard]] inline std::string foreign_key(std::string_view constraint_name, std::string_view referenced_table,
-                                             std::string_view referenced_columns,
-                                             std::string_view on_delete_action = {},
-                                             std::string_view on_update_action = {}) {
-    std::string s;
-    s += "CONSTRAINT ";
-    s += constraint_name;
-    s += " FOREIGN KEY ";
-    s += columns_sql<Cols...>();
-    s += " REFERENCES ";
-    s += referenced_table;
-    s += '(';
-    s += referenced_columns;
-    s += ')';
-    if (!on_delete_action.empty()) {
-        s += " ON DELETE ";
-        s += on_delete_action;
-    }
-    if (!on_update_action.empty()) {
-        s += " ON UPDATE ";
-        s += on_update_action;
-    }
-    return s;
-}
-
 // Accepts a check_expr predicate; column name, operator, and value are all
 // derived from the typed predicate.
 //

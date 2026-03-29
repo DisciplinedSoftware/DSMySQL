@@ -14,6 +14,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `savepoint_id<"name">` — compile-time savepoint name type (satisfies `NamedIdType`)
 - Instance-based overloads for procedure and savepoint entry-point functions — e.g. `savepoint(savepoint_id<"sp1">{})`, `drop_procedure(procedure_id<"usp_hello">{})`
 
+### Removed
+
+- `table_constraint::foreign_key` — unused vestigial function superseded by `fk_attr` column attributes
+
 ### Changed
 
 - Instance-based overloads for procedure and savepoint functions now use specific id types (`procedure_id<Name>`, `savepoint_id<Name>`) instead of generic `NamedIdType` — enables direct `fixed_string` deduction from the argument
