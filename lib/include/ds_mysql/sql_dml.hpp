@@ -553,8 +553,8 @@ template <NamedIdType SpId>
     return {};
 }
 
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::savepoint_builder<SpId> savepoint(SpId const&) {
+template <fixed_string Name>
+[[nodiscard]] dml_detail::savepoint_builder<savepoint_id<Name>> savepoint(savepoint_id<Name> const&) {
     return {};
 }
 
@@ -563,8 +563,8 @@ template <NamedIdType SpId>
     return {};
 }
 
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::release_savepoint_builder<SpId> release_savepoint(SpId const&) {
+template <fixed_string Name>
+[[nodiscard]] dml_detail::release_savepoint_builder<savepoint_id<Name>> release_savepoint(savepoint_id<Name> const&) {
     return {};
 }
 
@@ -573,8 +573,9 @@ template <NamedIdType SpId>
     return {};
 }
 
-template <NamedIdType SpId>
-[[nodiscard]] dml_detail::rollback_to_savepoint_builder<SpId> rollback_to_savepoint(SpId const&) {
+template <fixed_string Name>
+[[nodiscard]] dml_detail::rollback_to_savepoint_builder<savepoint_id<Name>> rollback_to_savepoint(
+    savepoint_id<Name> const&) {
     return {};
 }
 

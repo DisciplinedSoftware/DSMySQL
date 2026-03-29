@@ -1425,6 +1425,26 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
         auto const sql = call_procedure(procedure_id<"usp_add">{}, "1, 2").build_sql();
         expect(sql == "CALL usp_add(1, 2)"s) << sql;
     };
+
+    "create_procedure instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto proc = procedure_id<"usp_greet">{};
+        auto const sql = create_procedure(proc, "IN name VARCHAR(50)", "SELECT CONCAT('Hello, ', name);").build_sql();
+        expect(sql ==
+               "CREATE PROCEDURE usp_greet(IN name VARCHAR(50))\nBEGIN\nSELECT CONCAT('Hello, ', name);\nEND"s)
+            << sql;
+    };
+
+    "drop_procedure instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto proc = procedure_id<"usp_greet">{};
+        auto const sql = drop_procedure(proc).build_sql();
+        expect(sql == "DROP PROCEDURE usp_greet"s) << sql;
+    };
+
+    "call_procedure instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto proc = procedure_id<"usp_greet">{};
+        auto const sql = call_procedure(proc, "'World'").build_sql();
+        expect(sql == "CALL usp_greet('World')"s) << sql;
+    };
 };
 
 // ===================================================================

@@ -607,6 +607,24 @@ suite<"DML transaction_control"> dml_transaction_control_suite = [] {
         expect(sql == "ROLLBACK TO SAVEPOINT sp1"s) << sql;
     };
 
+    "savepoint instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto sp = savepoint_id<"tx_save">{};
+        auto const sql = savepoint(sp).build_sql();
+        expect(sql == "SAVEPOINT tx_save"s) << sql;
+    };
+
+    "release_savepoint instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto sp = savepoint_id<"tx_save">{};
+        auto const sql = release_savepoint(sp).build_sql();
+        expect(sql == "RELEASE SAVEPOINT tx_save"s) << sql;
+    };
+
+    "rollback_to_savepoint instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto sp = savepoint_id<"tx_save">{};
+        auto const sql = rollback_to_savepoint(sp).build_sql();
+        expect(sql == "ROLLBACK TO SAVEPOINT tx_save"s) << sql;
+    };
+
     "set_transaction_isolation_level ReadUncommitted"_test = [] {
         auto const sql = set_transaction_isolation_level(IsolationLevel::ReadUncommitted).build_sql();
         expect(sql == "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED"s) << sql;

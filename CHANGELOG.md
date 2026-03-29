@@ -16,6 +16,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Instance-based overloads for procedure and savepoint functions now use specific id types (`procedure_id<Name>`, `savepoint_id<Name>`) instead of generic `NamedIdType` — enables direct `fixed_string` deduction from the argument
 - `create_procedure`, `drop_procedure`, `call_procedure` now take `NamedIdType` template parameter instead of `std::string` — e.g. `create_procedure<procedure_id<"usp_hello">>(params, body)`
 - `savepoint`, `release_savepoint`, `rollback_to_savepoint` now take `NamedIdType` template parameter instead of `std::string` — e.g. `savepoint<savepoint_id<"sp1">>()`
 - Savepoint builders are now templated on their `NamedIdType` and carry no `std::string` member

@@ -2699,10 +2699,10 @@ template <NamedIdType ProcId>
     return {std::string(ProcId::name()), std::move(params), std::move(body)};
 }
 
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(ProcId const&, std::string params,
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::create_procedure_builder create_procedure(procedure_id<Name> const&, std::string params,
                                                                     std::string body) {
-    return {std::string(ProcId::name()), std::move(params), std::move(body)};
+    return {std::string(Name), std::move(params), std::move(body)};
 }
 
 template <NamedIdType ProcId>
@@ -2710,9 +2710,9 @@ template <NamedIdType ProcId>
     return ddl_detail::drop_procedure_builder{std::string(ProcId::name())};
 }
 
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure(ProcId const&) {
-    return ddl_detail::drop_procedure_builder{std::string(ProcId::name())};
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::drop_procedure_builder drop_procedure(procedure_id<Name> const&) {
+    return ddl_detail::drop_procedure_builder{std::string(Name)};
 }
 
 template <NamedIdType ProcId>
@@ -2720,9 +2720,9 @@ template <NamedIdType ProcId>
     return ddl_detail::call_builder{std::string(ProcId::name()), std::move(args)};
 }
 
-template <NamedIdType ProcId>
-[[nodiscard]] ddl_detail::call_builder call_procedure(ProcId const&, std::string args = {}) {
-    return ddl_detail::call_builder{std::string(ProcId::name()), std::move(args)};
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::call_builder call_procedure(procedure_id<Name> const&, std::string args = {}) {
+    return ddl_detail::call_builder{std::string(Name), std::move(args)};
 }
 
 // ===================================================================
