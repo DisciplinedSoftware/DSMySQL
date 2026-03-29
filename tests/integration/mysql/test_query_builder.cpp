@@ -1367,4 +1367,93 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
     };
 };
 
+// ===================================================================
+// last_insert_id / execute affected rows
+// ===================================================================
+
+struct auto_inc_row {
+    COLUMN_FIELD(id, uint32_t, column_attr::auto_increment)
+    COLUMN_FIELD(label, varchar_type<64>)
+};
+
+suite<"last_insert_id Integration"> last_insert_id_suite = [] {
+    "last_insert_id returns auto-generated id after INSERT"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(auto_inc_row{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(auto_inc_row{}).if_exists()).has_value());
+        expect(db->execute(create_table(auto_inc_row{})).has_value());
+
+        auto_inc_row row;
+        row.label_ = "first";
+        expect(db->execute(insert_into(auto_inc_row{}).values(row)).has_value());
+
+        auto const first_id = db->last_insert_id();
+        expect(first_id >= 1u) << "first insert should produce id >= 1, got " + std::to_string(first_id);
+
+        row.label_ = "second";
+        expect(db->execute(insert_into(auto_inc_row{}).values(row)).has_value());
+
+        auto const second_id = db->last_insert_id();
+        expect(second_id == first_id + 1u) << "second id should be first + 1, got " + std::to_string(second_id);
+    };
+
+    "last_insert_id is zero after DDL"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(auto_inc_row{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(auto_inc_row{}).if_exists()).has_value());
+        expect(db->execute(create_table(auto_inc_row{})).has_value());
+
+        expect(db->last_insert_id() == 0u) << "last_insert_id should be 0 after DDL";
+    };
+
+    "execute returns affected row count"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(auto_inc_row{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(auto_inc_row{}).if_exists()).has_value());
+        expect(db->execute(create_table(auto_inc_row{})).has_value());
+
+        auto_inc_row row;
+        row.label_ = "one";
+        auto const insert_result = db->execute(insert_into(auto_inc_row{}).values(row));
+        expect(fatal(insert_result.has_value()));
+        expect(*insert_result == 1u) << "INSERT of 1 row should return 1, got " + std::to_string(*insert_result);
+
+        auto const update_result = db->execute(
+            update(auto_inc_row{}).set<auto_inc_row::label>("updated").where(equal<auto_inc_row::label>("one")));
+        expect(fatal(update_result.has_value()));
+        expect(*update_result == 1u) << "UPDATE of 1 row should return 1, got " + std::to_string(*update_result);
+
+        auto const delete_result =
+            db->execute(delete_from(auto_inc_row{}).where(equal<auto_inc_row::label>("updated")));
+        expect(fatal(delete_result.has_value()));
+        expect(*delete_result == 1u) << "DELETE of 1 row should return 1, got " + std::to_string(*delete_result);
+
+        auto const empty_delete =
+            db->execute(delete_from(auto_inc_row{}).where(equal<auto_inc_row::label>("nonexistent")));
+        expect(fatal(empty_delete.has_value()));
+        expect(*empty_delete == 0u) << "DELETE of 0 rows should return 0, got " + std::to_string(*empty_delete);
+    };
+};
+
 }  // namespace ds_mysql
