@@ -61,7 +61,7 @@ struct product {
 // c) Fixed string literal — column name embedded directly, no tag needed.
 //    ⚠ Two tables with identically-named and -typed columns share the same C++ type,
 //    so column_field cannot verify which table a column belongs to. This means
-//    column_field columns cannot be used as select projections in from<Table>().
+//    from() cannot verify column membership for untagged column_field types.
 //    Prefer COLUMN_FIELD or explicit nested tags for query-building use cases.
 //   using price = column_field<"price", double>;
 //   price price_;
@@ -79,13 +79,13 @@ auto db = mysql_connection::connect(mysql_config{
 }).value();
 
 // CREATE TABLE IF NOT EXISTS product (...)
-db.execute(create_table<product>().if_not_exists());
+db.execute(create_table(product{}).if_not_exists());
 
 // Type-safe SELECT: returns std::expected<std::vector<std::tuple<uint32_t, varchar_type<255>>>, std::string>
-auto rows = db.query(select<product::id, product::name>()
-                         .from<product>()
-                         .where(product::price{9.99})
-                         .order_by<product::id>());
+auto rows = db.query(select(product::id{}, product::name{})
+                         .from(product{})
+                         .where(equal<product::price>(9.99))
+                         .order_by(product::id{}));
 
 for (auto const& [id, name] : *rows) {
     std::println("{}: {}", id, name.to_string());
@@ -201,15 +201,15 @@ auto db = mysql_connection::connect(cfg).value();
 ### DDL (CREATE, DROP)
 
 ```cpp
-db.execute(create_table<product>().if_not_exists());
-db.execute(drop_table<product>());
-db.execute(create_database<my_db>().if_not_exists());
+db.execute(create_table(product{}).if_not_exists());
+db.execute(drop_table(product{}));
+db.execute(create_database(my_db{}).if_not_exists());
 ```
 
 #### CREATE TABLE attributes (fluent API)
 
 ```cpp
-auto sql = create_table<product>()
+auto sql = create_table(product{})
                .if_not_exists()
                .engine(Engine::InnoDB)
                .auto_increment(1)
@@ -218,8 +218,8 @@ auto sql = create_table<product>()
                .comment("product catalog")
                .build_sql();
 
-auto ctas = create_table<product_archive>()
-                .as(select<product::id, product::name>().from<product>())
+auto ctas = create_table(product_archive{})
+                .as(select(product::id{}, product::name{}).from(product{}))
                 .engine("MyCustomEngine")
                 .default_charset("koi8r")
                 .build_sql();
@@ -228,28 +228,28 @@ auto ctas = create_table<product_archive>()
 ### DML (INSERT, UPDATE, DELETE)
 
 ```cpp
-db.execute(insert_into<product>().values(row));
-db.execute(update<product>().set(product::price{12.99}).where(product::id{1}));
-db.execute(delete_from<product>().where(product::id{1}));
-db.execute(truncate<product>());
+db.execute(insert_into(product{}).values(row));
+db.execute(update(product{}).set(product::price{12.99}).where(equal<product::id>(1u)));
+db.execute(delete_from(product{}).where(equal<product::id>(1u)));
+db.execute(truncate_table(product{}));
 ```
 
 ### DQL (SELECT, COUNT, DESCRIBE)
 
 ```cpp
 // Select specific columns
-auto rows = db.query(select<product::id, product::name>().from<product>());
+auto rows = db.query(select(product::id{}, product::name{}).from(product{}));
 
 // Select all columns
-auto all = db.query(select<product::id, product::sku, product::name, product::price>()
-                        .from<product>()
-                        .order_by<product::id>());
+auto all = db.query(select(product::id{}, product::sku{}, product::name{}, product::price{})
+                        .from(product{})
+                        .order_by(product::id{}));
 
 // Count
-auto cnt = db.query(count<product>().where(product::price{9.99}));
+auto cnt = db.query(count(product{}).where(equal<product::price>(9.99)));
 
 // DESCRIBE (schema introspection)
-auto cols = db.query(describe<product>());
+auto cols = db.query(describe(product{}));
 ```
 
 ### Schema Validation

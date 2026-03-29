@@ -47,10 +47,12 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 ### Header Layout (`lib/include/ds_mysql/`)
 
 - `ds_mysql.hpp` — umbrella include; users include only this
-- `mysql_connection.hpp` — `mysql_config` and `mysql_connection` classes; `.query()` returns `std::expected<ResultType, std::string>`, `.execute()` for DDL/DML
-- `sql_ddl.hpp` — `create_table<T>()`, `drop_table<T>()`, `create_database<DB>()`, `create_all_tables<DB>()`
-- `sql_dml.hpp` — `insert_into<T>()`, `update<T>()`, `delete_from<T>()`, `truncate<T>()`
-- `sql_dql.hpp` — `select<...>()`, `count<T>()`, `describe<T>()`
+- `mysql_connection.hpp` — `mysql_config`, `connect_options`, and `mysql_connection` classes; `.query()` returns `std::expected<ResultType, std::string>`, `.execute()` returns `std::expected<uint64_t, std::string>` (affected row count); also provides `last_insert_id()`, `ping()`, `commit()`, `rollback()`, `autocommit()`, `select_db()`, `reset_connection()`, `escape_string()`, `warning_count()`, `info()`, `server_version()`, `server_info()`, `stat()`, `thread_id()`, `character_set()`, `set_character_set()`
+- `sql_ddl.hpp` — `create_table(T{})`, `drop_table(T{})`, `create_database(DB{})`, `create_all_tables(DB{})`
+- `sql_dml.hpp` — `insert_into(T{})`, `update(T{})`, `delete_from(T{})`, `truncate_table(T{})`
+- `sql_dql.hpp` — `select(col1{}, col2{})`, `count(T{})`, `describe(T{})`
+- `connect_options.hpp` — `connect_options` fluent builder and `ssl_mode` enum for pre-connect `mysql_options()` configuration (timeouts, SSL/TLS, charset, compression, etc.)
+- `charset_name.hpp` — `charset_name` strong type for character set names
 - `column_field.hpp` / `column_field_base_*.hpp` — `column_field<"name", Type>` descriptors and `COLUMN_FIELD(name, type)` macro
 - `schema_generator.hpp` — derives CREATE TABLE SQL from a C++ struct at compile time using Boost.PFR
 - `sql_varchar.hpp`, `sql_numeric.hpp`, `sql_temporal.hpp` — library-specific SQL types (`varchar_type<N>`, `decimal_type<P,S>`, `datetime_type<FSP>`, etc.)
@@ -61,7 +63,7 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 - Native C++ types map directly: `int32_t` → INT, `int64_t` → BIGINT, `double` → DOUBLE, `std::string` → TEXT
 - `std::optional<T>` → nullable column
 - `varchar_type<N>` → VARCHAR(N); `decimal_type<P,S>` → DECIMAL(P,S)
-- Strong-typed wrappers (`host_name`, `database_name`, `port_number`) enforce correct argument passing
+- Strong-typed wrappers (`host_name`, `database_name`, `port_number`, `charset_name`) enforce correct argument passing
 
 ### Schema Generation and Validation
 
