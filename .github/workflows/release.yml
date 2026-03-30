@@ -59,48 +59,14 @@ jobs:
             exit 1
           fi
 
-  unit-tests:
-    name: Unit tests (GCC)
+  ci:
+    name: CI
     needs: validate-version
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y software-properties-common ca-certificates gpg wget
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
-            | gpg --dearmor \
-            | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg > /dev/null
-          echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ noble main' \
-            | sudo tee /etc/apt/sources.list.d/kitware.list
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-          sudo apt-get update -q
-          sudo apt-get install -y cmake ninja-build g++-15 gcc-15 \
-            libmysqlclient-dev pkg-config
-        env:
-          DEBIAN_FRONTEND: noninteractive
-
-      - name: Configure
-        run: |
-          cmake --preset release \
-            -DSKIP_DOCKER_MANAGEMENT=ON \
-            -DBUILD_INTEGRATION_TESTS=OFF
-        env:
-          CXX: g++-15
-          CC: gcc-15
-
-      - name: Build
-        run: cmake --build --preset release -j4
-
-      - name: Unit tests
-        run: ctest --preset release -R tests_unit_ds_mysql --output-on-failure
+    uses: ./.github/workflows/ci.yml
 
   release:
     name: Create GitHub release
-    needs: [validate-version, unit-tests]
+    needs: [validate-version, ci]
     runs-on: ubuntu-latest
 
     steps:
