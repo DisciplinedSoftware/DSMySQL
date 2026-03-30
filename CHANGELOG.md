@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.6.0] – 2026-03-30
+
 ### Added
 
 - `column_attr::primary_key` — inline column-level `PRIMARY KEY` attribute for single-column primary keys, e.g. `COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)`
@@ -366,7 +370,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.5.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.0...HEAD
+[4.6.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.1...v4.5.0
 [4.4.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.3.0...v4.4.0

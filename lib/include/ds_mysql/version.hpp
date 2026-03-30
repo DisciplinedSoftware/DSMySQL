@@ -17,14 +17,14 @@ namespace ds_mysql {
 /// `version_generated.hpp` is present (e.g. raw-header, non-CMake usage).
 struct version {
     static constexpr std::uint32_t major = 4;
-    static constexpr std::uint32_t minor = 5;
+    static constexpr std::uint32_t minor = 6;
     static constexpr std::uint32_t patch = 0;
 
     /// Packed integer: major * 10000 + minor * 100 + patch.
     static constexpr std::uint32_t value = major * 10'000u + minor * 100u + patch;
 
     /// Canonical fallback string for non-generated builds.
-    static constexpr std::string_view string = "4.5.0";
+    static constexpr std::string_view string = "4.6.0";
 };
 
 }  // namespace ds_mysql
