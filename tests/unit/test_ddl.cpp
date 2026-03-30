@@ -178,7 +178,7 @@ struct symbol_with_indexes {
 };
 
 struct audit_log {
-    COLUMN_FIELD(id, uint32_t, column_attr::auto_increment)
+    COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(event_type, varchar_type<64>)
     COLUMN_FIELD(user_id, uint32_t, column_attr::comment<"User who triggered the event">)
     COLUMN_FIELD(description, varchar_type<255>)
@@ -233,15 +233,9 @@ struct ds_mysql::database_name_for<custom_named_db> {
 };
 
 template <>
-struct ds_mysql::table_inline_primary_key<symbol_with_indexes> {
-    static constexpr bool value = false;
-};
-
-template <>
 struct ds_mysql::table_constraints<symbol_with_indexes> {
     static std::vector<std::string> get() {
         return {
-            table_constraint::primary_key(symbol_with_indexes::id{}),
             table_constraint::key(index_id<"index_exchange_id">{}, symbol_with_indexes::exchange_id{}),
         };
     }
@@ -251,22 +245,6 @@ template <>
 struct ds_mysql::table_attributes<table_with_attrs> {
     static create_table_option get() {
         return create_table_option{}.engine(Engine::InnoDB).default_charset(Charset::utf8mb4);
-    }
-};
-
-// Disable inline primary key for audit_log since we're using column attributes
-template <>
-struct ds_mysql::table_inline_primary_key<audit_log> {
-    static constexpr bool value = false;
-};
-
-// Define table constraints for audit_log
-template <>
-struct ds_mysql::table_constraints<audit_log> {
-    static std::vector<std::string> get() {
-        return {
-            table_constraint::primary_key(audit_log::id{}),
-        };
     }
 };
 
@@ -335,7 +313,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(integer_column_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE integer_column_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    count INT NOT NULL,\n"
                "    count_w INT(11) NOT NULL,\n"
                "    flags INT UNSIGNED NOT NULL,\n"
@@ -359,7 +337,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(tagged_integer_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_integer_alias_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    count INT NOT NULL,\n"
                "    flags INT UNSIGNED NOT NULL,\n"
                "    big BIGINT NOT NULL,\n"
@@ -372,7 +350,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(temporal_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE temporal_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    created_at DATETIME NOT NULL,\n"
                "    updated_at TIMESTAMP NOT NULL\n"
                ");\n"s)
@@ -383,7 +361,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(time_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE time_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    start_time TIME NOT NULL,\n"
                "    end_time TIME\n"
                ");\n"s)
@@ -412,7 +390,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(fsp_temporal_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE fsp_temporal_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    created_at DATETIME(6) NOT NULL,\n"
                "    updated_at TIMESTAMP(3) NOT NULL,\n"
                "    duration TIME(4) NOT NULL,\n"
@@ -430,7 +408,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(tagged_temporal_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_temporal_alias_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    created_at DATETIME NOT NULL,\n"
                "    updated_at TIMESTAMP NOT NULL,\n"
                "    duration TIME NOT NULL\n"
@@ -446,7 +424,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(tagged_numeric_alias_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE tagged_numeric_alias_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    value0 FLOAT NOT NULL,\n"
                "    value1 DOUBLE NOT NULL,\n"
                "    value2 DECIMAL NOT NULL\n"
@@ -458,7 +436,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(numeric_format_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE numeric_format_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    price FLOAT(12,4) NOT NULL,\n"
                "    ratio DOUBLE(16,8) NOT NULL,\n"
                "    amount DECIMAL(18,6)\n"
@@ -470,7 +448,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(formatted_numeric_column_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE formatted_numeric_column_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    value0 FLOAT NOT NULL,\n"
                "    value1 FLOAT(12,4) NOT NULL,\n"
                "    value2a DOUBLE(12) NOT NULL,\n"
@@ -491,7 +469,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -502,18 +480,18 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
             << sql;
     };
 
-    "create_table - SQL contains first column as PRIMARY KEY"_test = [] {
+    "create_table - basic table with no constraints"_test = [] {
         auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -544,7 +522,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "DROP TABLE IF EXISTS test_table;\n"
                "CREATE TABLE IF NOT EXISTS test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -556,7 +534,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "DROP TABLE test_table;\n"
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -571,7 +549,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_temporary_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TEMPORARY TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -582,7 +560,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_temporary_table(test_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TEMPORARY TABLE IF NOT EXISTS test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -617,7 +595,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "DROP TEMPORARY TABLE IF EXISTS test_table;\n"
                "CREATE TEMPORARY TABLE IF NOT EXISTS test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -629,7 +607,7 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql ==
                "DROP TEMPORARY TABLE test_table;\n"
                "CREATE TEMPORARY TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -711,7 +689,7 @@ suite<"DDL"> ddl_suite = [] {
                              .build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENGINE=MyCustomEngine DEFAULT CHARSET=koi8r ROW_FORMAT=DYNAMIC COLLATE=koi8r_general_ci;\n"s)
@@ -722,14 +700,14 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).collate(Collation::utf8mb4_unicode_ci).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COLLATE=utf8mb4_unicode_ci;\n"s)
             << sql;
     };
 
-    "create_table with table_constraints trait - emits table-level PRIMARY KEY and KEY"_test = [] {
+    "create_table with table_constraints trait - emits table-level KEY"_test = [] {
         auto const sql = create_table(symbol_with_indexes{})
                              .engine(Engine::InnoDB)
                              .auto_increment(1)
@@ -746,7 +724,6 @@ suite<"DDL"> ddl_suite = [] {
                "    currency VARCHAR(32),\n"
                "    created_date DATETIME NOT NULL,\n"
                "    last_updated_date DATETIME NOT NULL,\n"
-               "    PRIMARY KEY (id),\n"
                "    KEY index_exchange_id (exchange_id)\n"
                ") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;\n"s)
             << sql;
@@ -784,25 +761,30 @@ suite<"DDL"> ddl_suite = [] {
         expect(sql == "CONSTRAINT chk_tag_present CHECK (tag IS NOT NULL)"s) << sql;
     };
 
-    "create_table with column_attributes - emits AUTO_INCREMENT, COMMENT, DEFAULT, ON UPDATE"_test = [] {
+    "create_table with column_attributes - emits COMMENT, DEFAULT, ON UPDATE"_test = [] {
         auto const sql = create_table(audit_log{}).default_charset(Charset::utf8).build_sql();
         expect(sql ==
                "CREATE TABLE audit_log (\n"
-               "    id INT UNSIGNED NOT NULL AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    event_type VARCHAR(64) NOT NULL,\n"
                "    user_id INT UNSIGNED NOT NULL COMMENT 'User who triggered the event',\n"
                "    description VARCHAR(255) NOT NULL,\n"
-               "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n"
-               "    PRIMARY KEY (id)\n"
+               "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP\n"
                ") DEFAULT CHARSET=utf8;\n"s)
             << sql;
+    };
+
+    "create_table - first column has no automatic PRIMARY KEY or AUTO_INCREMENT"_test = [] {
+        auto const sql = create_table(test_table{}).build_sql();
+        expect(!sql.contains("PRIMARY KEY")) << sql;
+        expect(!sql.contains("AUTO_INCREMENT")) << sql;
     };
 
     "create_table with table_attributes trait - emits default ENGINE and CHARSET"_test = [] {
         auto const sql = create_table(table_with_attrs{}).build_sql();
         expect(sql ==
                "CREATE TABLE table_with_attrs (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL\n"
                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n"s)
             << sql;
@@ -812,7 +794,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(table_with_attrs{}).engine(Engine::MyISAM).build_sql();
         expect(sql ==
                "CREATE TABLE table_with_attrs (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL\n"
                ") ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;\n"s)
             << sql;
@@ -822,7 +804,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(table_with_attrs{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS table_with_attrs (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL\n"
                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;\n"s)
             << sql;
@@ -849,7 +831,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).avg_row_length(512).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") AVG_ROW_LENGTH=512;\n"s)
@@ -860,7 +842,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).checksum(true).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") CHECKSUM=1;\n"s)
@@ -871,7 +853,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).checksum(false).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") CHECKSUM=0;\n"s)
@@ -882,7 +864,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).comment("my table comment").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMMENT='my table comment';\n"s)
@@ -893,7 +875,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).comment("it's a table").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMMENT='it''s a table';\n"s)
@@ -904,7 +886,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_zlib = create_table(test_table{}).compression(Compression::Zlib).build_sql();
         expect(sql_zlib ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMPRESSION='ZLIB';\n"s)
@@ -913,7 +895,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_lz4 = create_table(test_table{}).compression(Compression::Lz4).build_sql();
         expect(sql_lz4 ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMPRESSION='LZ4';\n"s)
@@ -922,7 +904,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_none = create_table(test_table{}).compression(Compression::None).build_sql();
         expect(sql_none ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMPRESSION='NONE';\n"s)
@@ -933,7 +915,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).compression("LZ4").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") COMPRESSION='LZ4';\n"s)
@@ -944,7 +926,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).connection("mysql://remote/db/table").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") CONNECTION='mysql://remote/db/table';\n"s)
@@ -955,7 +937,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).data_directory("/var/lib/mysql/data").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") DATA DIRECTORY='/var/lib/mysql/data';\n"s)
@@ -966,7 +948,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).index_directory("/var/lib/mysql/index").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") INDEX DIRECTORY='/var/lib/mysql/index';\n"s)
@@ -977,7 +959,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_on = create_table(test_table{}).delay_key_write(true).build_sql();
         expect(sql_on ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") DELAY_KEY_WRITE=1;\n"s)
@@ -986,7 +968,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_off = create_table(test_table{}).delay_key_write(false).build_sql();
         expect(sql_off ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") DELAY_KEY_WRITE=0;\n"s)
@@ -997,7 +979,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_y = create_table(test_table{}).encryption(Encryption::Y).build_sql();
         expect(sql_y ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENCRYPTION='Y';\n"s)
@@ -1006,7 +988,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_n = create_table(test_table{}).encryption(Encryption::N).build_sql();
         expect(sql_n ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENCRYPTION='N';\n"s)
@@ -1017,7 +999,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).encryption("Y").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENCRYPTION='Y';\n"s)
@@ -1028,7 +1010,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_no = create_table(test_table{}).insert_method(InsertMethod::No).build_sql();
         expect(sql_no ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") INSERT_METHOD=NO;\n"s)
@@ -1037,7 +1019,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_first = create_table(test_table{}).insert_method(InsertMethod::First).build_sql();
         expect(sql_first ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") INSERT_METHOD=FIRST;\n"s)
@@ -1046,7 +1028,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_last = create_table(test_table{}).insert_method(InsertMethod::Last).build_sql();
         expect(sql_last ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") INSERT_METHOD=LAST;\n"s)
@@ -1057,7 +1039,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).insert_method("FIRST").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") INSERT_METHOD=FIRST;\n"s)
@@ -1068,7 +1050,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).key_block_size(8).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") KEY_BLOCK_SIZE=8;\n"s)
@@ -1079,7 +1061,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).max_rows(1000000).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") MAX_ROWS=1000000;\n"s)
@@ -1090,7 +1072,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).min_rows(100).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") MIN_ROWS=100;\n"s)
@@ -1101,7 +1083,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_default = create_table(test_table{}).pack_keys(PackKeys::Default).build_sql();
         expect(sql_default ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") PACK_KEYS=DEFAULT;\n"s)
@@ -1110,7 +1092,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_zero = create_table(test_table{}).pack_keys(PackKeys::Zero).build_sql();
         expect(sql_zero ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") PACK_KEYS=0;\n"s)
@@ -1119,7 +1101,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_one = create_table(test_table{}).pack_keys(PackKeys::One).build_sql();
         expect(sql_one ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") PACK_KEYS=1;\n"s)
@@ -1130,7 +1112,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).pack_keys("1").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") PACK_KEYS=1;\n"s)
@@ -1141,7 +1123,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).password("secret").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") PASSWORD='secret';\n"s)
@@ -1152,7 +1134,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_dynamic = create_table(test_table{}).row_format(RowFormat::Dynamic).build_sql();
         expect(sql_dynamic ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=DYNAMIC;\n"s)
@@ -1161,7 +1143,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_compressed = create_table(test_table{}).row_format(RowFormat::Compressed).build_sql();
         expect(sql_compressed ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=COMPRESSED;\n"s)
@@ -1170,7 +1152,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_compact = create_table(test_table{}).row_format(RowFormat::Compact).build_sql();
         expect(sql_compact ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=COMPACT;\n"s)
@@ -1179,7 +1161,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_fixed = create_table(test_table{}).row_format(RowFormat::Fixed).build_sql();
         expect(sql_fixed ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=FIXED;\n"s)
@@ -1188,7 +1170,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_redundant = create_table(test_table{}).row_format(RowFormat::Redundant).build_sql();
         expect(sql_redundant ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=REDUNDANT;\n"s)
@@ -1197,7 +1179,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_default = create_table(test_table{}).row_format(RowFormat::Default).build_sql();
         expect(sql_default ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ROW_FORMAT=DEFAULT;\n"s)
@@ -1208,7 +1190,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_on = create_table(test_table{}).stats_auto_recalc(true).build_sql();
         expect(sql_on ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_AUTO_RECALC=1;\n"s)
@@ -1217,7 +1199,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_off = create_table(test_table{}).stats_auto_recalc(false).build_sql();
         expect(sql_off ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_AUTO_RECALC=0;\n"s)
@@ -1228,7 +1210,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).stats_auto_recalc_default().build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_AUTO_RECALC=DEFAULT;\n"s)
@@ -1239,7 +1221,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_on = create_table(test_table{}).stats_persistent(true).build_sql();
         expect(sql_on ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_PERSISTENT=1;\n"s)
@@ -1248,7 +1230,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql_off = create_table(test_table{}).stats_persistent(false).build_sql();
         expect(sql_off ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_PERSISTENT=0;\n"s)
@@ -1259,7 +1241,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).stats_persistent_default().build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_PERSISTENT=DEFAULT;\n"s)
@@ -1270,7 +1252,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).stats_sample_pages(200).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") STATS_SAMPLE_PAGES=200;\n"s)
@@ -1281,7 +1263,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).tablespace("innodb_system").build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") TABLESPACE=innodb_system;\n"s)
@@ -1293,7 +1275,7 @@ suite<"DDL"> ddl_suite = [] {
             create_table(test_table{}).union_tables(test_table{}, new_table{}, table_with_attrs{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") UNION=(test_table,new_table,table_with_attrs);\n"s)
@@ -1313,7 +1295,7 @@ suite<"DDL"> ddl_suite = [] {
                              .build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci "
@@ -1325,7 +1307,7 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).engine(Engine::InnoDB).engine(Engine::MyISAM).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ") ENGINE=MyISAM;\n"s)
@@ -1337,7 +1319,7 @@ suite<"DDL"> ddl_suite = [] {
             auto const sql = create_table(new_table{}).engine(e).build_sql();
             auto const expected =
                 "CREATE TABLE new_table (\n"
-                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                "    id INT UNSIGNED NOT NULL\n"
                 ") ENGINE=" +
                 std::string(expected_name) + ";\n";
             expect(sql == expected) << sql;
@@ -1358,7 +1340,7 @@ suite<"DDL"> ddl_suite = [] {
             auto const sql = create_table(new_table{}).default_charset(c).build_sql();
             auto const expected =
                 "CREATE TABLE new_table (\n"
-                "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+                "    id INT UNSIGNED NOT NULL\n"
                 ") DEFAULT CHARSET=" +
                 std::string(expected_name) + ";\n";
             expect(sql == expected) << sql;
@@ -1399,7 +1381,7 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
         auto const sql = create_table(child_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE child_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    parent_id INT UNSIGNED NOT NULL,\n"
                "    FOREIGN KEY (parent_id) REFERENCES parent_table(id)\n"
                ");\n"s)
@@ -1410,7 +1392,7 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
         auto const sql = create_table(child_table_cascade{}).build_sql();
         expect(sql ==
                "CREATE TABLE child_table_cascade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    parent_id INT UNSIGNED NOT NULL,\n"
                "    FOREIGN KEY (parent_id) REFERENCES parent_table(id) ON DELETE CASCADE ON UPDATE CASCADE\n"
                ");\n"s)
@@ -1421,7 +1403,7 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
         auto const sql = create_table(test_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE test_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    name VARCHAR(255) NOT NULL,\n"
                "    tag VARCHAR(64)\n"
                ");\n"s)
@@ -1472,7 +1454,7 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS test_db;\n"
                "CREATE TABLE IF NOT EXISTS symbol (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };
@@ -1486,10 +1468,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
                "CREATE TABLE schema_bootstrap_db.account (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE TABLE schema_bootstrap_db.trade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };
@@ -1504,10 +1486,10 @@ suite<"DDL CREATE DATABASE"> ddl_create_database_suite = [] {
         expect(sql ==
                "CREATE DATABASE IF NOT EXISTS schema_bootstrap_db;\n"
                "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.account (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.trade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };
@@ -1593,10 +1575,10 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
         auto const sql = create_all_tables(schema_bootstrap_db{}).build_sql();
         expect(sql ==
                "CREATE TABLE schema_bootstrap_db.account (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE TABLE schema_bootstrap_db.trade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };
@@ -1605,10 +1587,10 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
         auto const sql = create_all_tables(schema_bootstrap_db{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.account (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE TABLE IF NOT EXISTS schema_bootstrap_db.trade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };
@@ -1618,10 +1600,10 @@ suite<"DDL CREATE ALL TABLES"> ddl_create_all_tables_suite = [] {
             create_all_tables(schema_bootstrap_db{}).then().create_database(schema_bootstrap_db{}).build_sql();
         expect(sql ==
                "CREATE TABLE schema_bootstrap_db.account (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE TABLE schema_bootstrap_db.trade (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"
                "CREATE DATABASE schema_bootstrap_db;\n"s)
             << sql;
@@ -1828,7 +1810,7 @@ suite<"DDL text_type types"> ddl_text_type_suite = [] {
         auto const sql = create_table(text_table{}).build_sql();
         expect(sql ==
                "CREATE TABLE text_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    description TEXT NOT NULL,\n"
                "    notes MEDIUMTEXT NOT NULL,\n"
                "    body LONGTEXT NOT NULL,\n"
@@ -1841,7 +1823,7 @@ suite<"DDL text_type types"> ddl_text_type_suite = [] {
         auto const sql = create_table(text_table{}).if_not_exists().build_sql();
         expect(sql ==
                "CREATE TABLE IF NOT EXISTS text_table (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    id INT UNSIGNED NOT NULL,\n"
                "    description TEXT NOT NULL,\n"
                "    notes MEDIUMTEXT NOT NULL,\n"
                "    body LONGTEXT NOT NULL,\n"
@@ -1887,7 +1869,7 @@ suite<"DDL USE"> ddl_use_suite = [] {
                "CREATE DATABASE IF NOT EXISTS test_db;\n"
                "USE test_db;\n"
                "CREATE TABLE IF NOT EXISTS symbol (\n"
-               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT\n"
+               "    id INT UNSIGNED NOT NULL\n"
                ");\n"s)
             << sql;
     };

@@ -75,20 +75,10 @@ enum class Encryption {
 // ===================================================================
 // CREATE TABLE constraint customization
 //
-// table_inline_primary_key<T>
-//   - true  (default): first column is emitted as `PRIMARY KEY AUTO_INCREMENT`
-//   - false          : first column is emitted as `AUTO_INCREMENT` only,
-//                      allowing table_constraints<T> to define table-level PK
-//
 // table_constraints<T>
 //   - return additional table-level constraints/index definitions appended
 //     inside CREATE TABLE (...)
 // ===================================================================
-
-template <typename T>
-struct table_inline_primary_key {
-    static constexpr bool value = true;
-};
 
 template <typename T>
 struct table_constraints {
@@ -1033,12 +1023,6 @@ template <typename T, std::size_t I>
     col += sql_type_override.empty() ? sql_type_for<field_type>() : sql_type_override;
     if constexpr (!is_field_nullable_v<field_type>) {
         col += " NOT NULL";
-    }
-    if constexpr (I == 0) {
-        if constexpr (table_inline_primary_key<T>::value) {
-            col += " PRIMARY KEY AUTO_INCREMENT";
-        }
-        // When inline PK is disabled, typed column attributes should handle AUTO_INCREMENT
     }
     if constexpr (requires { field_type::ddl_auto_increment; } && field_type::ddl_auto_increment) {
         col += " AUTO_INCREMENT";

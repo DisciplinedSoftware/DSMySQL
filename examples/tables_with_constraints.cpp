@@ -1,10 +1,9 @@
 // tables_with_constraints.cpp — DSMySQL table constraints example.
 //
 // Demonstrates how to:
-//  1. Define table-level PRIMARY KEY, secondary indexes, and other constraints
+//  1. Define table-level constraints and secondary indexes
 //  2. Customize CREATE TABLE output with table_constraints<T> trait
-//  3. Disable inline implicit primary key with table_inline_primary_key<T>
-//  4. Use table_constraint helpers: primary_key, key, unique_key, check, etc.
+//  3. Use table_constraint helpers: primary_key, key, unique_key, check, etc.
 //
 // Build with:
 //   cmake --preset release && cmake --build build -j$(nproc)
@@ -45,23 +44,14 @@ struct order_detail {
 };
 
 // ===================================================================
-// Customize symbol table: define table-level PRIMARY KEY and secondary
-// indexes using the table_constraints<T> trait.
+// Customize symbol table: define secondary indexes using the
+// table_constraints<T> trait.
 // ===================================================================
-
-template <>
-struct ds_mysql::table_inline_primary_key<symbol> {
-    // Disable the default inline PRIMARY KEY AUTO_INCREMENT on first column
-    static constexpr bool value = false;
-};
 
 template <>
 struct ds_mysql::table_constraints<symbol> {
     static std::vector<std::string> get() {
         return {
-            // Define table-level PRIMARY KEY(id)
-            ds_mysql::table_constraint::primary_key<symbol::id>(),
-
             // Define secondary index on exchange_id
             ds_mysql::table_constraint::key<symbol::exchange_id>(ds_mysql::index_id<"index_exchange_id">{}),
 
@@ -76,17 +66,9 @@ struct ds_mysql::table_constraints<symbol> {
 // ===================================================================
 
 template <>
-struct ds_mysql::table_inline_primary_key<order_detail> {
-    static constexpr bool value = false;
-};
-
-template <>
 struct ds_mysql::table_constraints<order_detail> {
     static std::vector<std::string> get() {
         return {
-            // Define table-level PRIMARY KEY(id)
-            ds_mysql::table_constraint::primary_key<order_detail::id>(),
-
             // Define unique constraint on (order_id, line_number)
             ds_mysql::table_constraint::unique_key<order_detail::order_id, order_detail::line_number>(
                 ds_mysql::index_id<"uq_order_line">{}),

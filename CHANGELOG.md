@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- `table_inline_primary_key<T>` trait and automatic `PRIMARY KEY AUTO_INCREMENT` on the first column — define primary keys explicitly via `table_constraints<T>` or column attributes (`column_attr::auto_increment`)
+
 ---
 
 ## [4.4.1] – 2026-03-29

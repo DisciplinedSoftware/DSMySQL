@@ -469,9 +469,6 @@ template <typename T, std::size_t I>
     if constexpr (!is_optional_v<field_type>) {
         col += " NOT NULL";
     }
-    if constexpr (I == 0) {
-        col += " PRIMARY KEY AUTO_INCREMENT";
-    }
     return col;
 }
 
