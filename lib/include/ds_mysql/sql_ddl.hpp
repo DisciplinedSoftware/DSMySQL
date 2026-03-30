@@ -89,72 +89,72 @@ struct table_constraints {
 
 namespace table_constraint {
 
-template <ColumnDescriptor... Cols>
+template <ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string columns_sql() {
     std::string s;
     s += '(';
     bool first = true;
-    (((s += (first ? "" : ", "), s += column_traits<Cols>::column_name(), first = false)), ...);
+    (((s += (first ? "" : ", "), s += Cols::column_name(), first = false)), ...);
     s += ')';
     return s;
 }
 
-template <ColumnDescriptor... Cols>
+template <ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string primary_key() {
     return "PRIMARY KEY " + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols>
+template <ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string primary_key(Cols const&...) {
     return "PRIMARY KEY " + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols, fixed_string Name>
+template <ColumnFieldType... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string key(index_id<Name> const&) {
     return "KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <fixed_string Name, ColumnDescriptor... Cols>
+template <fixed_string Name, ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string key(index_id<Name> const&, Cols const&...) {
     return "KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols, fixed_string Name>
+template <ColumnFieldType... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string unique_key(index_id<Name> const&) {
     return "UNIQUE KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <fixed_string Name, ColumnDescriptor... Cols>
+template <fixed_string Name, ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string unique_key(index_id<Name> const&, Cols const&...) {
     return "UNIQUE KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols, fixed_string Name>
+template <ColumnFieldType... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string fulltext_key(index_id<Name> const&) {
     return "FULLTEXT KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <fixed_string Name, ColumnDescriptor... Cols>
+template <fixed_string Name, ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string fulltext_key(index_id<Name> const&, Cols const&...) {
     return "FULLTEXT KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <ColumnDescriptor... Cols, fixed_string Name>
+template <ColumnFieldType... Cols, fixed_string Name>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string spatial_key(index_id<Name> const&) {
     return "SPATIAL KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
 }
 
-template <fixed_string Name, ColumnDescriptor... Cols>
+template <fixed_string Name, ColumnFieldType... Cols>
     requires(sizeof...(Cols) > 0)
 [[nodiscard]] inline std::string spatial_key(index_id<Name> const&, Cols const&...) {
     return "SPATIAL KEY " + std::string(Name) + ' ' + columns_sql<Cols...>();
@@ -1387,7 +1387,7 @@ private:
     Prior prior_;
 };
 
-template <typename Table, ColumnDescriptor... Cols>
+template <typename Table, ColumnFieldType... Cols>
 class create_index_builder {
 public:
     using ddl_tag_type = void;
@@ -1416,7 +1416,7 @@ public:
         s += table_name_for<Table>::value().to_string_view();
         s += " (";
         bool first = true;
-        (((s += (first ? "" : ", "), s += column_traits<Cols>::column_name(), first = false)), ...);
+        (((s += (first ? "" : ", "), s += Cols::column_name(), first = false)), ...);
         s += ");\n";
         return s;
     }
@@ -1455,11 +1455,10 @@ public:
         : prior_(std::move(prior)), actions_(std::move(actions)) {
     }
 
-    template <ColumnDescriptor Col>
+    template <ColumnFieldType Col>
     [[nodiscard]] alter_table_builder add_column() const {
         auto copy = *this;
-        std::string action =
-            "ADD COLUMN " + std::string(column_traits<Col>::column_name()) + " " + sql_type_name<Col>::value();
+        std::string action = "ADD COLUMN " + std::string(Col::column_name()) + " " + sql_type_name<Col>::value();
         if (!is_field_nullable_v<Col>) {
             action += " NOT NULL";
         }
@@ -1467,29 +1466,28 @@ public:
         return copy;
     }
 
-    template <ColumnDescriptor Col>
+    template <ColumnFieldType Col>
     [[nodiscard]] alter_table_builder drop_column() const {
         auto copy = *this;
-        copy.actions_.push_back("DROP COLUMN " + std::string(column_traits<Col>::column_name()));
+        copy.actions_.push_back("DROP COLUMN " + std::string(Col::column_name()));
         return copy;
     }
 
     // RENAME COLUMN old_name TO new_name
-    // NewCol must be a ColumnDescriptor with the same value_type as OldCol.
-    template <ColumnDescriptor OldCol, ColumnDescriptor NewCol>
+    // NewCol must be a ColumnFieldType with the same value_type as OldCol.
+    template <ColumnFieldType OldCol, ColumnFieldType NewCol>
         requires std::same_as<typename OldCol::value_type, typename NewCol::value_type>
     [[nodiscard]] alter_table_builder rename_column() const {
         auto copy = *this;
-        copy.actions_.push_back("RENAME COLUMN " + std::string(column_traits<OldCol>::column_name()) + " TO " +
-                                std::string(column_traits<NewCol>::column_name()));
+        copy.actions_.push_back("RENAME COLUMN " + std::string(OldCol::column_name()) + " TO " +
+                                std::string(NewCol::column_name()));
         return copy;
     }
 
-    template <ColumnDescriptor Col>
+    template <ColumnFieldType Col>
     [[nodiscard]] alter_table_builder modify_column() const {
         auto copy = *this;
-        std::string action =
-            "MODIFY COLUMN " + std::string(column_traits<Col>::column_name()) + " " + sql_type_name<Col>::value();
+        std::string action = "MODIFY COLUMN " + std::string(Col::column_name()) + " " + sql_type_name<Col>::value();
         if (!is_field_nullable_v<Col>) {
             action += " NOT NULL";
         }
@@ -1530,13 +1528,13 @@ public:
 
     // CHANGE COLUMN old_name new_name new_type [NOT NULL]
     // OldCol: existing column (provides the current name).
-    // NewCol: ColumnDescriptor providing the new column name and type; use std::optional<T> in NewCol's
+    // NewCol: ColumnFieldType providing the new column name and type; use std::optional<T> in NewCol's
     //         value type to make the column nullable.
-    template <ColumnDescriptor OldCol, ColumnDescriptor NewCol>
+    template <ColumnFieldType OldCol, ColumnFieldType NewCol>
     [[nodiscard]] alter_table_builder change_column() const {
         auto copy = *this;
-        std::string act = "CHANGE COLUMN " + std::string(column_traits<OldCol>::column_name()) + " " +
-                          std::string(column_traits<NewCol>::column_name()) + " " + sql_type_name<NewCol>::value();
+        std::string act = "CHANGE COLUMN " + std::string(OldCol::column_name()) + " " +
+                          std::string(NewCol::column_name()) + " " + sql_type_name<NewCol>::value();
         if (!is_field_nullable_v<NewCol>) {
             act += " NOT NULL";
         }
@@ -1545,7 +1543,7 @@ public:
     }
 
     // ADD INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols, fixed_string Name>
+    template <ColumnFieldType... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] alter_table_builder add_index(index_id<Name> const&) const {
         auto copy = *this;
@@ -1554,7 +1552,7 @@ public:
     }
 
     // ADD UNIQUE INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols, fixed_string Name>
+    template <ColumnFieldType... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] alter_table_builder add_unique_index(index_id<Name> const&) const {
         auto copy = *this;
@@ -1564,7 +1562,7 @@ public:
     }
 
     // ADD FULLTEXT INDEX name (col1, col2, ...)
-    template <ColumnDescriptor... Cols, fixed_string Name>
+    template <ColumnFieldType... Cols, fixed_string Name>
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] alter_table_builder add_fulltext_index(index_id<Name> const&) const {
         auto copy = *this;
@@ -2313,12 +2311,12 @@ template <ValidTable From, ValidTable To>
     return ddl_detail::rename_table_builder<From, To>{};
 }
 
-template <ColumnDescriptor... Cols, fixed_string Name, ValidTable Table>
+template <ColumnFieldType... Cols, fixed_string Name, ValidTable Table>
 [[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(index_id<Name> const&, Table const&) {
     return ddl_detail::create_index_builder<Table, Cols...>{std::string(Name)};
 }
 
-template <fixed_string Name, ValidTable Table, ColumnDescriptor... Cols>
+template <fixed_string Name, ValidTable Table, ColumnFieldType... Cols>
 [[nodiscard]] ddl_detail::create_index_builder<Table, Cols...> create_index_on(index_id<Name> const&, Table const&,
                                                                                Cols const&...) {
     return ddl_detail::create_index_builder<Table, Cols...>{std::string(Name)};

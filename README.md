@@ -252,6 +252,56 @@ auto cnt = db.query(count(product{}).where(equal<product::price>(9.99)));
 auto cols = db.query(describe(product{}));
 ```
 
+### CTEs (Common Table Expressions)
+
+```cpp
+// Non-recursive CTE
+auto sql = with(cte("active", select(product::id{}).from(product{}).where(equal<product::price>(9.99))))
+    .select(count_all{})
+    .from(cte_ref{"active"})
+    .build_sql();
+// → WITH active AS (SELECT id FROM product WHERE price = 9.99) SELECT COUNT(*) FROM active
+
+// Multiple CTEs
+auto c1 = cte("expensive", select(product::id{}).from(product{}).where(greater_than<product::price>(100.0)));
+auto c2 = cte("cheap",     select(product::id{}).from(product{}).where(less_than<product::price>(10.0)));
+auto sql = with(c1, c2).select(count_all{}).from(cte_ref{"expensive"}).build_sql();
+
+// Recursive CTE
+auto sql = with(recursive(cte("nums", "SELECT 1 AS n UNION ALL SELECT n+1 FROM nums WHERE n < 10")))
+    .select(count_all{})
+    .from(cte_ref{"nums"})
+    .build_sql();
+// → WITH RECURSIVE nums AS (...) SELECT COUNT(*) FROM nums
+```
+
+### Prepared Statements
+
+```cpp
+// Prepare once, execute many times with different parameters
+auto stmt = db.prepare("SELECT id, code FROM trade WHERE type = ?").value();
+auto stocks = stmt.query<std::tuple<uint32_t, std::string>>(std::string{"Stock"}).value();
+auto bonds  = stmt.query<std::tuple<uint32_t, std::string>>(std::string{"Bond"}).value();
+
+// DML with prepared statements
+auto ins = db.prepare("INSERT INTO trade (code, type) VALUES (?, ?)").value();
+auto affected = ins.execute(std::string{"AAPL"}, std::string{"Stock"}).value();
+auto id = ins.last_insert_id();
+```
+
+### Transaction Guard
+
+```cpp
+// RAII scoped transaction — auto-rollback on destruction if not committed
+{
+    auto guard = transaction_guard::begin(db).value();
+    db.execute(insert_into(product{}).values(row));
+    db.execute(update(product{}).set(product::price{12.99}).where(equal<product::id>(1u)));
+    guard.commit().value();  // explicit commit
+}
+// If commit() is never called, the destructor rolls back automatically.
+```
+
 ### Schema Validation
 
 ```cpp

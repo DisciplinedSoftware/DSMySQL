@@ -64,7 +64,7 @@ void append_assignment_sql(std::string& s, bool& first, Col const& field) {
         s += ", ";
     }
     using C = std::decay_t<Col>;
-    s += column_traits<C>::column_name();
+    s += C::column_name();
     s += " = ";
     s += sql_detail::to_sql_value(field.value);
     first = false;

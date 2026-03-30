@@ -562,14 +562,12 @@ suite<"DQL JOIN Queries"> dql_join_queries_suite = [] {
             << sql;
     };
 
-    "inner_join with col<T,I> descriptors - auto-detects multi-table"_test = [] {
-        // col<product, 1> = category_id field, col<category, 0> = id field
-        auto const sql = select(col<product, 2>{}, col<category, 1>{})
+    "inner_join with tagged_column_field descriptors - auto-detects multi-table"_test = [] {
+        auto const sql = select(product::sku{}, category::label{})
                              .from(product{})
-                             .inner_join(category{}, col<product, 1>{}, col<category, 0>{})
+                             .inner_join(category{}, product::category_id{}, category::id{})
                              .build_sql();
-        expect(sql == "SELECT sku, label FROM product INNER JOIN category ON product.category_id = category.id"s)
-            << sql;
+        expect(sql == "SELECT sku, label FROM product INNER JOIN category ON category_id = id"s) << sql;
     };
 
     "joined<T> still works as explicit escape hatch"_test = [] {
@@ -2245,11 +2243,11 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
     };
 
     // order_by<qual<Col>> — case 7 (qualified join column)
-    "order_by<qual<col<T,I>>> — qualified table.column for JOIN ORDER BY"_test = [] {
+    "order_by<qual<tagged_col>> — qualified table.column for JOIN ORDER BY"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
                              .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
-                             .order_by(qual<col<ext_category, 1>>{})
+                             .order_by(qual<ext_category::label>{})
                              .build_sql();
         expect(
             sql ==
@@ -2257,11 +2255,11 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
             << sql;
     };
 
-    "order_by<qual<col<T,I>>, desc> — qualified column DESC"_test = [] {
+    "order_by<qual<tagged_col>, desc> — qualified column DESC"_test = [] {
         auto const sql = select(ext_product::sku{})
                              .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
-                             .order_by(desc(qual<col<ext_category, 1>>{}))
+                             .order_by(desc(qual<ext_category::label>{}))
                              .build_sql();
         expect(
             sql ==
@@ -2269,11 +2267,11 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
             << sql;
     };
 
-    "order_by<nulls_last<qual<col<T,I>>>> — NULL handling supports qualified columns"_test = [] {
+    "order_by<nulls_last<qual<tagged_col>>> — NULL handling supports qualified columns"_test = [] {
         auto const sql = select(ext_product::sku{})
                              .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
-                             .order_by(nulls_last<qual<col<ext_category, 1>>>{})
+                             .order_by(nulls_last<qual<ext_category::label>>{})
                              .build_sql();
         expect(sql ==
                "SELECT sku FROM ext_product INNER JOIN ext_category ON category_id = id ORDER BY (ext_category.label "
@@ -2282,11 +2280,11 @@ suite<"DQL ORDER BY Features"> dql_order_by_features_suite = [] {
             << sql;
     };
 
-    "order_by<nulls_first<qual<col<T,I>>>, desc> — qualified NULL handling with DESC"_test = [] {
+    "order_by<nulls_first<qual<tagged_col>>, desc> — qualified NULL handling with DESC"_test = [] {
         auto const sql = select(ext_product::sku{})
                              .from(ext_product{})
                              .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
-                             .order_by(desc(nulls_first<qual<col<ext_category, 1>>>{}))
+                             .order_by(desc(nulls_first<qual<ext_category::label>>{}))
                              .build_sql();
         expect(sql ==
                "SELECT sku FROM ext_product INNER JOIN ext_category ON category_id = id ORDER BY (ext_category.label "
@@ -2529,15 +2527,12 @@ suite<"DQL Extended JOIN Types"> dql_extended_join_suite = [] {
         expect(sql == "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON category_id = id"s) << sql;
     };
 
-    "straight_join with qualified col descriptors — generates table-qualified ON"_test = [] {
+    "straight_join with tagged column field descriptors"_test = [] {
         auto const sql = select(ext_product::sku{}, ext_category::label{})
                              .from(ext_product{})
-                             .straight_join(ext_category{}, col<ext_product, 1>{}, col<ext_category, 0>{})
+                             .straight_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
                              .build_sql();
-        expect(
-            sql ==
-            "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON ext_product.category_id = ext_category.id"s)
-            << sql;
+        expect(sql == "SELECT sku, label FROM ext_product STRAIGHT_JOIN ext_category ON category_id = id"s) << sql;
     };
 
     "straight_join_on — generates STRAIGHT_JOIN ... ON compound condition"_test = [] {
@@ -2577,22 +2572,20 @@ suite<"DQL Derived Table"> dql_derived_table_suite = [] {
 // ===================================================================
 
 suite<"DQL CTE"> dql_cte_suite = [] {
-    "with_cte single CTE — WITH name AS (q) main_select"_test = [] {
+    "with single CTE — WITH name AS (q) SELECT ... FROM name"_test = [] {
         auto const cte_q = select(ext_product::type{}, count_all{}).from(ext_product{}).group_by(ext_product::type{});
-        auto const main_q = select(ext_product::type{}).from(ext_product{});
-        auto const cte = with_cte("counts", cte_q);
-        auto const sql = cte.build_sql(main_q);
+        auto const sql = with(cte("counts", cte_q)).select(ext_product::type{}).from(ext_product{}).build_sql();
         expect(sql ==
                "WITH counts AS (SELECT type, COUNT(*) FROM ext_product GROUP BY type) SELECT type FROM ext_product"s)
             << sql;
     };
 
-    "with_cte two CTEs — WITH cte1 AS (...), cte2 AS (...) SELECT ..."_test = [] {
-        auto const cte1 = select(ext_product::type{}, count_all{}).from(ext_product{}).group_by(ext_product::type{});
-        auto const cte2 = select(ext_product::sku{}).from(ext_product{}).where(is_not_null<ext_product::name>());
-        auto const main = select(ext_product::id{}).from(ext_product{});
-        auto const cte = with_cte("counts", cte1).with_cte("skus", cte2);
-        auto const sql = cte.build_sql(main);
+    "with two CTEs — WITH cte1 AS (...), cte2 AS (...) SELECT ..."_test = [] {
+        auto const c1 =
+            cte("counts", select(ext_product::type{}, count_all{}).from(ext_product{}).group_by(ext_product::type{}));
+        auto const c2 =
+            cte("skus", select(ext_product::sku{}).from(ext_product{}).where(is_not_null<ext_product::name>()));
+        auto const sql = with(c1, c2).select(ext_product::id{}).from(ext_product{}).build_sql();
         expect(sql ==
                "WITH counts AS (SELECT type, COUNT(*) FROM ext_product GROUP BY type), "
                "skus AS (SELECT sku FROM ext_product WHERE name IS NOT NULL) "
@@ -2600,13 +2593,69 @@ suite<"DQL CTE"> dql_cte_suite = [] {
             << sql;
     };
 
-    "with_recursive_cte — emits WITH RECURSIVE"_test = [] {
-        auto const seed =
-            select(ext_product::id{}).from(ext_product{}).where(equal<ext_product::id>(ext_product::id{1u}));
-        auto const main = select(ext_product::id{}).from(ext_product{});
-        auto const sql = with_recursive_cte("seed_ids", seed).build_sql(main);
+    "with(recursive(...)) — emits WITH RECURSIVE"_test = [] {
+        auto const seed = recursive(
+            cte("seed_ids",
+                select(ext_product::id{}).from(ext_product{}).where(equal<ext_product::id>(ext_product::id{1u}))));
+        auto const sql = with(seed).select(ext_product::id{}).from(ext_product{}).build_sql();
         expect(sql ==
                "WITH RECURSIVE seed_ids AS (SELECT id FROM ext_product WHERE id = 1) SELECT id FROM ext_product"s)
+            << sql;
+    };
+
+    "with CTE from_cte — SELECT FROM CTE name"_test = [] {
+        auto const sql = with(cte("active", select(ext_product::id{}).from(ext_product{})))
+                             .select(count_all{})
+                             .from(cte_ref{"active"})
+                             .build_sql();
+        expect(sql == "WITH active AS (SELECT id FROM ext_product) SELECT COUNT(*) FROM active"s) << sql;
+    };
+
+    "with CTE raw SQL"_test = [] {
+        auto const sql = with(cte("raw_cte", "SELECT 1 AS x")).select(count_all{}).from(cte_ref{"raw_cte"}).build_sql();
+        expect(sql == "WITH raw_cte AS (SELECT 1 AS x) SELECT COUNT(*) FROM raw_cte"s) << sql;
+    };
+
+    "with(recursive(...)) raw SQL"_test = [] {
+        auto const sql = with(recursive(cte("nums", "SELECT 1 AS n UNION ALL SELECT n + 1 FROM nums WHERE n < 10")))
+                             .select(count_all{})
+                             .from(cte_ref{"nums"})
+                             .build_sql();
+        expect(sql ==
+               "WITH RECURSIVE nums AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM nums WHERE n < 10) "
+               "SELECT COUNT(*) FROM nums"s)
+            << sql;
+    };
+
+    "mixed recursive and non-recursive CTEs — recursive wins"_test = [] {
+        auto const c1 = cte("base", select(ext_product::id{}).from(ext_product{}));
+        auto const c2 = recursive(cte("tree", "SELECT 1 AS n UNION ALL SELECT n + 1 FROM tree WHERE n < 5"));
+        auto const sql = with(c1, c2).select(count_all{}).from(cte_ref{"base"}).build_sql();
+        expect(sql ==
+               "WITH RECURSIVE base AS (SELECT id FROM ext_product), "
+               "tree AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM tree WHERE n < 5) "
+               "SELECT COUNT(*) FROM base"s)
+            << sql;
+    };
+
+    "with CTE and from(table) — CTE prefix prepended to table query"_test = [] {
+        auto const sql = with(cte("helper", "SELECT 1 AS x"))
+                             .select(ext_product::id{})
+                             .from(ext_product{})
+                             .where(equal<ext_product::id>(ext_product::id{1u}))
+                             .build_sql();
+        expect(sql == "WITH helper AS (SELECT 1 AS x) SELECT id FROM ext_product WHERE id = 1"s) << sql;
+    };
+
+    "with CTE and joined from — CTE prefix propagated"_test = [] {
+        auto const sql = with(cte("helper", "SELECT 1 AS x"))
+                             .select(ext_product::sku{}, ext_category::label{})
+                             .from(ext_product{})
+                             .inner_join(ext_category{}, ext_product::category_id{}, ext_category::id{})
+                             .build_sql();
+        expect(sql ==
+               "WITH helper AS (SELECT 1 AS x) "
+               "SELECT sku, label FROM ext_product INNER JOIN ext_category ON category_id = id"s)
             << sql;
     };
 };

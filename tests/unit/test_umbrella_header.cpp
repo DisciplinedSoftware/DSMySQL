@@ -34,4 +34,28 @@ suite<"public api umbrella header"> public_api_umbrella_header_suite = [] {
 
         expect(sql == "SELECT id, name FROM api_product WHERE sku = 'ABC' ORDER BY id ASC"s) << sql;
     };
+
+    "ds_mysql.hpp exposes transaction_guard"_test = [] {
+        // transaction_guard is move-only and constructed via begin() — verify it's available.
+        static_assert(!std::is_copy_constructible_v<transaction_guard>);
+        static_assert(std::is_move_constructible_v<transaction_guard>);
+    };
+
+    "ds_mysql.hpp exposes prepared_statement"_test = [] {
+        // prepared_statement is move-only and constructed via mysql_connection::prepare().
+        static_assert(!std::is_copy_constructible_v<prepared_statement>);
+        static_assert(std::is_move_constructible_v<prepared_statement>);
+    };
+
+    "ds_mysql.hpp exposes CTE builders"_test = [] {
+        auto const sql = with(cte("t", "SELECT 1 AS x")).select(count_all{}).from(cte_ref{"t"}).build_sql();
+        expect(sql == "WITH t AS (SELECT 1 AS x) SELECT COUNT(*) FROM t"s) << sql;
+
+        auto const rsql = with(recursive(cte("r", "SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<3")))
+                              .select(count_all{})
+                              .from(cte_ref{"r"})
+                              .build_sql();
+        expect(rsql == "WITH RECURSIVE r AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n<3) SELECT COUNT(*) FROM r"s)
+            << rsql;
+    };
 };

@@ -1533,4 +1533,244 @@ suite<"last_insert_id Integration"> last_insert_id_suite = [] {
     };
 };
 
+// ===================================================================
+// transaction_guard integration tests
+// ===================================================================
+
+suite<"transaction_guard Integration"> transaction_guard_integration_suite = [] {
+    "transaction_guard commit persists data"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        {
+            auto guard = transaction_guard::begin(*db);
+            expect(fatal(guard.has_value())) << "begin() should succeed";
+
+            trade row{};
+            row.code_ = varchar_type<32>{"AAPL"};
+            row.type_ = varchar_type<64>{"Stock"};
+            row.executed_at_ = datetime_type<>{};
+            row.recorded_at_ = datetime_type<>{};
+            expect(db->execute(insert_into(trade{}).values(row)).has_value());
+
+            auto commit_result = guard->commit();
+            expect(commit_result.has_value()) << "commit() should succeed";
+            expect(guard->is_committed());
+        }
+
+        auto cnt = db->query(count(trade{}));
+        expect(fatal(cnt.has_value()));
+        expect(std::get<0>(cnt->at(0)) == 1u) << "committed row should persist";
+    };
+
+    "transaction_guard destructor rolls back uncommitted work"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        {
+            auto guard = transaction_guard::begin(*db);
+            expect(fatal(guard.has_value()));
+
+            trade row{};
+            row.code_ = varchar_type<32>{"ROLLME"};
+            row.type_ = varchar_type<64>{"Test"};
+            row.executed_at_ = datetime_type<>{};
+            row.recorded_at_ = datetime_type<>{};
+            expect(db->execute(insert_into(trade{}).values(row)).has_value());
+            // no commit — guard destructor should rollback
+        }
+
+        auto cnt = db->query(count(trade{}));
+        expect(fatal(cnt.has_value()));
+        expect(std::get<0>(cnt->at(0)) == 0u) << "uncommitted row should be rolled back";
+    };
+
+    "transaction_guard explicit rollback"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        {
+            auto guard = transaction_guard::begin(*db);
+            expect(fatal(guard.has_value()));
+
+            trade row{};
+            row.code_ = varchar_type<32>{"EXPLICIT"};
+            row.type_ = varchar_type<64>{"Test"};
+            row.executed_at_ = datetime_type<>{};
+            row.recorded_at_ = datetime_type<>{};
+            expect(db->execute(insert_into(trade{}).values(row)).has_value());
+
+            auto rb = guard->rollback();
+            expect(rb.has_value()) << "explicit rollback should succeed";
+        }
+
+        auto cnt = db->query(count(trade{}));
+        expect(fatal(cnt.has_value()));
+        expect(std::get<0>(cnt->at(0)) == 0u) << "rolled-back row should not persist";
+    };
+};
+
+// ===================================================================
+// prepared_statement integration tests
+// ===================================================================
+
+suite<"prepared_statement Integration"> prepared_statement_integration_suite = [] {
+    "prepare and execute DML — insert with parameters"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        auto stmt = db->prepare("INSERT INTO trade (code, type, executed_at, recorded_at) VALUES (?, ?, NOW(), NOW())");
+        expect(fatal(stmt.has_value())) << "prepare should succeed: " + stmt.error();
+        expect(stmt->param_count() == 2u);
+
+        auto result = stmt->execute(std::string{"AAPL"}, std::string{"Stock"});
+        expect(fatal(result.has_value())) << "execute should succeed: " + result.error();
+        expect(*result == 1u) << "should affect 1 row";
+
+        result = stmt->execute(std::string{"GOOGL"}, std::string{"Stock"});
+        expect(fatal(result.has_value()));
+        expect(*result == 1u);
+
+        auto cnt = db->query(count(trade{}));
+        expect(fatal(cnt.has_value()));
+        expect(std::get<0>(cnt->at(0)) == 2u) << "two rows should be inserted";
+    };
+
+    "prepare and query — select with parameters"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        // Insert test data using regular execute
+        auto ins = db->prepare("INSERT INTO trade (code, type, executed_at, recorded_at) VALUES (?, ?, NOW(), NOW())");
+        expect(fatal(ins.has_value()));
+        expect(ins->execute(std::string{"AAPL"}, std::string{"Stock"}).has_value());
+        expect(ins->execute(std::string{"GOOGL"}, std::string{"Stock"}).has_value());
+        expect(ins->execute(std::string{"MSFT"}, std::string{"Stock"}).has_value());
+
+        // Query with prepared statement
+        auto sel = db->prepare("SELECT id, code FROM trade WHERE type = ? ORDER BY code");
+        expect(fatal(sel.has_value())) << "prepare SELECT should succeed";
+
+        using row_t = std::tuple<uint32_t, std::string>;
+        auto rows = sel->query<row_t>(std::string{"Stock"});
+        expect(fatal(rows.has_value())) << "query should succeed: " + rows.error();
+        expect(rows->size() == 3u) << "should return 3 rows, got " + std::to_string(rows->size());
+
+        // Verify ordered by code: AAPL, GOOGL, MSFT
+        expect(std::get<1>(rows->at(0)) == "AAPL"s);
+        expect(std::get<1>(rows->at(1)) == "GOOGL"s);
+        expect(std::get<1>(rows->at(2)) == "MSFT"s);
+    };
+
+    "prepare with zero parameters"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        auto stmt = db->prepare("SELECT COUNT(*) FROM trade");
+        expect(fatal(stmt.has_value()));
+        expect(stmt->param_count() == 0u);
+
+        using row_t = std::tuple<uint64_t>;
+        auto rows = stmt->query<row_t>();
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        expect(std::get<0>(rows->at(0)) == 0u);
+    };
+
+    "prepared statement last_insert_id"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)db->execute(drop_table(trade{}).if_exists());
+        }};
+
+        expect(db->execute(drop_table(trade{}).if_exists()).has_value());
+        expect(db->execute(create_table(trade{})).has_value());
+
+        auto stmt = db->prepare("INSERT INTO trade (code, type, executed_at, recorded_at) VALUES (?, ?, NOW(), NOW())");
+        expect(fatal(stmt.has_value()));
+
+        expect(stmt->execute(std::string{"AAPL"}, std::string{"Stock"}).has_value());
+        auto const first_id = stmt->last_insert_id();
+        expect(first_id > 0u) << "first insert should produce a non-zero id";
+
+        expect(stmt->execute(std::string{"GOOGL"}, std::string{"Stock"}).has_value());
+        auto const second_id = stmt->last_insert_id();
+        expect(second_id == first_id + 1u) << "second id should be first + 1";
+    };
+
+    "parameter count mismatch returns error"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto db = mysql_connection::connect(*config);
+        expect(fatal(db));
+
+        auto stmt = db->prepare("SELECT 1 WHERE 1 = ?");
+        expect(fatal(stmt.has_value()));
+
+        // Pass 0 params when 1 is expected
+        using row_t = std::tuple<uint64_t>;
+        auto rows = stmt->query<row_t>();
+        expect(!rows.has_value()) << "should fail with parameter mismatch";
+    };
+};
+
 }  // namespace ds_mysql

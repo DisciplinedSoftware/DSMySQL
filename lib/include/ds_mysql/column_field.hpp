@@ -108,13 +108,9 @@ struct unwrap_column_field<T> {
 template <typename T>
 using unwrap_column_field_t = typename unwrap_column_field<T>::type;
 
-}  // namespace ds_mysql
-
 // ===================================================================
 // tagged_column_field — tag-struct based column descriptor
 // ===================================================================
-
-namespace ds_mysql {
 
 /**
  * tagged_column_field<Tag, T> — tag-struct based column descriptor.

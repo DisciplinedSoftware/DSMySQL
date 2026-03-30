@@ -19,6 +19,7 @@
 #include "ds_mysql/database_name.hpp"
 #include "ds_mysql/host_name.hpp"
 #include "ds_mysql/port_number.hpp"
+#include "ds_mysql/prepared_statement.hpp"
 #include "ds_mysql/sql_ddl.hpp"
 #include "ds_mysql/sql_dml.hpp"
 #include "ds_mysql/sql_dql.hpp"
@@ -392,6 +393,28 @@ public:
         return out;
     }
 
+    // ---------------------------------------------------------------
+    // Prepared statements
+    // ---------------------------------------------------------------
+
+    // Prepare a SQL string for repeated execution with bound parameters.
+    [[nodiscard]] std::expected<prepared_statement, std::string> prepare(std::string_view sql) const {
+        auto stmt = std::unique_ptr<MYSQL_STMT, prepared_statement::stmt_deleter>(mysql_stmt_init(connection_.get()));
+        if (!stmt) {
+            return std::unexpected(last_error());
+        }
+        if (mysql_stmt_prepare(stmt.get(), sql.data(), static_cast<unsigned long>(sql.size())) != 0) {
+            return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+        }
+        return prepared_statement{std::move(stmt)};
+    }
+
+    // Prepare a typed query builder for repeated execution.
+    template <SqlBuilder Stmt>
+    [[nodiscard]] std::expected<prepared_statement, std::string> prepare(Stmt const& stmt) const {
+        return prepare(stmt.build_sql());
+    }
+
     // Validate that the C++ table struct T matches the live schema in the database.
     //
     // Runs DESCRIBE <table> and checks:
@@ -596,6 +619,99 @@ private:
     }
 
     std::unique_ptr<MYSQL, decltype(&mysql_close)> connection_;
+};
+
+// ===================================================================
+// transaction_guard — RAII scoped transaction helper.
+//
+// This is a C++ resource-management utility, not a MySQL semantic.
+// Disables autocommit on construction and automatically rolls back on
+// destruction unless commit() has been called.  Move-only.
+//
+//   {
+//       auto guard = transaction_guard::begin(conn);
+//       if (!guard) { /* handle error */ }
+//       conn.execute(insert_into(t{}).values(row));
+//       auto result = guard->commit();
+//       if (!result) { /* handle commit error */ }
+//   }
+//   // If commit() was never called, destructor rolls back.
+// ===================================================================
+
+class transaction_guard {
+public:
+    transaction_guard(transaction_guard const&) = delete;
+    transaction_guard& operator=(transaction_guard const&) = delete;
+
+    transaction_guard(transaction_guard&& other) noexcept : conn_(other.conn_), committed_(other.committed_) {
+        other.conn_ = nullptr;
+    }
+
+    transaction_guard& operator=(transaction_guard&& other) noexcept {
+        if (this != &other) {
+            if (conn_ && !committed_) {
+                (void)conn_->rollback();
+            }
+            conn_ = other.conn_;
+            committed_ = other.committed_;
+            other.conn_ = nullptr;
+        }
+        return *this;
+    }
+
+    ~transaction_guard() {
+        if (conn_ && !committed_) {
+            (void)conn_->rollback();
+        }
+    }
+
+    // Factory: begin a transaction by disabling autocommit.
+    [[nodiscard]] static std::expected<transaction_guard, std::string> begin(mysql_connection const& conn) {
+        auto result = conn.autocommit(false);
+        if (!result) {
+            return std::unexpected(result.error());
+        }
+        return transaction_guard{&conn};
+    }
+
+    // Commit the transaction and re-enable autocommit.
+    [[nodiscard]] std::expected<void, std::string> commit() {
+        if (!conn_) {
+            return std::unexpected("transaction_guard: no active connection");
+        }
+        auto result = conn_->commit();
+        if (!result) {
+            return std::unexpected(result.error());
+        }
+        committed_ = true;
+        // Re-enable autocommit so the connection returns to its default state.
+        return conn_->autocommit(true);
+    }
+
+    // Explicitly roll back the transaction and re-enable autocommit.
+    [[nodiscard]] std::expected<void, std::string> rollback() {
+        if (!conn_) {
+            return std::unexpected("transaction_guard: no active connection");
+        }
+        auto result = conn_->rollback();
+        if (!result) {
+            return std::unexpected(result.error());
+        }
+        committed_ = true;  // prevent double-rollback in destructor
+        return conn_->autocommit(true);
+    }
+
+    // Check whether commit() has been called.
+    [[nodiscard]] bool is_committed() const noexcept {
+        return committed_;
+    }
+
+private:
+    explicit transaction_guard(mysql_connection const* conn) : conn_(conn) {
+    }
+
+    mysql_connection const* conn_ = nullptr;
+    bool committed_ = false;
 };
 
 }  // namespace ds_mysql

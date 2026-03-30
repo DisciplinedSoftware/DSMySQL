@@ -229,14 +229,14 @@ public:
     }
 
     template <typename Spec>
-        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+        requires(ColumnFieldType<Spec> || DescOrder<Spec>)
     [[nodiscard]] update_set_where_builder order_by(Spec) const {
         auto copy = *this;
         if constexpr (DescOrder<Spec>) {
             using Col = typename Spec::col_spec;
-            copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) + " DESC");
+            copy.order_by_clauses_.push_back(std::string(Col::column_name()) + " DESC");
         } else {
-            copy.order_by_clauses_.push_back(std::string(column_traits<Spec>::column_name()) + " ASC");
+            copy.order_by_clauses_.push_back(std::string(Spec::column_name()) + " ASC");
         }
         return copy;
     }
@@ -272,7 +272,7 @@ public:
     }
 
     template <typename Spec>
-        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+        requires(ColumnFieldType<Spec> || DescOrder<Spec>)
     [[nodiscard]] update_set_where_builder<T, Cols...> order_by(Spec s) const {
         return update_set_where_builder<T, Cols...>{assignments_, std::nullopt}.order_by(s);
     }
@@ -345,14 +345,14 @@ public:
     }
 
     template <typename Spec>
-        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+        requires(ColumnFieldType<Spec> || DescOrder<Spec>)
     [[nodiscard]] delete_from_where_builder order_by(Spec) const {
         auto copy = *this;
         if constexpr (DescOrder<Spec>) {
             using Col = typename Spec::col_spec;
-            copy.order_by_clauses_.push_back(std::string(column_traits<Col>::column_name()) + " DESC");
+            copy.order_by_clauses_.push_back(std::string(Col::column_name()) + " DESC");
         } else {
-            copy.order_by_clauses_.push_back(std::string(column_traits<Spec>::column_name()) + " ASC");
+            copy.order_by_clauses_.push_back(std::string(Spec::column_name()) + " ASC");
         }
         return copy;
     }
@@ -377,7 +377,7 @@ public:
     }
 
     template <typename Spec>
-        requires(ColumnDescriptor<Spec> || DescOrder<Spec>)
+        requires(ColumnFieldType<Spec> || DescOrder<Spec>)
     [[nodiscard]] delete_from_where_builder<T> order_by(Spec s) const {
         return delete_from_where_builder<T>{std::nullopt}.order_by(s);
     }

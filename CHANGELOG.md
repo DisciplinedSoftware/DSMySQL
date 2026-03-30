@@ -8,6 +8,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `prepared_statement` — RAII wrapper for MySQL prepared statements (`MYSQL_STMT*`); created via `mysql_connection::prepare(sql)` or `prepare(builder)`; supports type-safe parameter binding via `execute(params...)` and typed result fetching via `query<RowType>(params...)`
+- `transaction_guard` — RAII scoped transaction helper; `transaction_guard::begin(conn)` disables autocommit, destructor auto-rolls-back unless `commit()` is called; also provides explicit `rollback()`
+- CTE fluent API — `with(cte("name", query)).select(...).from(cte_ref{"name"})` and `with(recursive(cte("name", sql))).select(...)` replace the old `with_cte()`/`with_recursive_cte()` builders
+- `sql_predicates.hpp` — predicates, operators, and `col_expr`/`col_ref` extracted from `sql_core.hpp` into their own header for readability
+
+### Changed
+
+- `ColumnDescriptor` concept replaced by `ColumnFieldType` everywhere — the dual-concept system is removed
+- `column_traits<T>` removed — callers now use `T::column_name()` and `T::value_type` directly
+- `qual<Col>` now derives the table name from the tag type via compile-time reflection, replacing the old `col<T,I>` approach
+- `sql_core.hpp` reduced from ~1 035 to ~340 lines via the predicate extraction
+
+### Removed
+
+- `col<Table, Index>` (`col.hpp`) — index-based column descriptor removed; use `tagged_column_field` (or `COLUMN_FIELD` macro) instead
+- `col_of<&T::field>` — member-pointer column alias removed alongside `col<T,I>`
+- `cte_builder`, `with_cte()`, `with_recursive_cte()` — replaced by the new `with(cte(...))` fluent API
+
 ---
 
 ## [4.6.3] – 2026-03-30
