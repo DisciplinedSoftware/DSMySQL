@@ -3050,9 +3050,9 @@ concept GroupBySpec = requires {
 // Resolved at build_sql() time: emits the alias name if set, otherwise
 // falls back to the projection's sql_expr().
 struct alias_order_entry {
-    std::size_t proj_index;
+    std::size_t proj_index{};
     std::string fallback_expr;  // sql_expr() of the projection
-    sort_order dir;
+    sort_order dir{sort_order::asc};
 };
 
 using order_by_item = std::variant<std::string, alias_order_entry>;
