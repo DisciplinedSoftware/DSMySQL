@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.6.2] – 2026-03-30
+
 ### Changed
 
 - `select_query_builder`: replace `std::vector<order_by_item>` with a single `std::string` for ORDER BY clause accumulation. Remove `alias_order_entry` struct and `order_by_item` variant; `order_by_alias()` now resolves aliases eagerly at call time instead of deferring to `build_sql()`.
@@ -380,7 +384,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.1...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.2...HEAD
+[4.6.2]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.1...v4.6.2
 [4.6.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.0...v4.6.1
 [4.6.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.1...v4.5.0
