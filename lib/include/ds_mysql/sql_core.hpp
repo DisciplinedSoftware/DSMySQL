@@ -235,6 +235,8 @@ template <typename T>
         return format_datetime(v);
     } else if constexpr (is_time_type_v<T>) {
         return format_time(v.duration(), v.fractional_second_precision());
+    } else if constexpr (is_date_type_v<T>) {
+        return std::format("'{:%Y-%m-%d}'", v.days());
     } else if constexpr (std::same_as<T, bool>) {
         return v ? "1" : "0";
     } else if constexpr (is_formatted_numeric_type_v<T>) {
@@ -250,7 +252,7 @@ template <typename T>
     } else {
         static_assert(false,
                       "to_sql_value: unsupported type. "
-                      "Supported: column_field<T>, optional<T>, datetime_type, timestamp_type, bool, "
+                      "Supported: column_field<T>, optional<T>, datetime_type, timestamp_type, date_type, bool, "
                       "integral types, floating-point types, float_type<P,S>, double_type<P,S>, "
                       "decimal_type<P,S>, varchar_type<N>, text_type, std::string, "
                       "std::chrono::system_clock::time_point, time_type");
@@ -265,7 +267,7 @@ template <typename T>
 // ===================================================================
 template <typename T>
 concept SqlValue =
-    ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> || is_timestamp_type_v<T> ||
+    ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> || is_timestamp_type_v<T> || is_date_type_v<T> ||
     std::same_as<T, std::chrono::system_clock::time_point> || is_time_type_v<T> || std::same_as<T, bool> ||
     std::integral<T> || std::floating_point<T> || is_formatted_numeric_type_v<T> || is_varchar_type_v<T> ||
     is_text_type_v<T> || std::same_as<T, std::string>;

@@ -103,6 +103,21 @@ private:
     uint32_t fractional_second_precision_;
 };
 
+class date_type {
+public:
+    date_type() noexcept : days_() {
+    }
+    explicit date_type(std::chrono::sys_days d) noexcept : days_(d) {
+    }
+
+    [[nodiscard]] std::chrono::sys_days days() const noexcept {
+        return days_;
+    }
+
+private:
+    std::chrono::sys_days days_{};
+};
+
 using datetime_type_default = datetime_type<>;
 using timestamp_type_default = timestamp_type<>;
 using time_type_default = time_type<>;
@@ -131,5 +146,12 @@ template <uint32_t Fsp>
 struct is_time_type<time_type<Fsp>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_time_type_v = is_time_type<T>::value;
+
+template <typename T>
+struct is_date_type : std::false_type {};
+template <>
+struct is_date_type<date_type> : std::true_type {};
+template <typename T>
+inline constexpr bool is_date_type_v = is_date_type<T>::value;
 
 }  // namespace ds_mysql

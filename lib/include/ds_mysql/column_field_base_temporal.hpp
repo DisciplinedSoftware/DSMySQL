@@ -210,6 +210,94 @@ struct base<std::optional<timestamp_type<Fsp>>> : column_field_tag {
     }
 };
 
+// ===================================================================
+// base<date_type> specializations
+// ===================================================================
+
+template <>
+struct base<date_type> : column_field_tag {
+    using value_type = date_type;
+
+    date_type value{};
+
+    constexpr base() = default;
+    base(std::chrono::sys_days d) noexcept : value(d) {
+    }
+    base(date_type v) noexcept : value(v) {
+    }
+
+    base& operator=(std::chrono::sys_days d) noexcept {
+        value = date_type{d};
+        return *this;
+    }
+    base& operator=(date_type v) noexcept {
+        value = v;
+        return *this;
+    }
+
+    [[nodiscard]] constexpr date_type const& get() const noexcept {
+        return value;
+    }
+    [[nodiscard]] constexpr date_type& get() noexcept {
+        return value;
+    }
+
+    constexpr operator date_type const&() const noexcept {
+        return value;
+    }
+    constexpr operator date_type&() noexcept {
+        return value;
+    }
+};
+
+template <>
+struct base<std::optional<date_type>> : column_field_tag {
+    using value_type = std::optional<date_type>;
+
+    std::optional<date_type> value{};
+
+    constexpr base() = default;
+    constexpr base(std::nullopt_t) noexcept : value(std::nullopt) {
+    }
+    base(std::chrono::sys_days d) noexcept : value(date_type{d}) {
+    }
+    base(date_type v) noexcept : value(std::move(v)) {
+    }
+    base(std::optional<date_type> v) noexcept : value(std::move(v)) {
+    }
+
+    constexpr base& operator=(std::nullopt_t) noexcept {
+        value = std::nullopt;
+        return *this;
+    }
+    constexpr base& operator=(std::chrono::sys_days d) noexcept {
+        value = date_type{d};
+        return *this;
+    }
+    constexpr base& operator=(date_type v) noexcept {
+        value = std::move(v);
+        return *this;
+    }
+    constexpr base& operator=(std::optional<date_type> v) noexcept {
+        value = std::move(v);
+        return *this;
+    }
+
+    [[nodiscard]] constexpr std::optional<date_type> const& get() const noexcept {
+        return value;
+    }
+    [[nodiscard]] constexpr std::optional<date_type>& get() noexcept {
+        return value;
+    }
+
+    constexpr operator std::optional<date_type> const&() const noexcept {
+        return value;
+    }
+    constexpr operator std::optional<date_type>&() noexcept {
+        return value;
+    }
+};
+
 }  // namespace column_field_detail
 
 }  // namespace ds_mysql

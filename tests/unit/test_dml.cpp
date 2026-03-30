@@ -199,6 +199,27 @@ suite<"DML"> dml_suite = [] {
         expect(t5.duration() == microseconds{(838 * 3600LL + 59 * 60LL + 59LL) * 1000000LL});
     };
 
+    "date_type serialization formats as YYYY-MM-DD"_test = [] {
+        using namespace std::chrono;
+        auto const d1 = date_type{sys_days{year{2024} / January / 15}};
+        expect(sql_detail::to_sql_value(d1) == "'2024-01-15'"s);
+
+        auto const d2 = date_type{sys_days{year{1999} / December / 31}};
+        expect(sql_detail::to_sql_value(d2) == "'1999-12-31'"s);
+
+        // Default-constructed date_type → epoch
+        expect(sql_detail::to_sql_value(date_type{}) == "'1970-01-01'"s);
+    };
+
+    "date_type deserialization parses MySQL DATE strings correctly"_test = [] {
+        using namespace std::chrono;
+        auto const d1 = ::ds_mysql::detail::from_mysql_value_nonnull<date_type>("2024-01-15");
+        expect(d1.days() == sys_days{year{2024} / January / 15});
+
+        auto const d2 = ::ds_mysql::detail::from_mysql_value_nonnull<date_type>("1999-12-31");
+        expect(d2.days() == sys_days{year{1999} / December / 31});
+    };
+
     "formatted numeric wrapper types serialize and deserialize like their underlying values"_test = [] {
         expect(sql_type_for<float_type<>>() == "FLOAT"s);
         expect(sql_type_for<float_type<12, 4>>() == "FLOAT(12,4)"s);

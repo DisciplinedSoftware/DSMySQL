@@ -96,6 +96,8 @@ struct sql_type_name {
                 } else {
                     return "TIME(" + std::to_string(base_type::column_fsp) + ")";
                 }
+            } else if constexpr (is_date_type_v<base_type>) {
+                return "DATE";
             } else {
                 static_assert(false,
                               "Unsupported type for SQL mapping. Supported: uint32_t, int32_t, uint64_t, "
@@ -105,7 +107,7 @@ struct sql_type_name {
                               "bool, varchar_type<N>, text_type (TEXT), "
                               "mediumtext_type (MEDIUMTEXT, MySQL), longtext_type (LONGTEXT, MySQL), "
                               "std::chrono::system_clock::time_point, datetime_type<Fsp>, timestamp_type<Fsp>, "
-                              "time_type<Fsp>, and their std::optional variants");
+                              "time_type<Fsp>, date_type, and their std::optional variants");
             }
         }  // end else (not ColumnFieldType)
     }
@@ -211,6 +213,10 @@ namespace sql_type_format {
 
 [[nodiscard]] inline std::string time_type(uint32_t fractional_second_precision) {
     return "TIME(" + std::to_string(fractional_second_precision) + ")";
+}
+
+[[nodiscard]] inline std::string date_type() {
+    return "DATE";
 }
 
 }  // namespace sql_type_format

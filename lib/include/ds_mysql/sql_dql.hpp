@@ -2892,6 +2892,14 @@ T from_mysql_value_nonnull(std::string_view sv) {
         std::tm tm{};
         ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
         return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    } else if constexpr (is_date_type_v<T>) {
+        std::istringstream ss{std::string{sv}};
+        std::tm tm{};
+        ss >> std::get_time(&tm, "%Y-%m-%d");
+        tm.tm_hour = 0;
+        tm.tm_min = 0;
+        tm.tm_sec = 0;
+        return T{std::chrono::floor<std::chrono::days>(std::chrono::system_clock::from_time_t(std::mktime(&tm)))};
     } else if constexpr (is_time_type_v<T>) {
         bool const negative = !sv.empty() && sv[0] == '-';
         std::string_view const s = negative ? sv.substr(1) : sv;
@@ -2918,7 +2926,7 @@ T from_mysql_value_nonnull(std::string_view sv) {
                       "Unsupported type for MySQL deserialization. "
                       "Supported: uint32_t, int32_t, uint64_t, int64_t, float, double, float_type<P,S>, "
                       "double_type<P,S>, decimal_type<P,S>, bool, std::string, varchar_type<N>, text_type, "
-                      "std::chrono::system_clock::time_point (for DATETIME/TIMESTAMP), time_type, "
+                      "std::chrono::system_clock::time_point (for DATETIME/TIMESTAMP), date_type, time_type, "
                       "and their std::optional variants.");
     }
 }

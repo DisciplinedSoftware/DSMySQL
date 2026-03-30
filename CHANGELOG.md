@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `date_type` for MySQL `DATE` columns — stores `std::chrono::sys_days`, supports serialization (`'YYYY-MM-DD'`), deserialization, and `std::optional<date_type>` for nullable columns
+
 ---
 
 ## [4.5.0] – 2026-03-29
