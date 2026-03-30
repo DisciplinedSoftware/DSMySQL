@@ -3046,17 +3046,6 @@ concept GroupBySpec = requires {
     { detail::group_by_spec_traits<T>::cols_string() } -> std::convertible_to<std::string>;
 };
 
-// alias_order_entry — deferred alias lookup for order_by_alias<Proj>()
-// Resolved at build_sql() time: emits the alias name if set, otherwise
-// falls back to the projection's sql_expr().
-struct alias_order_entry {
-    std::size_t proj_index{};
-    std::string fallback_expr;  // sql_expr() of the projection
-    sort_order dir{sort_order::asc};
-};
-
-using order_by_item = std::variant<std::string, alias_order_entry>;
-
 enum class select_lock_mode {
     none,
     for_update,
@@ -3180,28 +3169,28 @@ struct select_query_builder {
                         return std::string(column_traits<Col>::column_name());
                     }
                 }();
-                copy.order_by_clauses_.push_back("(" + col_name +
+                copy.append_order_by_("(" + col_name +
                                                  (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-                copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                copy.append_order_by_(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (QualifiedCol<ColSpec>) {
-                copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                copy.append_order_by_(qualified_col_name<typename ColSpec::col_type>() +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (PositionWrapper<ColSpec>) {
                 static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
                               "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
                 static constexpr std::size_t Index =
                     sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-                copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                copy.append_order_by_(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (ColIndexWrapper<ColSpec>) {
                 static_assert(ColSpec::value <= sizeof...(Projs),
                               "order_by(col_index<N>): N is out of range for this SELECT list");
-                copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                copy.append_order_by_(std::to_string(ColSpec::value) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (Projection<ColSpec>) {
-                copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                copy.append_order_by_(std::string(projection_traits<ColSpec>::sql_expr()) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else {
-                copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                copy.append_order_by_(std::string(column_traits<ColSpec>::column_name()) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             }
         } else {
@@ -3217,28 +3206,28 @@ struct select_query_builder {
                         return std::string(column_traits<Col>::column_name());
                     }
                 }();
-                copy.order_by_clauses_.push_back("(" + col_name +
+                copy.append_order_by_("(" + col_name +
                                                  (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-                copy.order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                copy.append_order_by_(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (QualifiedCol<ColSpec>) {
-                copy.order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                copy.append_order_by_(qualified_col_name<typename ColSpec::col_type>() +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (PositionWrapper<ColSpec>) {
                 static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
                               "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
                 static constexpr std::size_t Index =
                     sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-                copy.order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                copy.append_order_by_(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (ColIndexWrapper<ColSpec>) {
                 static_assert(ColSpec::value <= sizeof...(Projs),
                               "order_by(col_index<N>): N is out of range for this SELECT list");
-                copy.order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                copy.append_order_by_(std::to_string(ColSpec::value) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (Projection<ColSpec>) {
-                copy.order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                copy.append_order_by_(std::string(projection_traits<ColSpec>::sql_expr()) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else {
-                copy.order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                copy.append_order_by_(std::string(column_traits<ColSpec>::column_name()) +
                                                  (Dir == sort_order::asc ? " ASC" : " DESC"));
             }
         }
@@ -3261,28 +3250,28 @@ struct select_query_builder {
                         return std::string(column_traits<Col>::column_name());
                     }
                 }();
-                order_by_clauses_.push_back("(" + col_name +
+                append_order_by_("(" + col_name +
                                             (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-                order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                append_order_by_(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (QualifiedCol<ColSpec>) {
-                order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                append_order_by_(qualified_col_name<typename ColSpec::col_type>() +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (PositionWrapper<ColSpec>) {
                 static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
                               "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
                 static constexpr std::size_t Index =
                     sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-                order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                append_order_by_(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (ColIndexWrapper<ColSpec>) {
                 static_assert(ColSpec::value <= sizeof...(Projs),
                               "order_by(col_index<N>): N is out of range for this SELECT list");
-                order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                append_order_by_(std::to_string(ColSpec::value) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (Projection<ColSpec>) {
-                order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                append_order_by_(std::string(projection_traits<ColSpec>::sql_expr()) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else {
-                order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                append_order_by_(std::string(column_traits<ColSpec>::column_name()) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             }
         } else {
@@ -3298,28 +3287,28 @@ struct select_query_builder {
                         return std::string(column_traits<Col>::column_name());
                     }
                 }();
-                order_by_clauses_.push_back("(" + col_name +
+                append_order_by_("(" + col_name +
                                             (ColSpec::puts_nulls_last ? " IS NULL) ASC" : " IS NULL) DESC"));
-                order_by_clauses_.push_back(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                append_order_by_(col_name + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (QualifiedCol<ColSpec>) {
-                order_by_clauses_.push_back(qualified_col_name<typename ColSpec::col_type>() +
+                append_order_by_(qualified_col_name<typename ColSpec::col_type>() +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (PositionWrapper<ColSpec>) {
                 static_assert((std::is_same_v<typename ColSpec::proj_type, Projs> || ...),
                               "order_by(position<Proj>): Proj must be one of the projections in this SELECT");
                 static constexpr std::size_t Index =
                     sql_detail::proj_index_in_pack<typename ColSpec::proj_type, Projs...>() + 1;
-                order_by_clauses_.push_back(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
+                append_order_by_(std::to_string(Index) + (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (ColIndexWrapper<ColSpec>) {
                 static_assert(ColSpec::value <= sizeof...(Projs),
                               "order_by(col_index<N>): N is out of range for this SELECT list");
-                order_by_clauses_.push_back(std::to_string(ColSpec::value) +
+                append_order_by_(std::to_string(ColSpec::value) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else if constexpr (Projection<ColSpec>) {
-                order_by_clauses_.push_back(std::string(projection_traits<ColSpec>::sql_expr()) +
+                append_order_by_(std::string(projection_traits<ColSpec>::sql_expr()) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             } else {
-                order_by_clauses_.push_back(std::string(column_traits<ColSpec>::column_name()) +
+                append_order_by_(std::string(column_traits<ColSpec>::column_name()) +
                                             (Dir == sort_order::asc ? " ASC" : " DESC"));
             }
         }
@@ -3332,13 +3321,13 @@ struct select_query_builder {
     [[nodiscard]] select_query_builder order_by(case_when_builder<ValueType> expr,
                                                 sort_order dir = sort_order::asc) const& {
         auto copy = *this;
-        copy.order_by_clauses_.push_back(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
+        copy.append_order_by_(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
         return copy;
     }
     template <typename ValueType>
     [[nodiscard]] select_query_builder order_by(case_when_builder<ValueType> expr,
                                                 sort_order dir = sort_order::asc) && {
-        order_by_clauses_.push_back(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
+        append_order_by_(expr.build_sql() + (dir == sort_order::asc ? " ASC" : " DESC"));
         return std::move(*this);
     }
 
@@ -3356,7 +3345,7 @@ struct select_query_builder {
             expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
         }
         expr += ")";
-        copy.order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
+        copy.append_order_by_(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
         return copy;
     }
     template <FieldOrderBy ColSpec, SqlValue ValueType>
@@ -3368,43 +3357,38 @@ struct select_query_builder {
             expr += ", " + ::ds_mysql::sql_detail::to_sql_value(v);
         }
         expr += ")";
-        order_by_clauses_.push_back(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
+        append_order_by_(std::move(expr) + (dir == sort_order::asc ? " ASC" : " DESC"));
         return std::move(*this);
     }
 
     // order_by_alias<Proj>()        — ORDER BY the alias assigned to Proj via with_alias<Proj>()
     // order_by_alias<Proj, desc>()  — ORDER BY alias DESC
     // Falls back to the projection's sql_expr() if no alias has been set.
+    // Note: with_alias() must be called before order_by_alias() for the alias to be used.
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
     [[nodiscard]] select_query_builder order_by_alias(Proj) const& {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
-        copy.order_by_clauses_.push_back(
-            alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::asc});
+        copy.append_order_by_(resolve_alias_order_<Proj>(sort_order::asc));
         return copy;
     }
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
     [[nodiscard]] select_query_builder order_by_alias(Proj) && {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
-        order_by_clauses_.push_back(alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::asc});
+        append_order_by_(resolve_alias_order_<Proj>(sort_order::asc));
         return std::move(*this);
     }
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
     [[nodiscard]] select_query_builder order_by_alias(desc_order<Proj>) const& {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
         auto copy = *this;
-        copy.order_by_clauses_.push_back(
-            alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::desc});
+        copy.append_order_by_(resolve_alias_order_<Proj>(sort_order::desc));
         return copy;
     }
     template <AnyProjection Proj>
         requires((std::is_same_v<Proj, Projs> || ...))
     [[nodiscard]] select_query_builder order_by_alias(desc_order<Proj>) && {
-        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
-        order_by_clauses_.push_back(alias_order_entry{Index, proj_sql_expr(std::get<Index>(projs_)), sort_order::desc});
+        append_order_by_(resolve_alias_order_<Proj>(sort_order::desc));
         return std::move(*this);
     }
 
@@ -3809,23 +3793,9 @@ struct select_query_builder {
             sql += " HAVING ";
             sql += having_->build_sql();
         }
-        if (!order_by_clauses_.empty()) {
+        if (!order_by_clause_.empty()) {
             sql += " ORDER BY ";
-            bool f = true;
-            for (auto const& item : order_by_clauses_) {
-                if (!f) {
-                    sql += ", ";
-                }
-                if (std::holds_alternative<std::string>(item)) {
-                    sql += std::get<std::string>(item);
-                } else {
-                    auto const& e = std::get<alias_order_entry>(item);
-                    auto it = aliases_.find(e.proj_index);
-                    sql += (it != aliases_.end() ? it->second : e.fallback_expr);
-                    sql += (e.dir == sort_order::asc ? " ASC" : " DESC");
-                }
-                f = false;
-            }
+            sql += order_by_clause_;
         }
         if (limit_.has_value()) {
             sql += " LIMIT ";
@@ -3908,12 +3878,26 @@ struct select_query_builder {
         return s;
     }
 
+    void append_order_by_(std::string clause) {
+        if (!order_by_clause_.empty()) order_by_clause_ += ", ";
+        order_by_clause_ += std::move(clause);
+    }
+
+    template <typename Proj>
+    [[nodiscard]] std::string resolve_alias_order_(sort_order dir) const {
+        static constexpr std::size_t Index = sql_detail::proj_index_in_pack<Proj, Projs...>();
+        auto it = aliases_.find(Index);
+        std::string result = (it != aliases_.end()) ? it->second : proj_sql_expr(std::get<Index>(projs_));
+        result += (dir == sort_order::asc ? " ASC" : " DESC");
+        return result;
+    }
+
     std::optional<sql_predicate> where_;
     std::string group_by_;
     bool with_rollup_ = false;
     group_by_mode group_by_mode_ = group_by_mode::standard;
     std::optional<sql_predicate> having_;
-    std::vector<order_by_item> order_by_clauses_;
+    std::string order_by_clause_;
     std::optional<std::size_t> limit_;
     std::optional<std::size_t> offset_;
     select_lock_mode lock_mode_ = select_lock_mode::none;

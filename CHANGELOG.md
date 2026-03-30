@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `select_query_builder`: replace `std::vector<order_by_item>` with a single `std::string` for ORDER BY clause accumulation. Remove `alias_order_entry` struct and `order_by_item` variant; `order_by_alias()` now resolves aliases eagerly at call time instead of deferring to `build_sql()`.
+
 ---
 
 ## [4.6.1] – 2026-03-30
