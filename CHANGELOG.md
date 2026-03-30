@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `column_attr::primary_key` — inline column-level `PRIMARY KEY` attribute for single-column primary keys, e.g. `COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)`
 - `date_type` for MySQL `DATE` columns — stores `std::chrono::sys_days`, supports serialization (`'YYYY-MM-DD'`), deserialization, and `std::optional<date_type>` for nullable columns
 
 ---
@@ -18,7 +19,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- `table_inline_primary_key<T>` trait and automatic `PRIMARY KEY AUTO_INCREMENT` on the first column — define primary keys explicitly via `table_constraints<T>` or column attributes (`column_attr::auto_increment`)
+- `table_inline_primary_key<T>` trait and automatic `PRIMARY KEY AUTO_INCREMENT` on the first column — define primary keys explicitly via `column_attr::primary_key`, `table_constraints<T>`, or both
 
 ---
 

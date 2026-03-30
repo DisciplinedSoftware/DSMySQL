@@ -196,6 +196,11 @@ struct table_with_attrs {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(name, varchar_type<255>)
 };
+
+struct table_with_pk {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
+    COLUMN_FIELD(name, varchar_type<255>)
+};
 }  // namespace
 
 template <>
@@ -798,6 +803,16 @@ suite<"DDL"> ddl_suite = [] {
         auto const sql = create_table(test_table{}).build_sql();
         expect(!sql.contains("PRIMARY KEY")) << sql;
         expect(!sql.contains("AUTO_INCREMENT")) << sql;
+    };
+
+    "create_table - column_attr::primary_key emits PRIMARY KEY on column"_test = [] {
+        auto const sql = create_table(table_with_pk{}).build_sql();
+        expect(sql ==
+               "CREATE TABLE table_with_pk (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    name VARCHAR(255) NOT NULL\n"
+               ");\n"s)
+            << sql;
     };
 
     "create_table with table_attributes trait - emits default ENGINE and CHARSET"_test = [] {

@@ -42,6 +42,7 @@ struct column_field : column_field_detail::base<T> {
     using column_field_detail::base<T>::base;
     using column_field_detail::base<T>::operator=;
 
+    static constexpr bool ddl_primary_key = (std::same_as<Attrs, column_attr::primary_key> || ...);
     static constexpr bool ddl_auto_increment = (std::same_as<Attrs, column_attr::auto_increment> || ...);
     static constexpr bool ddl_unique = (std::same_as<Attrs, column_attr::unique> || ...);
     static constexpr bool ddl_default_current_timestamp =

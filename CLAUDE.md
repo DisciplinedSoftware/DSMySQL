@@ -53,7 +53,7 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 - `sql_dql.hpp` — `select(col1{}, col2{})`, `count(T{})`, `describe(T{})`
 - `connect_options.hpp` — `connect_options` fluent builder and `ssl_mode` enum for pre-connect `mysql_options()` configuration (timeouts, SSL/TLS, charset, compression, etc.)
 - `charset_name.hpp` — `charset_name` strong type for character set names
-- `column_field.hpp` / `column_field_base_*.hpp` — `column_field<"name", Type>` descriptors and `COLUMN_FIELD(name, type)` macro
+- `column_field.hpp` / `column_field_base_*.hpp` — `column_field<"name", Type, Attrs...>` descriptors, `COLUMN_FIELD(name, type, attrs...)` macro, and column attributes (`column_attr::primary_key`, `auto_increment`, `unique`, `default_current_timestamp`, `on_update_current_timestamp`, `comment<"...">`, `collate<"...">`)
 - `schema_generator.hpp` — derives CREATE TABLE SQL from a C++ struct at compile time using Boost.PFR
 - `sql_varchar.hpp`, `sql_numeric.hpp`, `sql_temporal.hpp` — library-specific SQL types (`varchar_type<N>`, `decimal_type<P,S>`, `datetime_type<FSP>`, etc.)
 - `metadata.hpp` — types for querying `information_schema`

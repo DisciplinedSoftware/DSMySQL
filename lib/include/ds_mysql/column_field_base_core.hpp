@@ -15,6 +15,7 @@ struct column_field_tag {};
 
 namespace column_attr {
 
+struct primary_key {};
 struct auto_increment {};
 struct unique {};
 struct default_current_timestamp {};

@@ -1024,6 +1024,9 @@ template <typename T, std::size_t I>
     if constexpr (!is_field_nullable_v<field_type>) {
         col += " NOT NULL";
     }
+    if constexpr (requires { field_type::ddl_primary_key; } && field_type::ddl_primary_key) {
+        col += " PRIMARY KEY";
+    }
     if constexpr (requires { field_type::ddl_auto_increment; } && field_type::ddl_auto_increment) {
         col += " AUTO_INCREMENT";
     }

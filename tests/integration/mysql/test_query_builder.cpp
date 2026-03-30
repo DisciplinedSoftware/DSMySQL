@@ -20,7 +20,7 @@ namespace ds_mysql {
 namespace {
 
 struct trade {
-    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
     COLUMN_FIELD(account_id, std::optional<uint32_t>)
     COLUMN_FIELD(code, varchar_type<32>)
     COLUMN_FIELD(type, varchar_type<64>)
@@ -1449,7 +1449,7 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
 // ===================================================================
 
 struct auto_inc_row {
-    COLUMN_FIELD(id, uint32_t, column_attr::auto_increment)
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
     COLUMN_FIELD(label, varchar_type<64>)
 };
 
