@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(DSMySQL
-    VERSION 4.6.0
+    VERSION 4.6.1
     DESCRIPTION "A portable C++23 type-safe MySQL query builder and database wrapper"
     LANGUAGES CXX
 )

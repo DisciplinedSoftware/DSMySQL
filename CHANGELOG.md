@@ -10,6 +10,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [4.6.1] – 2026-03-30
+
+- Add default initialization for `alias_order_entry` members.
+
+---
+
 ## [4.6.0] – 2026-03-30
 
 ### Added
@@ -370,7 +376,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.0...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.1...HEAD
+[4.6.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.0...v4.6.1
 [4.6.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.1...v4.5.0
 [4.4.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.4.0...v4.4.1
