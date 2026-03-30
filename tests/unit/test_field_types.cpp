@@ -154,6 +154,39 @@ suite<"varchar_type"> varchar_type_suite = [] {
         expect(std::string_view{f.c_str()} == "hi"sv);
     };
 
+    "varchar_type owns its value — copy is independent"_test = [] {
+        varchar_type<32> a{"AAPL"};
+        varchar_type<32> b = a;
+        a = varchar_type<32>{"MSFT"};
+        expect(b == "AAPL"sv);
+    };
+
+    "varchar_type owns its value — move leaves valid state"_test = [] {
+        varchar_type<32> a{"AAPL"};
+        varchar_type<32> b = std::move(a);
+        expect(b == "AAPL"sv);
+    };
+
+    "varchar_type owns its value — survives source string destruction"_test = [] {
+        auto make = [] {
+            std::string src = "hello world";
+            return varchar_type<32>::create(src);
+        };
+        auto result = make();
+        expect(fatal(result.has_value()));
+        expect(result->view() == "hello world"sv);
+    };
+
+    "varchar_type create — value survives via copy assignment"_test = [] {
+        varchar_type<64> v;
+        {
+            auto tmp = varchar_type<64>::create("temporary");
+            expect(fatal(tmp.has_value()));
+            v = *tmp;
+        }
+        expect(v.view() == "temporary"sv);
+    };
+
     // Compile-time trait checks
     static_assert(is_varchar_type_v<varchar_type<32>>);
     static_assert(is_varchar_type_v<varchar_type<255>>);

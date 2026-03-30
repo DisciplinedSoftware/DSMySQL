@@ -260,7 +260,7 @@ suite<"INSERT Integration"> insert_integration_suite = [] {
 
         expect(db->execute(drop_table(trade{}).if_exists().then().create_table(trade{})).has_value());
 
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -327,7 +327,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
 
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -400,7 +400,7 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -456,8 +456,8 @@ suite<"SELECT Integration"> select_integration_suite = [] {
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"},
-                                varchar_type<32>{"AMZN"}, varchar_type<32>{"TSLA"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"},
+                                 varchar_type<32>{"AMZN"}, varchar_type<32>{"TSLA"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -556,7 +556,7 @@ suite<"DELETE Integration"> delete_integration_suite = [] {
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -614,7 +614,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -639,7 +639,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -665,7 +665,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -694,7 +694,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";
@@ -722,7 +722,7 @@ suite<"WHERE Operator Syntax Integration"> where_operator_integration_suite = []
 
         expect(db->execute(create_table(trade{}).if_not_exists()).has_value());
         expect(db->execute(delete_from(trade{})).has_value());
-        for (auto const code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
+        for (auto const& code : {varchar_type<32>{"AAPL"}, varchar_type<32>{"GOOGL"}, varchar_type<32>{"MSFT"}}) {
             trade row;
             row.code_ = code;
             row.type_ = "Stock";

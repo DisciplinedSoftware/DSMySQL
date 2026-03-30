@@ -1,7 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <array>
 #include <cstddef>
 #include <expected>
 #include <string>
@@ -27,12 +25,12 @@ public:
 
     // Compile-time constructor for string literals — capacity validated at compile time.
     template <std::size_t M>
-    constexpr varchar_type(char const (&str)[M]) noexcept : storage_(str, M - 1) {
+    constexpr varchar_type(char const (&str)[M]) : storage_(str, M - 1) {
         static_assert(M - 1 <= capacity, "string literal exceeds varchar_type capacity");
     }
 
     // Factory for runtime strings — validates capacity, returns std::expected.
-    [[nodiscard]] static std::expected<varchar_type, varchar_error> create(std::string_view value) noexcept {
+    [[nodiscard]] static std::expected<varchar_type, varchar_error> create(std::string_view value) {
         if (value.size() > capacity) {
             return std::unexpected(varchar_error::too_long);
         }
@@ -43,7 +41,7 @@ public:
         return "VARCHAR(" + std::to_string(capacity) + ")";
     }
 
-    [[nodiscard]] constexpr std::size_t size() const noexcept {
+    [[nodiscard]] std::size_t size() const noexcept {
         return storage_.size();
     }
 
@@ -51,40 +49,40 @@ public:
         return capacity;
     }
 
-    [[nodiscard]] constexpr std::string_view view() const noexcept {
-        return {storage_.data(), storage_.size()};
+    [[nodiscard]] std::string_view view() const noexcept {
+        return storage_;
     }
 
-    [[nodiscard]] constexpr char const* c_str() const noexcept {
-        return storage_.data();
+    [[nodiscard]] char const* c_str() const noexcept {
+        return storage_.c_str();
     }
 
-    [[nodiscard]] constexpr bool empty() const noexcept {
+    [[nodiscard]] bool empty() const noexcept {
         return storage_.empty();
     }
 
-    constexpr operator std::string_view() const noexcept {
+    operator std::string_view() const noexcept {
         return view();
     }
 
-    [[nodiscard]] constexpr bool operator==(varchar_type const& other) const noexcept {
+    [[nodiscard]] bool operator==(varchar_type const& other) const noexcept {
         return view() == other.view();
     }
 
-    [[nodiscard]] constexpr bool operator==(std::string_view other) const noexcept {
+    [[nodiscard]] bool operator==(std::string_view other) const noexcept {
         return view() == other;
     }
 
     template <std::size_t M>
-    [[nodiscard]] constexpr bool operator==(char const (&other)[M]) const noexcept {
+    [[nodiscard]] bool operator==(char const (&other)[M]) const noexcept {
         return view() == std::string_view{other, M - 1};
     }
 
 private:
-    varchar_type(detail::varchar_unchecked_tag, std::string_view value) noexcept : storage_(value) {
+    varchar_type(detail::varchar_unchecked_tag, std::string_view value) : storage_(value) {
     }
 
-    std::string_view storage_;
+    std::string storage_;
 };
 
 template <typename T>

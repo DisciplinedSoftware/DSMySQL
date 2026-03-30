@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `varchar_type` now owns its value (`std::string` storage instead of `std::string_view`), preventing use-after-free when values outlive the source buffer (e.g. query results).
+
 ---
 
 ## [4.6.2] – 2026-03-30
