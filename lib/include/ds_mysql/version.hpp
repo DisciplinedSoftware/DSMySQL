@@ -18,13 +18,13 @@ namespace ds_mysql {
 struct version {
     static constexpr std::uint32_t major = 4;
     static constexpr std::uint32_t minor = 6;
-    static constexpr std::uint32_t patch = 2;
+    static constexpr std::uint32_t patch = 3;
 
     /// Packed integer: major * 10000 + minor * 100 + patch.
     static constexpr std::uint32_t value = major * 10'000u + minor * 100u + patch;
 
     /// Canonical fallback string for non-generated builds.
-    static constexpr std::string_view string = "4.6.2";
+    static constexpr std::string_view string = "4.6.3";
 };
 
 }  // namespace ds_mysql
