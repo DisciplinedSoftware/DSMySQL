@@ -150,6 +150,36 @@ void append_assignment_sql(std::string& s, bool& first, Col const& field) {
     first = false;
 }
 
+// ---------------------------------------------------------------
+// case_set — wraps a column + CASE expression for UPDATE SET.
+//
+// Usage:
+//   update(t{}).set_case(t::status{}, case_when(cond, "active").else_("inactive"))
+//
+// Produces:
+//   UPDATE t SET status = CASE WHEN cond THEN 'active' ELSE 'inactive' END
+// ---------------------------------------------------------------
+
+template <ColumnFieldType Col, typename CaseBuilder>
+struct case_set {
+    CaseBuilder case_expr;
+
+    [[nodiscard]] static constexpr std::string_view column_name() {
+        return Col::column_name();
+    }
+};
+
+template <ColumnFieldType Col, typename CaseBuilder>
+void append_assignment_sql(std::string& s, bool& first, case_set<Col, CaseBuilder> const& assign) {
+    if (!first) {
+        s += ", ";
+    }
+    s += Col::column_name();
+    s += " = ";
+    s += assign.case_expr.build_sql();
+    first = false;
+}
+
 template <typename... Cols>
 [[nodiscard]] std::string build_assignment_sql(Cols const&... assignments) {
     std::string s;

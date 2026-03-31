@@ -381,6 +381,14 @@ public:
             std::tuple_cat(assignments_, std::tuple<NewCols...>{new_assignments...})};
     }
 
+    template <FieldOf<T> Col, typename CaseBuilder>
+        requires SqlBuilder<CaseBuilder>
+    [[nodiscard]] auto set_case(Col const&, CaseBuilder case_expr) const {
+        using assignment_t = case_set<Col, CaseBuilder>;
+        return update_set_builder<T, Cols..., assignment_t>{
+            std::tuple_cat(assignments_, std::tuple<assignment_t>{assignment_t{std::move(case_expr)}})};
+    }
+
     [[nodiscard]] update_set_where_builder<T, Cols...> where(sql_predicate condition) const {
         return {assignments_, std::move(condition)};
     }
@@ -418,6 +426,13 @@ public:
         requires(sizeof...(Cols) > 0)
     [[nodiscard]] update_set_builder<T, Cols...> set(Cols const&... assignments) const {
         return update_set_builder<T, Cols...>{std::tuple<Cols...>{assignments...}};
+    }
+
+    template <FieldOf<T> Col, typename CaseBuilder>
+        requires SqlBuilder<CaseBuilder>
+    [[nodiscard]] auto set_case(Col const&, CaseBuilder case_expr) const {
+        using assignment_t = case_set<Col, CaseBuilder>;
+        return update_set_builder<T, assignment_t>{std::tuple<assignment_t>{assignment_t{std::move(case_expr)}}};
     }
 };
 

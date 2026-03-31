@@ -788,3 +788,54 @@ suite<"DML - sql_default assignability"> dml_sql_default_suite = [] {
         expect(sql.find("VALUES (") != std::string::npos);
     };
 };
+
+// ===================================================================
+// DML — CASE/WHEN in UPDATE SET
+// ===================================================================
+
+suite<"DML CASE in UPDATE"> dml_case_update_suite = [] {
+    "set_case - UPDATE with CASE WHEN expression"_test = [] {
+        auto const sql =
+            update(asset{})
+                .set_case(asset::instrument{},
+                          case_when(equal<asset::ticker>(asset::ticker{"AAPL"}), "Tech"s).else_("Other"s))
+                .build_sql();
+        expect(sql ==
+               "UPDATE asset SET instrument = CASE WHEN ticker = 'AAPL' THEN 'Tech' ELSE 'Other' END"s)
+            << sql;
+    };
+
+    "set_case with WHERE - adds WHERE clause"_test = [] {
+        auto const sql =
+            update(asset{})
+                .set_case(asset::instrument{},
+                          case_when(equal<asset::ticker>(asset::ticker{"AAPL"}), "Tech"s)
+                              .when(equal<asset::ticker>(asset::ticker{"MSFT"}), "Software"s)
+                              .else_("Unknown"s))
+                .where(is_not_null<asset::name>())
+                .build_sql();
+        expect(sql.find("SET instrument = CASE WHEN ticker = 'AAPL' THEN 'Tech'"
+                        " WHEN ticker = 'MSFT' THEN 'Software' ELSE 'Unknown' END") != std::string::npos)
+            << sql;
+        expect(sql.find("WHERE name IS NOT NULL") != std::string::npos) << sql;
+    };
+
+    "set_case mixed with set - regular assignments and CASE together"_test = [] {
+        auto const sql = update(asset{})
+                             .set(asset::ticker{"UPDATED"})
+                             .set_case(asset::instrument{},
+                                       case_when(equal<asset::exchange_id>(1u), "Local"s).else_("Foreign"s))
+                             .build_sql();
+        expect(sql.find("SET ticker = 'UPDATED', instrument = CASE WHEN") != std::string::npos) << sql;
+    };
+
+    "set_case on update_builder directly - starts chain with CASE"_test = [] {
+        auto const sql =
+            update(asset{})
+                .set_case(asset::ticker{},
+                          case_when(equal<asset::id>(1u), asset::ticker{"A"}).else_(asset::ticker{"B"}))
+                .where(equal<asset::id>(1u))
+                .build_sql();
+        expect(sql == "UPDATE asset SET ticker = CASE WHEN id = 1 THEN 'A' ELSE 'B' END WHERE id = 1"s) << sql;
+    };
+};
