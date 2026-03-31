@@ -97,8 +97,8 @@ public:
     ~connection_pool() = default;
 
     /// Create a pool with `pool_size` connections using the given config.
-    [[nodiscard]] static std::expected<std::unique_ptr<connection_pool>, std::string> create(
-        mysql_config const& config, std::size_t pool_size) {
+    [[nodiscard]] static std::expected<std::unique_ptr<connection_pool>, std::string> create(mysql_config const& config,
+                                                                                             std::size_t pool_size) {
         return create_impl(config, pool_size, nullptr);
     }
 
@@ -111,7 +111,9 @@ public:
     /// Acquire a connection from the pool (blocks until one is available).
     [[nodiscard]] pooled_connection acquire() {
         std::unique_lock lock(mutex_);
-        cv_.wait(lock, [this] { return !pool_.empty(); });
+        cv_.wait(lock, [this] {
+            return !pool_.empty();
+        });
         auto conn = std::move(pool_.front());
         pool_.pop();
         return pooled_connection{this, std::move(conn)};

@@ -147,16 +147,32 @@ inline constexpr set_null_t set_null{};
 inline constexpr no_action_t no_action{};
 
 // on_delete(action) — intermediate composable style
-constexpr on_delete_cascade on_delete(cascade_t) { return {}; }
-constexpr on_delete_restrict on_delete(restrict_t) { return {}; }
-constexpr on_delete_set_null on_delete(set_null_t) { return {}; }
-constexpr on_delete_no_action on_delete(no_action_t) { return {}; }
+constexpr on_delete_cascade on_delete(cascade_t) {
+    return {};
+}
+constexpr on_delete_restrict on_delete(restrict_t) {
+    return {};
+}
+constexpr on_delete_set_null on_delete(set_null_t) {
+    return {};
+}
+constexpr on_delete_no_action on_delete(no_action_t) {
+    return {};
+}
 
 // on_update(action) — intermediate composable style
-constexpr on_update_cascade on_update(cascade_t) { return {}; }
-constexpr on_update_restrict on_update(restrict_t) { return {}; }
-constexpr on_update_set_null on_update(set_null_t) { return {}; }
-constexpr on_update_no_action on_update(no_action_t) { return {}; }
+constexpr on_update_cascade on_update(cascade_t) {
+    return {};
+}
+constexpr on_update_restrict on_update(restrict_t) {
+    return {};
+}
+constexpr on_update_set_null on_update(set_null_t) {
+    return {};
+}
+constexpr on_update_no_action on_update(no_action_t) {
+    return {};
+}
 
 // Descriptors for fully composable on(delete_(...)) / on(update_(...)) style
 template <typename Action>
@@ -165,15 +181,31 @@ struct delete_action {};
 template <typename Action>
 struct update_action {};
 
-constexpr delete_action<cascade_t> delete_(cascade_t) { return {}; }
-constexpr delete_action<restrict_t> delete_(restrict_t) { return {}; }
-constexpr delete_action<set_null_t> delete_(set_null_t) { return {}; }
-constexpr delete_action<no_action_t> delete_(no_action_t) { return {}; }
+constexpr delete_action<cascade_t> delete_(cascade_t) {
+    return {};
+}
+constexpr delete_action<restrict_t> delete_(restrict_t) {
+    return {};
+}
+constexpr delete_action<set_null_t> delete_(set_null_t) {
+    return {};
+}
+constexpr delete_action<no_action_t> delete_(no_action_t) {
+    return {};
+}
 
-constexpr update_action<cascade_t> update_(cascade_t) { return {}; }
-constexpr update_action<restrict_t> update_(restrict_t) { return {}; }
-constexpr update_action<set_null_t> update_(set_null_t) { return {}; }
-constexpr update_action<no_action_t> update_(no_action_t) { return {}; }
+constexpr update_action<cascade_t> update_(cascade_t) {
+    return {};
+}
+constexpr update_action<restrict_t> update_(restrict_t) {
+    return {};
+}
+constexpr update_action<set_null_t> update_(set_null_t) {
+    return {};
+}
+constexpr update_action<no_action_t> update_(no_action_t) {
+    return {};
+}
 
 // on(delete_action<A>) / on(update_action<A>) — dispatch to flat types
 template <typename A>

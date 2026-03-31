@@ -2083,7 +2083,9 @@ suite<"server cursor"> cursor_suite = [] {
         // Set up test data
         (void)(db->execute(drop_table(trade{}).if_exists()));
         expect(db->execute(create_table(trade{})).has_value());
-        auto _ = scope_guard{[&] { (void)(db->execute(drop_table(trade{}).if_exists())); }};
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(trade{}).if_exists()));
+        }};
 
         expect(db->execute(insert_into(trade{})
                                .columns(trade::code{}, trade::type{}, trade::name{}, trade::executed_at{},

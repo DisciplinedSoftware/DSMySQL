@@ -163,8 +163,7 @@ private:
         if (truncated) {
             (refetch_truncated<std::tuple_element_t<Is, RowType>>(Is), ...);
         }
-        return std::optional<RowType>{
-            RowType{extract_value<std::tuple_element_t<Is, RowType>>(Is)...}};
+        return std::optional<RowType>{RowType{extract_value<std::tuple_element_t<Is, RowType>>(Is)...}};
     }
 
     template <typename T>

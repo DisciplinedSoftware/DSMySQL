@@ -452,8 +452,7 @@ public:
 
     // Open a server-side cursor from a typed query builder with prefetch hint.
     template <typename RowType, SqlBuilder Stmt, typename... Params>
-    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(Stmt const& stmt,
-                                                                                 prefetch_rows hint,
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(Stmt const& stmt, prefetch_rows hint,
                                                                                  Params const&... params) const {
         return open_cursor_impl<RowType>(stmt.build_sql(), hint, params...);
     }
@@ -663,8 +662,8 @@ private:
 
     template <typename RowType, typename... Params>
     [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor_impl(std::string_view sql,
-                                                                                       prefetch_rows hint,
-                                                                                       Params const&... params) const {
+                                                                                      prefetch_rows hint,
+                                                                                      Params const&... params) const {
         using cursor_t = server_cursor<RowType>;
         using deleter_t = typename cursor_t::stmt_deleter;
 

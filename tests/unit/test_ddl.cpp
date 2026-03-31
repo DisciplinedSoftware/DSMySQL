@@ -1523,8 +1523,7 @@ struct child_table_composable {
 struct child_table_on_composed {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{},
-                 fk_attr::on(fk_attr::delete_(fk_attr::cascade)),
-                 fk_attr::on(fk_attr::update_(fk_attr::restrict_)))
+                 fk_attr::on(fk_attr::delete_(fk_attr::cascade)), fk_attr::on(fk_attr::update_(fk_attr::restrict_)))
 };
 }  // namespace
 
@@ -2126,8 +2125,7 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 
 suite<"DDL functions"> ddl_function_suite = [] {
     "create_function - generates CREATE FUNCTION with RETURNS"_test = [] {
-        auto const sql =
-            create_function(function_id<"fn_hello">{}, "", "VARCHAR(50)", "RETURN 'Hello';").build_sql();
+        auto const sql = create_function(function_id<"fn_hello">{}, "", "VARCHAR(50)", "RETURN 'Hello';").build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_hello()\n"
                "RETURNS VARCHAR(50)\n"
@@ -2138,8 +2136,7 @@ suite<"DDL functions"> ddl_function_suite = [] {
     };
 
     "create_function with params - includes params and return type"_test = [] {
-        auto const sql =
-            create_function(function_id<"fn_add">{}, "a INT, b INT", "INT", "RETURN a + b;").build_sql();
+        auto const sql = create_function(function_id<"fn_add">{}, "a INT, b INT", "INT", "RETURN a + b;").build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_add(a INT, b INT)\n"
                "RETURNS INT\n"
@@ -2163,8 +2160,7 @@ suite<"DDL functions"> ddl_function_suite = [] {
     };
 
     "create_function.no_sql - adds NO SQL characteristic"_test = [] {
-        auto const sql =
-            create_function(function_id<"fn_pi">{}, "", "DOUBLE", "RETURN 3.14159;").no_sql().build_sql();
+        auto const sql = create_function(function_id<"fn_pi">{}, "", "DOUBLE", "RETURN 3.14159;").no_sql().build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_pi()\n"
                "RETURNS DOUBLE\n"
@@ -2176,10 +2172,10 @@ suite<"DDL functions"> ddl_function_suite = [] {
     };
 
     "create_function.reads_sql_data - adds READS SQL DATA characteristic"_test = [] {
-        auto const sql =
-            create_function(function_id<"fn_lookup">{}, "uid INT", "VARCHAR(100)", "RETURN (SELECT name FROM users WHERE id = uid);")
-                .reads_sql_data()
-                .build_sql();
+        auto const sql = create_function(function_id<"fn_lookup">{}, "uid INT", "VARCHAR(100)",
+                                         "RETURN (SELECT name FROM users WHERE id = uid);")
+                             .reads_sql_data()
+                             .build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_lookup(uid INT)\n"
                "RETURNS VARCHAR(100)\n"
@@ -2191,11 +2187,10 @@ suite<"DDL functions"> ddl_function_suite = [] {
     };
 
     "create_function.modifies_sql_data - adds MODIFIES SQL DATA characteristic"_test = [] {
-        auto const sql =
-            create_function(function_id<"fn_inc">{}, "uid INT", "INT",
-                            "UPDATE counters SET cnt = cnt + 1 WHERE id = uid;\nRETURN 1;")
-                .modifies_sql_data()
-                .build_sql();
+        auto const sql = create_function(function_id<"fn_inc">{}, "uid INT", "INT",
+                                         "UPDATE counters SET cnt = cnt + 1 WHERE id = uid;\nRETURN 1;")
+                             .modifies_sql_data()
+                             .build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_inc(uid INT)\n"
                "RETURNS INT\n"
@@ -2208,10 +2203,8 @@ suite<"DDL functions"> ddl_function_suite = [] {
     };
 
     "create_function chained characteristics - combines DETERMINISTIC + NO SQL"_test = [] {
-        auto const sql = create_function(function_id<"fn_const">{}, "", "INT", "RETURN 42;")
-                             .deterministic()
-                             .no_sql()
-                             .build_sql();
+        auto const sql =
+            create_function(function_id<"fn_const">{}, "", "INT", "RETURN 42;").deterministic().no_sql().build_sql();
         expect(sql ==
                "CREATE FUNCTION fn_const()\n"
                "RETURNS INT\n"
@@ -2392,7 +2385,8 @@ suite<"DDL composition"> ddl_composition_suite = [] {
 
     // --- create(procedure(...)) ---
     "create(procedure) - equivalent to create_procedure"_test = [] {
-        auto const sql = create(procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;")).build_sql();
+        auto const sql =
+            create(procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;")).build_sql();
         auto const expected =
             create_procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;").build_sql();
         expect(sql == expected) << sql;
@@ -2407,9 +2401,8 @@ suite<"DDL composition"> ddl_composition_suite = [] {
     };
 
     "create(function).deterministic - chains correctly"_test = [] {
-        auto const sql = create(function(function_id<"fn_dbl">{}, "x INT", "INT", "RETURN x * 2;"))
-                             .deterministic()
-                             .build_sql();
+        auto const sql =
+            create(function(function_id<"fn_dbl">{}, "x INT", "INT", "RETURN x * 2;")).deterministic().build_sql();
         auto const expected =
             create_function(function_id<"fn_dbl">{}, "x INT", "INT", "RETURN x * 2;").deterministic().build_sql();
         expect(sql == expected) << sql;
@@ -2417,12 +2410,11 @@ suite<"DDL composition"> ddl_composition_suite = [] {
 
     // --- create(trigger<T>(...)) ---
     "create(trigger) - equivalent to create_trigger"_test = [] {
-        auto const sql =
-            create(trigger<test_table>(trigger_id<"trg_bi">{}, TriggerTiming::Before, TriggerEvent::Insert,
-                                       "SET NEW.name = UPPER(NEW.name);"))
-                .build_sql();
+        auto const sql = create(trigger<test_table>(trigger_id<"trg_bi">{}, TriggerTiming::Before, TriggerEvent::Insert,
+                                                    "SET NEW.name = UPPER(NEW.name);"))
+                             .build_sql();
         auto const expected = create_trigger<test_table>(trigger_id<"trg_bi">{}, TriggerTiming::Before,
-                                                          TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
+                                                         TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
                                   .build_sql();
         expect(sql == expected) << sql;
     };

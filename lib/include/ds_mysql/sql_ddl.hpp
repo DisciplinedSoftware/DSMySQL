@@ -2850,8 +2850,8 @@ public:
     }
 
     [[nodiscard]] std::string build_sql() const {
-        return "CREATE FUNCTION " + std::string(Name) + "(" + params_ + ")\nRETURNS " + returns_ +
-               characteristics_ + "\nBEGIN\n" + body_ + "\nEND";
+        return "CREATE FUNCTION " + std::string(Name) + "(" + params_ + ")\nRETURNS " + returns_ + characteristics_ +
+               "\nBEGIN\n" + body_ + "\nEND";
     }
 
 private:
@@ -2864,9 +2864,8 @@ private:
 }  // namespace ddl_detail
 
 template <fixed_string Name>
-[[nodiscard]] ddl_detail::create_function_builder<Name> create_function(function_id<Name> const& id,
-                                                                        std::string params, std::string returns,
-                                                                        std::string body) {
+[[nodiscard]] ddl_detail::create_function_builder<Name> create_function(function_id<Name> const& id, std::string params,
+                                                                        std::string returns, std::string body) {
     return {id, std::move(params), std::move(returns), std::move(body)};
 }
 
@@ -3048,19 +3047,19 @@ template <Database T>
 
 template <ValidTable T, fixed_string Name>
 [[nodiscard]] ddl_detail::trigger_desc<Name, T> trigger(trigger_id<Name> const&, TriggerTiming timing,
-                                                         TriggerEvent event, std::string body) {
+                                                        TriggerEvent event, std::string body) {
     return {timing, event, std::move(body)};
 }
 
 template <fixed_string Name>
 [[nodiscard]] ddl_detail::procedure_desc<Name> procedure(procedure_id<Name> const&, std::string params,
-                                                          std::string body) {
+                                                         std::string body) {
     return {std::move(params), std::move(body)};
 }
 
 template <fixed_string Name>
 [[nodiscard]] ddl_detail::function_desc<Name> function(function_id<Name> const&, std::string params,
-                                                        std::string returns, std::string body) {
+                                                       std::string returns, std::string body) {
     return {std::move(params), std::move(returns), std::move(body)};
 }
 
