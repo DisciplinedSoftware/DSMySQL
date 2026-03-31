@@ -1511,6 +1511,21 @@ struct child_table_cascade {
     COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{},
                  fk_attr::on_delete_cascade{}, fk_attr::on_update_cascade{})
 };
+
+// Composable style: on_delete(action) / on_update(action)
+struct child_table_composable {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{},
+                 fk_attr::on_delete(fk_attr::cascade), fk_attr::on_update(fk_attr::set_null))
+};
+
+// Fully composed: on(delete_(action)) / on(update_(action))
+struct child_table_on_composed {
+    COLUMN_FIELD(id, uint32_t)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{},
+                 fk_attr::on(fk_attr::delete_(fk_attr::cascade)),
+                 fk_attr::on(fk_attr::update_(fk_attr::restrict_)))
+};
 }  // namespace
 
 suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
@@ -1534,6 +1549,16 @@ suite<"DDL Foreign Keys"> ddl_foreign_keys_suite = [] {
                "    FOREIGN KEY (parent_id) REFERENCES parent_table(id) ON DELETE CASCADE ON UPDATE CASCADE\n"
                ");\n"s)
             << sql;
+    };
+
+    "fk_attr::on_delete(action) composable style - same SQL as flat type"_test = [] {
+        auto const sql = create_table(child_table_composable{}).build_sql();
+        expect(sql.find("ON DELETE CASCADE ON UPDATE SET NULL") != std::string::npos) << sql;
+    };
+
+    "fk_attr::on(delete_(action)) fully composed style - same SQL as flat type"_test = [] {
+        auto const sql = create_table(child_table_on_composed{}).build_sql();
+        expect(sql.find("ON DELETE CASCADE ON UPDATE RESTRICT") != std::string::npos) << sql;
     };
 
     "create_table without FK - no FOREIGN KEY clause"_test = [] {
