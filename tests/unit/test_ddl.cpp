@@ -2096,6 +2096,139 @@ suite<"DDL procedures"> ddl_procedure_suite = [] {
 };
 
 // ===================================================================
+// DDL — Stored Functions
+// ===================================================================
+
+suite<"DDL functions"> ddl_function_suite = [] {
+    "create_function - generates CREATE FUNCTION with RETURNS"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_hello">{}, "", "VARCHAR(50)", "RETURN 'Hello';").build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_hello()\n"
+               "RETURNS VARCHAR(50)\n"
+               "BEGIN\n"
+               "RETURN 'Hello';\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function with params - includes params and return type"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_add">{}, "a INT, b INT", "INT", "RETURN a + b;").build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_add(a INT, b INT)\n"
+               "RETURNS INT\n"
+               "BEGIN\n"
+               "RETURN a + b;\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function.deterministic - adds DETERMINISTIC characteristic"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_double">{}, "x INT", "INT", "RETURN x * 2;").deterministic().build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_double(x INT)\n"
+               "RETURNS INT\n"
+               "DETERMINISTIC\n"
+               "BEGIN\n"
+               "RETURN x * 2;\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function.no_sql - adds NO SQL characteristic"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_pi">{}, "", "DOUBLE", "RETURN 3.14159;").no_sql().build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_pi()\n"
+               "RETURNS DOUBLE\n"
+               "NO SQL\n"
+               "BEGIN\n"
+               "RETURN 3.14159;\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function.reads_sql_data - adds READS SQL DATA characteristic"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_lookup">{}, "uid INT", "VARCHAR(100)", "RETURN (SELECT name FROM users WHERE id = uid);")
+                .reads_sql_data()
+                .build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_lookup(uid INT)\n"
+               "RETURNS VARCHAR(100)\n"
+               "READS SQL DATA\n"
+               "BEGIN\n"
+               "RETURN (SELECT name FROM users WHERE id = uid);\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function.modifies_sql_data - adds MODIFIES SQL DATA characteristic"_test = [] {
+        auto const sql =
+            create_function(function_id<"fn_inc">{}, "uid INT", "INT",
+                            "UPDATE counters SET cnt = cnt + 1 WHERE id = uid;\nRETURN 1;")
+                .modifies_sql_data()
+                .build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_inc(uid INT)\n"
+               "RETURNS INT\n"
+               "MODIFIES SQL DATA\n"
+               "BEGIN\n"
+               "UPDATE counters SET cnt = cnt + 1 WHERE id = uid;\n"
+               "RETURN 1;\n"
+               "END"s)
+            << sql;
+    };
+
+    "create_function chained characteristics - combines DETERMINISTIC + NO SQL"_test = [] {
+        auto const sql = create_function(function_id<"fn_const">{}, "", "INT", "RETURN 42;")
+                             .deterministic()
+                             .no_sql()
+                             .build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_const()\n"
+               "RETURNS INT\n"
+               "DETERMINISTIC\n"
+               "NO SQL\n"
+               "BEGIN\n"
+               "RETURN 42;\n"
+               "END"s)
+            << sql;
+    };
+
+    "drop_function - generates DROP FUNCTION"_test = [] {
+        auto const sql = drop_function(function_id<"fn_hello">{}).build_sql();
+        expect(sql == "DROP FUNCTION fn_hello"s) << sql;
+    };
+
+    "drop_function.if_exists - generates DROP FUNCTION IF EXISTS"_test = [] {
+        auto const sql = drop_function(function_id<"fn_hello">{}).if_exists().build_sql();
+        expect(sql == "DROP FUNCTION IF EXISTS fn_hello"s) << sql;
+    };
+
+    "create_function instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto fn = function_id<"fn_greet">{};
+        auto const sql =
+            create_function(fn, "name VARCHAR(50)", "VARCHAR(100)", "RETURN CONCAT('Hello, ', name);").build_sql();
+        expect(sql ==
+               "CREATE FUNCTION fn_greet(name VARCHAR(50))\n"
+               "RETURNS VARCHAR(100)\n"
+               "BEGIN\n"
+               "RETURN CONCAT('Hello, ', name);\n"
+               "END"s)
+            << sql;
+    };
+
+    "drop_function instance-based - deduces Name from named variable"_test = [] {
+        constexpr auto fn = function_id<"fn_greet">{};
+        auto const sql = drop_function(fn).build_sql();
+        expect(sql == "DROP FUNCTION fn_greet"s) << sql;
+    };
+};
+
+// ===================================================================
 // DDL — Triggers
 // ===================================================================
 

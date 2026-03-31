@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `function_id<"name">` — compile-time identifier for stored functions
+- `create_function(function_id<"name">{}, params, returns, body)` — type-safe CREATE FUNCTION builder with optional `.deterministic()`, `.no_sql()`, `.reads_sql_data()`, `.modifies_sql_data()` characteristics
+- `drop_function(function_id<"name">{})` — DROP FUNCTION builder with `.if_exists()` support
+
 ---
 
 ## [4.7.0] – 2026-03-31

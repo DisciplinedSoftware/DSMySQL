@@ -335,6 +335,13 @@ struct procedure_id {
 };
 
 template <fixed_string Name>
+struct function_id {
+    [[nodiscard]] static constexpr std::string_view name() noexcept {
+        return Name;
+    }
+};
+
+template <fixed_string Name>
 struct savepoint_id {
     [[nodiscard]] static constexpr std::string_view name() noexcept {
         return Name;

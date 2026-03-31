@@ -2661,6 +2661,109 @@ template <fixed_string Name>
 }
 
 // ===================================================================
+// Stored Functions
+//
+// Entry points (executeable via db.execute()):
+//   create_function(function_id<"name">{}, params, returns, body)
+//       — CREATE FUNCTION name(params) RETURNS returns BEGIN body END
+//   create_function(function_id<"name">{}, params, returns, body).deterministic()
+//       — adds DETERMINISTIC characteristic
+//   create_function(function_id<"name">{}, params, returns, body).no_sql()
+//       — adds NO SQL characteristic
+//   create_function(function_id<"name">{}, params, returns, body).reads_sql_data()
+//       — adds READS SQL DATA characteristic
+//   create_function(function_id<"name">{}, params, returns, body).modifies_sql_data()
+//       — adds MODIFIES SQL DATA characteristic
+//   drop_function(function_id<"name">{})                 — DROP FUNCTION name
+//   drop_function(function_id<"name">{}).if_exists()     — DROP FUNCTION IF EXISTS name
+// ===================================================================
+
+namespace ddl_detail {
+
+template <fixed_string Name>
+class drop_function_if_exists_builder {
+public:
+    explicit drop_function_if_exists_builder(function_id<Name> const&) {
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP FUNCTION IF EXISTS " + std::string(Name);
+    }
+};
+
+template <fixed_string Name>
+class drop_function_builder {
+public:
+    explicit drop_function_builder(function_id<Name> const&) {
+    }
+
+    [[nodiscard]] drop_function_if_exists_builder<Name> if_exists() const {
+        return drop_function_if_exists_builder<Name>{function_id<Name>{}};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "DROP FUNCTION " + std::string(Name);
+    }
+};
+
+template <fixed_string Name>
+class create_function_builder {
+public:
+    create_function_builder(function_id<Name> const&, std::string params, std::string returns, std::string body)
+        : params_(std::move(params)), returns_(std::move(returns)), body_(std::move(body)) {
+    }
+
+    [[nodiscard]] create_function_builder deterministic() const {
+        auto copy = *this;
+        copy.characteristics_ += "\nDETERMINISTIC";
+        return copy;
+    }
+
+    [[nodiscard]] create_function_builder no_sql() const {
+        auto copy = *this;
+        copy.characteristics_ += "\nNO SQL";
+        return copy;
+    }
+
+    [[nodiscard]] create_function_builder reads_sql_data() const {
+        auto copy = *this;
+        copy.characteristics_ += "\nREADS SQL DATA";
+        return copy;
+    }
+
+    [[nodiscard]] create_function_builder modifies_sql_data() const {
+        auto copy = *this;
+        copy.characteristics_ += "\nMODIFIES SQL DATA";
+        return copy;
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        return "CREATE FUNCTION " + std::string(Name) + "(" + params_ + ")\nRETURNS " + returns_ +
+               characteristics_ + "\nBEGIN\n" + body_ + "\nEND";
+    }
+
+private:
+    std::string params_;
+    std::string returns_;
+    std::string body_;
+    std::string characteristics_;
+};
+
+}  // namespace ddl_detail
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::create_function_builder<Name> create_function(function_id<Name> const& id,
+                                                                        std::string params, std::string returns,
+                                                                        std::string body) {
+    return {id, std::move(params), std::move(returns), std::move(body)};
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::drop_function_builder<Name> drop_function(function_id<Name> const& id) {
+    return ddl_detail::drop_function_builder<Name>{id};
+}
+
+// ===================================================================
 // Triggers
 //
 // Entry points (executeable via db.execute()):
