@@ -1656,11 +1656,11 @@ suite<"prepared_statement Integration"> prepared_statement_integration_suite = [
         expect(db->execute(create_table(trade{})).has_value());
 
         auto stmt = db->prepare("INSERT INTO trade (code, type, executed_at, recorded_at) VALUES (?, ?, NOW(), NOW())");
-        expect(fatal(stmt.has_value())) << "prepare should succeed: " + stmt.error();
+        expect(fatal(stmt.has_value())) << "prepare should succeed: " + (stmt.has_value() ? "" : stmt.error());
         expect(stmt->param_count() == 2u);
 
         auto result = stmt->execute(std::string{"AAPL"}, std::string{"Stock"});
-        expect(fatal(result.has_value())) << "execute should succeed: " + result.error();
+        expect(fatal(result.has_value())) << "execute should succeed: " + (result.has_value() ? "" : result.error());
         expect(*result == 1u) << "should affect 1 row";
 
         result = stmt->execute(std::string{"GOOGL"}, std::string{"Stock"});
@@ -1698,7 +1698,7 @@ suite<"prepared_statement Integration"> prepared_statement_integration_suite = [
 
         using row_t = std::tuple<uint32_t, std::string>;
         auto rows = sel->query<row_t>(std::string{"Stock"});
-        expect(fatal(rows.has_value())) << "query should succeed: " + rows.error();
+        expect(fatal(rows.has_value())) << "query should succeed: " + (rows.has_value() ? "" : rows.error());
         expect(rows->size() == 3u) << "should return 3 rows, got " + std::to_string(rows->size());
 
         // Verify ordered by code: AAPL, GOOGL, MSFT
