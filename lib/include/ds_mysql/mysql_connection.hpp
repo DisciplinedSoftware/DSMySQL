@@ -20,6 +20,7 @@
 #include "ds_mysql/host_name.hpp"
 #include "ds_mysql/port_number.hpp"
 #include "ds_mysql/prepared_statement.hpp"
+#include "ds_mysql/server_cursor.hpp"
 #include "ds_mysql/sql_ddl.hpp"
 #include "ds_mysql/sql_dml.hpp"
 #include "ds_mysql/sql_dql.hpp"
@@ -415,6 +416,48 @@ public:
         return prepare(stmt.build_sql());
     }
 
+    // ---------------------------------------------------------------
+    // Server-side cursors
+    // ---------------------------------------------------------------
+
+    // Open a server-side cursor for streaming large result sets.
+    // Fetches rows one at a time (or in prefetch batches) instead of
+    // loading the entire result set into memory.
+    //
+    //   auto cursor = conn.open_cursor<RowType>("SELECT * FROM t WHERE x = ?", 42u);
+    //   while (auto row = cursor->fetch()) { ... }
+    //
+    // With prefetch hint:
+    //   auto cursor = conn.open_cursor<RowType>(sql, prefetch_rows{100}, 42u);
+    template <typename RowType, typename... Params>
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(std::string_view sql,
+                                                                                 Params const&... params) const {
+        return open_cursor_impl<RowType>(sql, prefetch_rows{1}, params...);
+    }
+
+    // Open a server-side cursor with a prefetch_rows hint.
+    template <typename RowType, typename... Params>
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(std::string_view sql,
+                                                                                 prefetch_rows hint,
+                                                                                 Params const&... params) const {
+        return open_cursor_impl<RowType>(sql, hint, params...);
+    }
+
+    // Open a server-side cursor from a typed query builder.
+    template <typename RowType, SqlBuilder Stmt, typename... Params>
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(Stmt const& stmt,
+                                                                                 Params const&... params) const {
+        return open_cursor_impl<RowType>(stmt.build_sql(), prefetch_rows{1}, params...);
+    }
+
+    // Open a server-side cursor from a typed query builder with prefetch hint.
+    template <typename RowType, SqlBuilder Stmt, typename... Params>
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor(Stmt const& stmt,
+                                                                                 prefetch_rows hint,
+                                                                                 Params const&... params) const {
+        return open_cursor_impl<RowType>(stmt.build_sql(), hint, params...);
+    }
+
     // Validate that the C++ table struct T matches the live schema in the database.
     //
     // Runs DESCRIBE <table> and checks:
@@ -616,6 +659,60 @@ private:
 
     [[nodiscard]] std::string last_error() const {
         return std::string(mysql_error(connection_.get()));
+    }
+
+    template <typename RowType, typename... Params>
+    [[nodiscard]] std::expected<server_cursor<RowType>, std::string> open_cursor_impl(std::string_view sql,
+                                                                                       prefetch_rows hint,
+                                                                                       Params const&... params) const {
+        using cursor_t = server_cursor<RowType>;
+        using deleter_t = typename cursor_t::stmt_deleter;
+
+        auto stmt = std::unique_ptr<MYSQL_STMT, deleter_t>(mysql_stmt_init(connection_.get()));
+        if (!stmt) {
+            return std::unexpected(last_error());
+        }
+
+        if (mysql_stmt_prepare(stmt.get(), sql.data(), static_cast<unsigned long>(sql.size())) != 0) {
+            return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+        }
+
+        // Enable server-side cursor.
+        unsigned long const cursor_type = CURSOR_TYPE_READ_ONLY;
+        if (mysql_stmt_attr_set(stmt.get(), STMT_ATTR_CURSOR_TYPE, &cursor_type)) {
+            return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+        }
+
+        // Set prefetch rows hint.
+        unsigned long const prefetch = hint.value;
+        if (mysql_stmt_attr_set(stmt.get(), STMT_ATTR_PREFETCH_ROWS, &prefetch)) {
+            return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+        }
+
+        // Bind input parameters.
+        constexpr auto N = sizeof...(Params);
+        if constexpr (N > 0) {
+            std::array<MYSQL_BIND, N> binds{};
+            std::array<bool, N> null_flags{};
+            auto params_tuple = std::tie(params...);
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                (stmt_detail::bind_input(binds[Is], std::get<Is>(params_tuple), null_flags[Is]), ...);
+            }(std::make_index_sequence<N>{});
+
+            if (mysql_stmt_bind_param(stmt.get(), binds.data())) {
+                return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+            }
+        }
+
+        if (mysql_stmt_execute(stmt.get()) != 0) {
+            return std::unexpected(std::string(mysql_stmt_error(stmt.get())));
+        }
+
+        auto cursor = cursor_t{std::move(stmt)};
+        if (auto r = cursor.bind_results(); !r) {
+            return std::unexpected(r.error());
+        }
+        return cursor;
     }
 
     std::unique_ptr<MYSQL, decltype(&mysql_close)> connection_;

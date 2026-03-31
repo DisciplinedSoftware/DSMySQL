@@ -2068,4 +2068,75 @@ suite<"async query"> async_suite = [] {
     };
 };
 
+// ===================================================================
+// Server-side cursor integration tests
+// ===================================================================
+
+suite<"server cursor"> cursor_suite = [] {
+    "open_cursor - fetches rows one by one"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+
+        // Set up test data
+        (void)(db->execute(drop_table(trade{}).if_exists()));
+        expect(db->execute(create_table(trade{})).has_value());
+        auto _ = scope_guard{[&] { (void)(db->execute(drop_table(trade{}).if_exists())); }};
+
+        expect(db->execute(insert_into(trade{})
+                               .columns(trade::code{}, trade::type{}, trade::name{}, trade::executed_at{},
+                                        trade::recorded_at{})
+                               .values(trade::code{"A"}, trade::type{"BUY"}, trade::name{"Test1"}, trade::executed_at{},
+                                       trade::recorded_at{}))
+                   .has_value());
+        expect(db->execute(insert_into(trade{})
+                               .columns(trade::code{}, trade::type{}, trade::name{}, trade::executed_at{},
+                                        trade::recorded_at{})
+                               .values(trade::code{"B"}, trade::type{"SELL"}, trade::name{"Test2"},
+                                       trade::executed_at{}, trade::recorded_at{}))
+                   .has_value());
+
+        using row_t = std::tuple<uint32_t, std::string>;
+        auto cursor = db->open_cursor<row_t>("SELECT id, code FROM trade ORDER BY id");
+        expect(fatal(cursor.has_value())) << cursor.error();
+
+        auto row1 = cursor->fetch();
+        expect(fatal(row1.has_value())) << row1.error();
+        expect(row1->has_value()) << "first row should exist";
+        expect(std::get<1>(**row1) == "A"s);
+
+        auto row2 = cursor->fetch();
+        expect(fatal(row2.has_value())) << row2.error();
+        expect(row2->has_value()) << "second row should exist";
+        expect(std::get<1>(**row2) == "B"s);
+
+        auto row3 = cursor->fetch();
+        expect(fatal(row3.has_value())) << row3.error();
+        expect(!row3->has_value()) << "no more rows";
+        expect(cursor->done());
+    };
+
+    "open_cursor with prefetch - fetches in batches"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+
+        using row_t = std::tuple<std::string>;
+        auto cursor = db->open_cursor<row_t>("SELECT @@version", prefetch_rows{10});
+        expect(fatal(cursor.has_value())) << cursor.error();
+
+        auto row1 = cursor->fetch();
+        expect(fatal(row1.has_value()));
+        expect(row1->has_value());
+
+        auto row2 = cursor->fetch();
+        expect(fatal(row2.has_value()));
+        expect(!row2->has_value()) << "only one row expected";
+    };
+};
+
 }  // namespace ds_mysql

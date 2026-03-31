@@ -19,6 +19,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `async_query(pool, stmt)` / `async_execute(pool, stmt)` — pool-based async query execution via `std::async`; returns `std::future` holding the result; multiple calls run concurrently on different connections from the pool
 - Composable FK action syntax — two new styles alongside the existing flat types: `fk_attr::on_delete(fk_attr::cascade)` (intermediate) and `fk_attr::on(fk_attr::delete_(fk_attr::cascade))` (fully composed, reads like SQL `ON DELETE CASCADE`); action tags: `cascade`, `restrict_`, `set_null`, `no_action`; all three styles produce identical attribute types
 - `set_case(col, case_when_builder)` — CASE/WHEN expressions in UPDATE SET clauses via `.set_case(col{}, case_when(cond, val).else_(val))` on `update_builder` and `update_set_builder`; chainable with `.set()`, `.where()`, `.order_by()`, `.limit()`
+- `server_cursor<RowType>` — streaming result set via MySQL server-side cursors; created via `conn.open_cursor<RowType>(sql, params...)` or with `prefetch_rows{n}` hint; `.fetch()` returns one row at a time without loading the full result set into memory
 
 ---
 
