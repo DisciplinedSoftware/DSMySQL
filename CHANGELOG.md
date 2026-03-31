@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [4.7.0] – 2026-03-31
+
 ### Added
 
 - `sql_default()` sentinel and `sql_default_t` type — represents the SQL `DEFAULT` keyword in INSERT statements
@@ -421,7 +425,8 @@ to allow display width similarly to floating point types.
 - `ds_mysql::version` struct providing `major`, `minor`, `patch`, `value`, and `string`
   compile-time constants.
 
-[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.3...HEAD
+[Unreleased]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.7.0...HEAD
+[4.7.0]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.3...v4.7.0
 [4.6.3]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.2...v4.6.3
 [4.6.2]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.1...v4.6.2
 [4.6.1]: https://github.com/DisciplinedSoftware/DSMySQL/compare/v4.6.0...v4.6.1
