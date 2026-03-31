@@ -2229,6 +2229,74 @@ suite<"DDL functions"> ddl_function_suite = [] {
 };
 
 // ===================================================================
+// DDL — Partitioning
+// ===================================================================
+
+suite<"DDL partitioning"> ddl_partition_suite = [] {
+    "partition_by_hash - HASH partition with count"_test = [] {
+        auto const sql = create_table(test_table{}).partition_by_hash(test_table::id{}).partitions(4).build_sql();
+        expect(sql.find("PARTITION BY HASH(id)\nPARTITIONS 4") != std::string::npos) << sql;
+    };
+
+    "partition_by_key - KEY partition with multiple columns"_test = [] {
+        auto const sql =
+            create_table(test_table{}).partition_by_key(test_table::id{}, test_table::name{}).partitions(8).build_sql();
+        expect(sql.find("PARTITION BY KEY(id, name)\nPARTITIONS 8") != std::string::npos) << sql;
+    };
+
+    "partition_by_range - RANGE partition with definitions"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .partition_by_range(test_table::id{})
+                             .add_partition("p0", partition_value::less_than(100))
+                             .add_partition("p1", partition_value::less_than(200))
+                             .add_partition("pmax", partition_value::less_than_maxvalue())
+                             .build_sql();
+        expect(sql.find("PARTITION BY RANGE(id)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION p0 VALUES LESS THAN (100)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION p1 VALUES LESS THAN (200)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION pmax VALUES LESS THAN MAXVALUE") != std::string::npos) << sql;
+    };
+
+    "partition_by_list - LIST partition with definitions"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .partition_by_list(test_table::id{})
+                             .add_partition("p_low", partition_value::in_list("1, 2, 3"))
+                             .add_partition("p_high", partition_value::in_list("4, 5, 6"))
+                             .build_sql();
+        expect(sql.find("PARTITION BY LIST(id)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION p_low VALUES IN (1, 2, 3)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION p_high VALUES IN (4, 5, 6)") != std::string::npos) << sql;
+    };
+
+    "partition_by_hash with engine - partitioning combined with table options"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .engine(Engine::InnoDB)
+                             .partition_by_hash(test_table::id{})
+                             .partitions(4)
+                             .build_sql();
+        expect(sql.find("ENGINE=InnoDB") != std::string::npos) << sql;
+        expect(sql.find("PARTITION BY HASH(id)") != std::string::npos) << sql;
+        expect(sql.find("PARTITIONS 4") != std::string::npos) << sql;
+    };
+
+    "partition_by_key - single column"_test = [] {
+        auto const sql = create_table(test_table{}).partition_by_key(test_table::id{}).partitions(2).build_sql();
+        expect(sql.find("PARTITION BY KEY(id)\nPARTITIONS 2") != std::string::npos) << sql;
+    };
+
+    "partition_by_range with if_not_exists - partitioning on conditional create"_test = [] {
+        auto const sql = create_table(test_table{})
+                             .partition_by_range(test_table::id{})
+                             .add_partition("p0", partition_value::less_than(50))
+                             .if_not_exists()
+                             .build_sql();
+        expect(sql.find("IF NOT EXISTS") != std::string::npos) << sql;
+        expect(sql.find("PARTITION BY RANGE(id)") != std::string::npos) << sql;
+        expect(sql.find("PARTITION p0 VALUES LESS THAN (50)") != std::string::npos) << sql;
+    };
+};
+
+// ===================================================================
 // DDL — Triggers
 // ===================================================================
 

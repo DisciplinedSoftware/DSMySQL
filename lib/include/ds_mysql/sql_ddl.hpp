@@ -493,12 +493,65 @@ template <ValidTable... Tables>
 
 }  // namespace ddl_detail
 
+// ===================================================================
+// Partition value helpers — used with .add_partition()
+//
+//   create_table(T{}).partition_by_range(T::id{})
+//       .add_partition("p0", partition_value::less_than(100))
+//       .add_partition("pmax", partition_value::less_than_maxvalue())
+//
+//   create_table(T{}).partition_by_list(T::status{})
+//       .add_partition("p_active", partition_value::in_list("1, 2"))
+// ===================================================================
+
+namespace partition_value {
+
+template <typename T>
+[[nodiscard]] std::string less_than(T value) {
+    if constexpr (std::is_integral_v<T>) {
+        return "VALUES LESS THAN (" + std::to_string(value) + ")";
+    } else {
+        return "VALUES LESS THAN (" + std::string(value) + ")";
+    }
+}
+
+[[nodiscard]] inline std::string less_than_maxvalue() {
+    return "VALUES LESS THAN MAXVALUE";
+}
+
+[[nodiscard]] inline std::string in_list(std::string values) {
+    return "VALUES IN (" + std::move(values) + ")";
+}
+
+}  // namespace partition_value
+
 struct create_table_option {
     [[nodiscard]] std::string to_sql() const {
         std::string out;
         for (auto const& [_, value_sql] : options) {
             out += " ";
             out += value_sql;
+        }
+        if (!partition_type_.empty()) {
+            out += "\n";
+            out += partition_type_;
+            if (num_partitions_ > 0) {
+                out += "\nPARTITIONS ";
+                out += std::to_string(num_partitions_);
+            }
+            if (!partition_defs_.empty()) {
+                out += " (\n";
+                for (std::size_t i = 0; i < partition_defs_.size(); ++i) {
+                    if (i > 0) {
+                        out += ",\n";
+                    }
+                    out += "    PARTITION ";
+                    out += partition_defs_[i].first;
+                    out += " ";
+                    out += partition_defs_[i].second;
+                }
+                out += "\n)";
+            }
         }
         return out;
     }
@@ -701,6 +754,21 @@ struct create_table_option {
         return *this;
     }
 
+    create_table_option& set_partition_type(std::string clause) {
+        partition_type_ = std::move(clause);
+        return *this;
+    }
+
+    create_table_option& set_num_partitions(std::size_t n) {
+        num_partitions_ = n;
+        return *this;
+    }
+
+    create_table_option& add_partition_def(std::string name, std::string value_clause) {
+        partition_defs_.emplace_back(std::move(name), std::move(value_clause));
+        return *this;
+    }
+
 private:
     void set(std::string key, std::string value_sql) {
         auto it = std::find_if(options.begin(), options.end(), [&](auto const& kv) {
@@ -714,6 +782,9 @@ private:
     }
 
     std::vector<std::pair<std::string, std::string>> options;
+    std::string partition_type_;
+    std::size_t num_partitions_ = 0;
+    std::vector<std::pair<std::string, std::string>> partition_defs_;
 };
 
 namespace ddl_detail {
@@ -893,6 +964,47 @@ public:
         requires(sizeof...(Tables) > 0)
     Derived& union_tables(Tables const&...) {
         options_.union_tables(Tables{}...);
+        return derived();
+    }
+
+    // --- Partitioning ---
+
+    template <ColumnFieldType Col>
+    Derived& partition_by_hash(Col const&) {
+        options_.set_partition_type("PARTITION BY HASH(" + std::string(Col::column_name()) + ")");
+        return derived();
+    }
+
+    template <ColumnFieldType... Cols>
+        requires(sizeof...(Cols) > 0)
+    Derived& partition_by_key(Cols const&...) {
+        std::string s = "PARTITION BY KEY(";
+        bool first = true;
+        (((s += (first ? "" : ", "), s += Cols::column_name(), first = false)), ...);
+        s += ")";
+        options_.set_partition_type(std::move(s));
+        return derived();
+    }
+
+    template <ColumnFieldType Col>
+    Derived& partition_by_range(Col const&) {
+        options_.set_partition_type("PARTITION BY RANGE(" + std::string(Col::column_name()) + ")");
+        return derived();
+    }
+
+    template <ColumnFieldType Col>
+    Derived& partition_by_list(Col const&) {
+        options_.set_partition_type("PARTITION BY LIST(" + std::string(Col::column_name()) + ")");
+        return derived();
+    }
+
+    Derived& partitions(std::size_t n) {
+        options_.set_num_partitions(n);
+        return derived();
+    }
+
+    Derived& add_partition(std::string name, std::string value_clause) {
+        options_.add_partition_def(std::move(name), std::move(value_clause));
         return derived();
     }
 

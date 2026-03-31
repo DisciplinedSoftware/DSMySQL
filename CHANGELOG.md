@@ -14,6 +14,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `create_function(function_id<"name">{}, params, returns, body)` — type-safe CREATE FUNCTION builder with optional `.deterministic()`, `.no_sql()`, `.reads_sql_data()`, `.modifies_sql_data()` characteristics
 - `drop_function(function_id<"name">{})` — DROP FUNCTION builder with `.if_exists()` support
 - Composition API — `create(descriptor)` / `drop(descriptor)` alternative syntax that separates verb from object: `create(table(T{}))`, `create(view(T{}))`, `create(database(DB{}))`, `create(procedure(...))`, `create(function(...))`, `create(trigger<T>(...))`, and matching `drop()` overloads; all return the same builders as the `create_*`/`drop_*` functions
+- Table partitioning — instance-based `.partition_by_hash(col)`, `.partition_by_key(cols...)`, `.partition_by_range(col)`, `.partition_by_list(col)` on `create_table` builders with `.partitions(n)` and `.add_partition(name, clause)` for partition definitions; `partition_value::less_than(v)`, `partition_value::less_than_maxvalue()`, `partition_value::in_list(values)` helpers
 
 ---
 
