@@ -13,6 +13,7 @@
 // sql_temporal, sql_varchar, sql_text, config, credentials, …) are
 // pulled in transitively by the headers above.
 
+#include "ds_mysql/connection_pool.hpp"
 #include "ds_mysql/metadata.hpp"
 #include "ds_mysql/mysql_connection.hpp"
 #include "ds_mysql/prepared_statement.hpp"

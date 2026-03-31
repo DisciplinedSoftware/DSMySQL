@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ds_mysql/connection_pool.hpp"
 #include "ds_mysql/mysql_connection.hpp"
 #include "ut_expected_expect.hpp"
 
@@ -1952,6 +1953,66 @@ suite<"sql_default INSERT Integration"> sql_default_insert_suite = [] {
         auto const& [label, status] = rows->at(0);
         expect(std::string_view(label) == "assigned");
         expect(std::string_view(status) == "active") << "status should use default 'active'";
+    };
+};
+
+// ===================================================================
+// Connection pool integration tests
+// ===================================================================
+
+suite<"connection pool"> pool_suite = [] {
+    "connection_pool::create - creates pool with given size"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 3);
+        expect(fatal(pool.has_value())) << pool.error();
+        expect((*pool)->size() == 3u);
+        expect((*pool)->available() == 3u);
+    };
+
+    "connection_pool::acquire - checks out a connection"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 2);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        {
+            auto conn = (*pool)->acquire();
+            expect((*pool)->available() == 1u);
+
+            auto result = conn->ping();
+            expect(result.has_value()) << "acquired connection should be alive";
+        }
+        // Connection returned to pool after scope exit
+        expect((*pool)->available() == 2u);
+    };
+
+    "connection_pool::try_acquire - returns nullopt when pool exhausted"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 1);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        auto conn1 = (*pool)->acquire();
+        expect((*pool)->available() == 0u);
+
+        auto conn2 = (*pool)->try_acquire();
+        expect(!conn2.has_value()) << "try_acquire should return nullopt when pool is empty";
+    };
+
+    "connection_pool - query through pooled connection"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 1);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        auto conn = (*pool)->acquire();
+        auto result = conn->query(sql_raw{"SELECT 1"});
+        expect(result.has_value()) << "query through pooled connection should succeed";
     };
 };
 
