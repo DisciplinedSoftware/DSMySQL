@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ds_mysql/async_query.hpp"
 #include "ds_mysql/connection_pool.hpp"
 #include "ds_mysql/mysql_connection.hpp"
 #include "ut_expected_expect.hpp"
@@ -2013,6 +2014,57 @@ suite<"connection pool"> pool_suite = [] {
         auto conn = (*pool)->acquire();
         auto result = conn->query(sql_raw{"SELECT 1"});
         expect(result.has_value()) << "query through pooled connection should succeed";
+    };
+};
+
+// ===================================================================
+// Async query integration tests
+// ===================================================================
+
+suite<"async query"> async_suite = [] {
+    "async_query raw - runs query on worker thread"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 2);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        auto future = async_query(**pool, sql_raw{"SELECT 1 AS val"});
+        auto result = future.get();
+        expect(result.has_value()) << "async raw query should succeed";
+        expect(result->size() == 1u);
+    };
+
+    "async_execute - runs DDL on worker thread"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 2);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        auto future = async_execute(**pool, drop_table(trade{}).if_exists());
+        auto result = future.get();
+        expect(result.has_value()) << "async execute should succeed";
+    };
+
+    "async_query - multiple concurrent queries"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value())) << "Missing MySQL environment variables";
+
+        auto pool = connection_pool::create(*config, 3);
+        expect(fatal(pool.has_value())) << pool.error();
+
+        auto f1 = async_query(**pool, sql_raw{"SELECT 1"});
+        auto f2 = async_query(**pool, sql_raw{"SELECT 2"});
+        auto f3 = async_query(**pool, sql_raw{"SELECT 3"});
+
+        auto r1 = f1.get();
+        auto r2 = f2.get();
+        auto r3 = f3.get();
+
+        expect(r1.has_value());
+        expect(r2.has_value());
+        expect(r3.has_value());
     };
 };
 

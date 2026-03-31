@@ -16,6 +16,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Composition API — `create(descriptor)` / `drop(descriptor)` alternative syntax that separates verb from object: `create(table(T{}))`, `create(view(T{}))`, `create(database(DB{}))`, `create(procedure(...))`, `create(function(...))`, `create(trigger<T>(...))`, and matching `drop()` overloads; all return the same builders as the `create_*`/`drop_*` functions
 - Table partitioning — instance-based `.partition_by_hash(col)`, `.partition_by_key(cols...)`, `.partition_by_range(col)`, `.partition_by_list(col)` on `create_table` builders with `.partitions(n)` and `.add_partition(name, clause)` for partition definitions; `partition_value::less_than(v)`, `partition_value::less_than_maxvalue()`, `partition_value::in_list(values)` helpers
 - `connection_pool` — thread-safe connection pool with `connection_pool::create(config, size)` factory, `acquire()` (blocking), `try_acquire()` (non-blocking), and RAII `pooled_connection` that auto-returns to pool on destruction
+- `async_query(pool, stmt)` / `async_execute(pool, stmt)` — pool-based async query execution via `std::async`; returns `std::future` holding the result; multiple calls run concurrently on different connections from the pool
 
 ---
 
