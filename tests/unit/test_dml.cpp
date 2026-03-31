@@ -43,6 +43,13 @@ struct integer_typed_row {
     COLUMN_FIELD(big, bigint_type<>)
     COLUMN_FIELD(big_flags, bigint_unsigned_type<>)
 };
+
+struct auto_inc_table {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(label, varchar_type<64>)
+    COLUMN_FIELD(status, varchar_type<20>, column_attr::default_value("active"))
+};
+
 }  // namespace
 
 // ===================================================================
@@ -666,5 +673,118 @@ suite<"DML transaction_control"> dml_transaction_control_suite = [] {
     "set_transaction_isolation_level Serializable"_test = [] {
         auto const sql = set_transaction_isolation_level(IsolationLevel::Serializable).build_sql();
         expect(sql == "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE"s) << sql;
+    };
+};
+
+// ===================================================================
+// Positional field-based insert
+// ===================================================================
+suite<"DML - positional insert"> dml_positional_insert_suite = [] {
+    "positional insert with sql_default for auto_increment"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .values(sql_default(), auto_inc_table::label{"foo"}, auto_inc_table::status{"bar"})
+                             .build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (id, label, status) VALUES (DEFAULT, 'foo', 'bar')"s) << sql;
+    };
+
+    "positional insert with all explicit values"_test = [] {
+        auto const sql =
+            insert_into(auto_inc_table{})
+                .values(auto_inc_table::id{42u}, auto_inc_table::label{"foo"}, auto_inc_table::status{"bar"})
+                .build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (id, label, status) VALUES (42, 'foo', 'bar')"s) << sql;
+    };
+
+    "positional insert with multiple sql_default"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .values(sql_default(), auto_inc_table::label{"foo"}, sql_default())
+                             .build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (id, label, status) VALUES (DEFAULT, 'foo', DEFAULT)"s) << sql;
+    };
+
+    "positional insert with on_duplicate_key_update"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .values(sql_default(), auto_inc_table::label{"foo"}, auto_inc_table::status{"bar"})
+                             .on_duplicate_key_update(auto_inc_table::label{"updated"})
+                             .build_sql();
+        expect(sql ==
+               "INSERT INTO auto_inc_table (id, label, status) VALUES (DEFAULT, 'foo', 'bar') "
+               "ON DUPLICATE KEY UPDATE label = 'updated'"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// Column-specific insert
+// ===================================================================
+suite<"DML - column-specific insert"> dml_column_specific_insert_suite = [] {
+    "column-specific insert with subset of columns"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .columns(auto_inc_table::label{}, auto_inc_table::status{})
+                             .values("foo", "bar")
+                             .build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (label, status) VALUES ('foo', 'bar')"s) << sql;
+    };
+
+    "column-specific insert with sql_default"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .columns(auto_inc_table::id{}, auto_inc_table::label{})
+                             .values(sql_default(), "foo")
+                             .build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (id, label) VALUES (DEFAULT, 'foo')"s) << sql;
+    };
+
+    "column-specific insert with single column"_test = [] {
+        auto const sql =
+            insert_into(auto_inc_table{}).columns(auto_inc_table::label{}).values("only_label").build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (label) VALUES ('only_label')"s) << sql;
+    };
+
+    "column-specific insert with on_duplicate_key_update"_test = [] {
+        auto const sql = insert_into(auto_inc_table{})
+                             .columns(auto_inc_table::label{}, auto_inc_table::status{})
+                             .values("foo", "bar")
+                             .on_duplicate_key_update(auto_inc_table::status{"updated"})
+                             .build_sql();
+        expect(sql ==
+               "INSERT INTO auto_inc_table (label, status) VALUES ('foo', 'bar') "
+               "ON DUPLICATE KEY UPDATE status = 'updated'"s)
+            << sql;
+    };
+};
+
+// ===================================================================
+// sql_default column field assignability
+// ===================================================================
+suite<"DML - sql_default assignability"> dml_sql_default_suite = [] {
+    "column field constructible from sql_default"_test = [] {
+        auto_inc_table row;
+        row.id_ = sql_default();
+        row.label_ = "test";
+        row.status_ = "active";
+        auto const sql = insert_into(auto_inc_table{}).values(row).build_sql();
+        expect(sql == "INSERT INTO auto_inc_table (id, label, status) VALUES (DEFAULT, 'test', 'active')"s) << sql;
+    };
+
+    "column field assigned sql_default then overwritten with value"_test = [] {
+        auto_inc_table::id id_field{sql_default()};
+        expect(id_field.is_sql_default());
+        id_field = 42u;
+        expect(!id_field.is_sql_default());
+    };
+
+    "default_value column supports sql_default"_test = [] {
+        auto_inc_table::status status_field{sql_default()};
+        expect(status_field.is_sql_default());
+    };
+
+    "struct-based insert still works - regression"_test = [] {
+        asset row;
+        row.exchange_id_ = 1u;
+        row.ticker_ = "AAPL";
+        row.instrument_ = "Stock";
+        auto const sql = insert_into(asset{}).values(row).build_sql();
+        expect(sql.starts_with("INSERT INTO asset ("));
+        expect(sql.find("VALUES (") != std::string::npos);
     };
 };

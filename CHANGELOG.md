@@ -10,6 +10,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `sql_default()` sentinel and `sql_default_t` type — represents the SQL `DEFAULT` keyword in INSERT statements
+- Positional field-based insert — `insert_into(t{}).values(sql_default(), col2{"val"}, col3{"val"})` allows specifying all struct fields in order with `sql_default()` as a placeholder for columns that should use their database default
+- Column-specific insert — `insert_into(t{}).columns(col1{}, col2{}).values(val1, val2)` allows inserting a subset of columns; column list is instance-based (no template arguments needed)
+- Column field `sql_default()` assignability — columns with `auto_increment` or `default_value` attributes can be constructed from or assigned `sql_default()`: `row.id_ = sql_default()`, then the struct-based `insert_into(t{}).values(row)` emits `DEFAULT` for those columns
 - `prepared_statement` — RAII wrapper for MySQL prepared statements (`MYSQL_STMT*`); created via `mysql_connection::prepare(sql)` or `prepare(builder)`; supports type-safe parameter binding via `execute(params...)` and typed result fetching via `query<RowType>(params...)`
 - `transaction_guard` — RAII scoped transaction helper; `transaction_guard::begin(conn)` disables autocommit, destructor auto-rolls-back unless `commit()` is called; also provides explicit `rollback()`
 - CTE fluent API — `with(cte("name", query)).select(...).from(cte_ref{"name"})` and `with(recursive(cte("name", sql))).select(...)` replace the old `with_cte()`/`with_recursive_cte()` builders

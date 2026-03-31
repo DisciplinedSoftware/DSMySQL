@@ -12,12 +12,16 @@ namespace ds_mysql {
 //   describe<T>()
 //       → build_sql()                           — DESCRIBE T
 //
-//   insert_into<T>()
+//   insert_into(T{})
 //       .values(row)
 //       → build_sql()                           — INSERT INTO T (...) VALUES (...)
 //       → .on_duplicate_key_update(col1, ...)   — ... ON DUPLICATE KEY UPDATE ...
 //       .values(rows) where rows is std::ranges::input_range<T>
 //       → build_sql()                           — INSERT INTO T (...) VALUES (...), (...), ...
+//       .values(sql_default(), col2{"v"}, ...)  — positional, all fields
+//       → build_sql()                           — INSERT INTO T (...) VALUES (DEFAULT, ...)
+//       .columns(col1{}, col2{}).values(v1, v2) — column-specific, subset
+//       → build_sql()                           — INSERT INTO T (col1, col2) VALUES (...)
 //
 //   update<T>()
 //       .set(col1, col2, ...)                   — all columns in one call
@@ -71,15 +75,15 @@ class insert_into_builder;
 template <typename... Cols>
 [[nodiscard]] std::string build_assignment_sql_from_tuple(std::tuple<Cols...> const& assignments);
 
-template <typename T, typename... Cols>
+template <typename T, typename InnerBuilder, typename... Cols>
 class insert_into_upsert_builder {
 public:
-    insert_into_upsert_builder(insert_into_values_builder<T> values_builder, std::tuple<Cols...> assignments)
-        : values_builder_(std::move(values_builder)), assignments_(std::move(assignments)) {
+    insert_into_upsert_builder(InnerBuilder inner, std::tuple<Cols...> assignments)
+        : inner_(std::move(inner)), assignments_(std::move(assignments)) {
     }
 
     [[nodiscard]] std::string build_sql() const {
-        auto insert_sql = values_builder_.build_sql();
+        auto insert_sql = inner_.build_sql();
         auto update_clause = build_assignment_sql_from_tuple(assignments_);
         std::string sql;
         sql.reserve(insert_sql.size() + 26 + update_clause.size());
@@ -90,7 +94,7 @@ public:
     }
 
 private:
-    insert_into_values_builder<T> values_builder_;
+    InnerBuilder inner_;
     std::tuple<Cols...> assignments_;
 };
 
@@ -108,8 +112,9 @@ public:
     // Template form: .on_duplicate_key_update<T::col>("val")  (mirrors update().set<>())
     template <FieldOf<T>... Cols>
         requires(sizeof...(Cols) > 0)
-    [[nodiscard]] insert_into_upsert_builder<T, Cols...> on_duplicate_key_update(Cols const&... assignments) const {
-        return insert_into_upsert_builder<T, Cols...>{*this, std::tuple<Cols...>{assignments...}};
+    [[nodiscard]] insert_into_upsert_builder<T, insert_into_values_builder<T>, Cols...> on_duplicate_key_update(
+        Cols const&... assignments) const {
+        return {*this, std::tuple<Cols...>{assignments...}};
     }
 
     [[nodiscard]] std::string build_sql() const {
@@ -155,13 +160,105 @@ private:
     bool bulk_ = false;
 };
 
+// ---------------------------------------------------------------
+// insert_into_fields_builder — positional field-based insert
+// (all struct fields, in order, each either column_field or sql_default)
+// ---------------------------------------------------------------
+template <typename T, typename... Args>
+class insert_into_fields_builder {
+public:
+    explicit insert_into_fields_builder(std::tuple<Args...> args) : args_(std::move(args)) {
+    }
+
+    template <FieldOf<T>... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] insert_into_upsert_builder<T, insert_into_fields_builder<T, Args...>, Cols...>
+    on_duplicate_key_update(Cols const&... assignments) const {
+        return {*this, std::tuple<Cols...>{assignments...}};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        const auto& column_list = dml_detail::generate_column_list<T>();
+        auto values = dml_detail::generate_field_values_impl(args_, std::make_index_sequence<sizeof...(Args)>{});
+        std::string s;
+        s.reserve(12 + table_name.size() + 2 + column_list.size() + 10 + values.size() + 1);
+        s += "INSERT INTO ";
+        s += table_name;
+        s += " (";
+        s += column_list;
+        s += ") VALUES (";
+        s += values;
+        s += ')';
+        return s;
+    }
+
+private:
+    std::tuple<Args...> args_;
+};
+
+// ---------------------------------------------------------------
+// insert_into_column_values_builder — column-specific insert
+// (subset of columns, raw values wrapped into column fields)
+// ---------------------------------------------------------------
+template <typename T, typename StoredTuple, typename... Cols>
+class insert_into_column_values_builder {
+public:
+    explicit insert_into_column_values_builder(StoredTuple stored) : stored_(std::move(stored)) {
+    }
+
+    template <FieldOf<T>... UpdateCols>
+        requires(sizeof...(UpdateCols) > 0)
+    [[nodiscard]] insert_into_upsert_builder<T, insert_into_column_values_builder, UpdateCols...>
+    on_duplicate_key_update(UpdateCols const&... assignments) const {
+        return {*this, std::tuple<UpdateCols...>{assignments...}};
+    }
+
+    [[nodiscard]] std::string build_sql() const {
+        const auto table_name = table_name_for<T>::value().to_string_view();
+        auto column_list = dml_detail::generate_column_names<Cols...>();
+        auto values = dml_detail::generate_field_values_impl(stored_, std::make_index_sequence<sizeof...(Cols)>{});
+        std::string s;
+        s.reserve(12 + table_name.size() + 2 + column_list.size() + 10 + values.size() + 1);
+        s += "INSERT INTO ";
+        s += table_name;
+        s += " (";
+        s += column_list;
+        s += ") VALUES (";
+        s += values;
+        s += ')';
+        return s;
+    }
+
+private:
+    StoredTuple stored_;
+};
+
+template <typename T, typename... Cols>
+class insert_into_columns_builder {
+public:
+    template <typename... Vals>
+        requires(sizeof...(Vals) == sizeof...(Cols) &&
+                 dml_detail::valid_column_values_impl<std::tuple<Cols...>, Vals...>(
+                     std::make_index_sequence<sizeof...(Cols)>{}))
+    [[nodiscard]] auto values(Vals const&... vals) const {
+        auto stored = std::tuple{dml_detail::make_insert_value<Cols>(vals)...};
+        return insert_into_column_values_builder<T, decltype(stored), Cols...>{std::move(stored)};
+    }
+};
+
+// ---------------------------------------------------------------
+// insert_into_builder
+// ---------------------------------------------------------------
 template <typename T>
 class insert_into_builder {
 public:
+    // Struct-based insert: .values(row)
     [[nodiscard]] insert_into_values_builder<T> values(T const& row) const {
         return insert_into_values_builder<T>{row};
     }
 
+    // Bulk insert: .values(range_of_rows)
     template <std::ranges::input_range Rows>
         requires std::same_as<std::remove_cvref_t<std::ranges::range_value_t<Rows>>, T>
     [[nodiscard]] insert_into_values_builder<T> values(Rows&& rows) const {
@@ -173,6 +270,23 @@ public:
             return {std::vector<T>{}, false};
         }
         return {std::move(collected_rows), /*bulk=*/true};
+    }
+
+    // Positional field-based insert: .values(sql_default(), col2{"val"}, ...)
+    // All struct fields must be provided in order. Each is either sql_default()
+    // or the matching column field type at that position.
+    template <typename... Args>
+        requires ValidFieldArgs<T, std::decay_t<Args>...>
+    [[nodiscard]] insert_into_fields_builder<T, std::decay_t<Args>...> values(Args const&... args) const {
+        return insert_into_fields_builder<T, std::decay_t<Args>...>{std::tuple<std::decay_t<Args>...>{args...}};
+    }
+
+    // Column-specific insert: .columns(col1{}, col2{}).values(val1, val2)
+    // Specify a subset of columns; values are provided in a subsequent .values() call.
+    template <FieldOf<T>... Cols>
+        requires(sizeof...(Cols) > 0)
+    [[nodiscard]] insert_into_columns_builder<T, Cols...> columns(Cols const&...) const {
+        return {};
     }
 };
 
@@ -410,9 +524,16 @@ template <ValidTable T>
  * Bulk insert (multiple rows in one statement):
  *   insert_into(symbol{}).values(rows).build_sql()   // rows is std::ranges::input_range<T>
  *
+ * Positional field-based insert (all fields, sql_default() for auto-increment):
+ *   insert_into(symbol{}).values(sql_default(), symbol::ticker{"AAPL"}, symbol::instrument{"Stock"}).build_sql()
+ *   // → INSERT INTO symbol (id, ticker, instrument) VALUES (DEFAULT, 'AAPL', 'Stock')
+ *
+ * Column-specific insert (subset of columns):
+ *   insert_into(symbol{}).columns(symbol::ticker{}, symbol::instrument{}).values("AAPL", "Stock").build_sql()
+ *   // → INSERT INTO symbol (ticker, instrument) VALUES ('AAPL', 'Stock')
+ *
  * Upsert (INSERT … ON DUPLICATE KEY UPDATE):
  *   insert_into(symbol{}).values(row).on_duplicate_key_update(symbol::ticker{"AAPL"}, ...)
- *   insert_into(symbol{}).values(row).on_duplicate_key_update<symbol::ticker>("AAPL")  // template form
  *
  * Example:
  *   symbol row;

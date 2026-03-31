@@ -102,7 +102,6 @@ struct attr_type_compat<ColumnType, First, Rest...> {
 template <fixed_string Name, typename T, auto... Attrs>
 struct column_field : column_field_detail::base<T> {
     using column_field_detail::base<T>::base;
-    using column_field_detail::base<T>::operator=;
 
     static constexpr bool ddl_primary_key = (std::is_same_v<decltype(Attrs), column_attr::primary_key> || ...);
     static constexpr bool ddl_auto_increment = (std::is_same_v<decltype(Attrs), column_attr::auto_increment> || ...);
@@ -111,8 +110,46 @@ struct column_field : column_field_detail::base<T> {
     static constexpr bool ddl_has_default = (column_field_detail::is_default_value_attr_v<decltype(Attrs)> || ...);
     static constexpr bool ddl_has_on_update = (column_field_detail::is_on_update_attr_v<decltype(Attrs)> || ...);
 
+    static constexpr bool supports_sql_default = ddl_auto_increment || ddl_has_default;
+
     static_assert(column_field_detail::attr_type_compat<T, Attrs...>::value,
                   "default_value / on_update type must match column value type");
+
+    // --- sql_default support ---------------------------------------------------
+    bool is_sql_default_ = false;
+
+    constexpr column_field(sql_default_t) noexcept
+        requires supports_sql_default
+        : is_sql_default_{true} {
+    }
+
+    constexpr column_field& operator=(sql_default_t) noexcept
+        requires supports_sql_default
+    {
+        is_sql_default_ = true;
+        return *this;
+    }
+
+    // Generic forwarding operator= that resets the sql_default flag.
+    template <typename U>
+    constexpr auto operator=(U&& v) -> column_field&
+        requires(!std::same_as<std::decay_t<U>, sql_default_t> && !std::same_as<std::decay_t<U>, column_field>) &&
+                requires(column_field_detail::base<T>& b) { b = std::forward<U>(std::declval<U>()); }
+    {
+        static_cast<column_field_detail::base<T>&>(*this) = std::forward<U>(v);
+        is_sql_default_ = false;
+        return *this;
+    }
+
+    constexpr column_field() = default;
+    constexpr column_field(column_field const&) = default;
+    constexpr column_field(column_field&&) = default;
+    constexpr column_field& operator=(column_field const&) = default;
+    constexpr column_field& operator=(column_field&&) = default;
+
+    [[nodiscard]] constexpr bool is_sql_default() const noexcept {
+        return is_sql_default_;
+    }
 
     [[nodiscard]] static std::string ddl_default_sql() {
         return column_field_detail::default_value_sql<Attrs...>::get();

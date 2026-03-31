@@ -30,6 +30,15 @@ inline constexpr bool is_fixed_string_v = is_fixed_string<T>::value;
 struct current_timestamp_t {};
 inline constexpr current_timestamp_t current_timestamp{};
 
+/// Sentinel type for SQL DEFAULT keyword in INSERT statements.
+/// Use with the field-based insert API or assign to auto_increment / default_value columns:
+///   insert_into(table{}).values(sql_default(), col2{"val"}, ...).build_sql()
+///   table::id field{sql_default()};
+struct sql_default_t {};
+[[nodiscard]] inline constexpr sql_default_t sql_default() noexcept {
+    return {};
+}
+
 namespace column_attr {
 
 struct primary_key {};

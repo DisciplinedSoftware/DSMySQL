@@ -58,6 +58,86 @@ template <typename T>
     return cached;
 }
 
+// ---------------------------------------------------------------
+// Positional insert validation — ValidFieldArgs<T, Args...>
+// Each arg at position I must be sql_default_t or the exact column
+// field type at that struct position.
+// ---------------------------------------------------------------
+template <typename T, std::size_t I, typename Arg>
+concept ValidFieldArg = std::same_as<std::decay_t<Arg>, sql_default_t> ||
+                        std::same_as<std::decay_t<Arg>, boost::pfr::tuple_element_t<I, T>>;
+
+template <typename T, typename... Args, std::size_t... Is>
+consteval bool valid_field_args_impl(std::index_sequence<Is...>) {
+    return (ValidFieldArg<T, Is, Args> && ...);
+}
+
+template <typename T, typename... Args>
+concept ValidFieldArgs = (sizeof...(Args) == boost::pfr::tuple_size_v<T>) &&
+                         valid_field_args_impl<T, Args...>(std::make_index_sequence<sizeof...(Args)>{});
+
+// ---------------------------------------------------------------
+// Column-specific insert validation — ValidColumnValue<Col, Val>
+// A value is valid for a column if it is sql_default_t or the
+// column field type is constructible from it.
+// ---------------------------------------------------------------
+template <typename Col, typename Val>
+concept ValidColumnValue = std::same_as<std::decay_t<Val>, sql_default_t> || std::constructible_from<Col, Val const&>;
+
+template <typename ColsTuple, typename... Vals, std::size_t... Is>
+consteval bool valid_column_values_impl(std::index_sequence<Is...>) {
+    return (ValidColumnValue<std::tuple_element_t<Is, ColsTuple>, Vals> && ...);
+}
+
+// ---------------------------------------------------------------
+// Field-based value generation from tuple
+// ---------------------------------------------------------------
+template <typename Tuple, std::size_t... Is>
+[[nodiscard]] std::string generate_field_values_impl(Tuple const& args, std::index_sequence<Is...>) {
+    if constexpr (sizeof...(Is) == 0)
+        return {};
+    std::string parts[] = {sql_detail::to_sql_value(std::get<Is>(args))...};
+    std::string values;
+    values.reserve(sizeof...(Is) * 8);
+    for (std::size_t i = 0; i < sizeof...(Is); ++i) {
+        if (i > 0)
+            values += ", ";
+        values += parts[i];
+    }
+    return values;
+}
+
+// ---------------------------------------------------------------
+// Column name list from explicit column types
+// ---------------------------------------------------------------
+template <typename... Cols>
+[[nodiscard]] std::string generate_column_names() {
+    if constexpr (sizeof...(Cols) == 0)
+        return {};
+    std::string_view names[] = {Cols::column_name()...};
+    std::string result;
+    result.reserve(sizeof...(Cols) * 12);
+    for (std::size_t i = 0; i < sizeof...(Cols); ++i) {
+        if (i > 0)
+            result += ", ";
+        result += names[i];
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------
+// make_insert_value — wraps a raw value into a column field, or
+// passes through sql_default_t unchanged.
+// ---------------------------------------------------------------
+template <typename Col, typename Val>
+[[nodiscard]] auto make_insert_value(Val const& v) {
+    if constexpr (std::same_as<std::decay_t<Val>, sql_default_t>) {
+        return sql_default_t{};
+    } else {
+        return Col{v};
+    }
+}
+
 template <typename Col>
 void append_assignment_sql(std::string& s, bool& first, Col const& field) {
     if (!first) {

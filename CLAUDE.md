@@ -49,11 +49,11 @@ Style: Google-based, 120-char line limit, 4-space indent (`.clang-format` at roo
 - `ds_mysql.hpp` — umbrella include; users include only this
 - `mysql_connection.hpp` — `mysql_config`, `connect_options`, and `mysql_connection` classes; `.query()` returns `std::expected<ResultType, std::string>`, `.execute()` returns `std::expected<uint64_t, std::string>` (affected row count; errors include the failing SQL statement); also provides `last_insert_id()`, `ping()`, `commit()`, `rollback()`, `autocommit()`, `select_db()`, `reset_connection()`, `escape_string()`, `warning_count()`, `info()`, `server_version()`, `server_info()`, `stat()`, `thread_id()`, `character_set()`, `set_character_set()`
 - `sql_ddl.hpp` — `create_table(T{})`, `drop_table(T{})`, `create_database(DB{})`, `create_all_tables(DB{})`
-- `sql_dml.hpp` — `insert_into(T{})`, `update(T{})`, `delete_from(T{})`, `truncate_table(T{})`
+- `sql_dml.hpp` — `insert_into(T{})` (struct-based, positional field-based with `sql_default()`, column-specific via `.columns().values()`), `update(T{})`, `delete_from(T{})`, `truncate_table(T{})`
 - `sql_dql.hpp` — `select(col1{}, col2{})`, `count(T{})`, `describe(T{})`
 - `connect_options.hpp` — `connect_options` fluent builder and `ssl_mode` enum for pre-connect `mysql_options()` configuration (timeouts, SSL/TLS, charset, compression, etc.)
 - `charset_name.hpp` — `charset_name` strong type for character set names
-- `column_field.hpp` / `column_field_base_*.hpp` — `column_field<"name", Type, Attrs...>` descriptors, `COLUMN_FIELD(name, type, attrs...)` macro, and column attributes passed as NTTP instances: `column_attr::primary_key{}`, `auto_increment{}`, `unique{}`, `default_value(0)`, `default_value("text")`, `default_value(current_timestamp)`, `on_update(current_timestamp)`, `comment("...")`, `collate("...")`
+- `column_field.hpp` / `column_field_base_*.hpp` — `column_field<"name", Type, Attrs...>` descriptors, `COLUMN_FIELD(name, type, attrs...)` macro, column attributes passed as NTTP instances: `column_attr::primary_key{}`, `auto_increment{}`, `unique{}`, `default_value(0)`, `default_value("text")`, `default_value(current_timestamp)`, `on_update(current_timestamp)`, `comment("...")`, `collate("...")`; `sql_default_t` sentinel and `sql_default()` factory — columns with `auto_increment` or `default_value` support construction/assignment from `sql_default()`
 - `schema_generator.hpp` — derives CREATE TABLE SQL from a C++ struct at compile time using Boost.PFR
 - `sql_varchar.hpp`, `sql_numeric.hpp`, `sql_temporal.hpp` — library-specific SQL types (`varchar_type<N>`, `decimal_type<P,S>`, `datetime_type<FSP>`, etc.)
 - `metadata.hpp` — types for querying `information_schema`

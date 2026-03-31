@@ -206,7 +206,14 @@ namespace sql_detail {
  */
 template <typename T>
 [[nodiscard]] std::string to_sql_value(T const& v) {
-    if constexpr (ColumnFieldType<T>) {
+    if constexpr (std::same_as<T, sql_default_t>) {
+        return "DEFAULT";
+    } else if constexpr (ColumnFieldType<T>) {
+        if constexpr (requires(T const& x) { x.is_sql_default_; }) {
+            if (v.is_sql_default_) {
+                return "DEFAULT";
+            }
+        }
         return to_sql_value(v.value);
     } else if constexpr (is_optional_v<T>) {
         if (!v.has_value()) {
@@ -267,10 +274,10 @@ template <typename T>
 // ===================================================================
 template <typename T>
 concept SqlValue =
-    ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> || is_timestamp_type_v<T> || is_date_type_v<T> ||
-    std::same_as<T, std::chrono::system_clock::time_point> || is_time_type_v<T> || std::same_as<T, bool> ||
-    std::integral<T> || std::floating_point<T> || is_formatted_numeric_type_v<T> || is_varchar_type_v<T> ||
-    is_text_type_v<T> || std::same_as<T, std::string>;
+    std::same_as<T, sql_default_t> || ColumnFieldType<T> || is_optional_v<T> || is_datetime_type_v<T> ||
+    is_timestamp_type_v<T> || is_date_type_v<T> || std::same_as<T, std::chrono::system_clock::time_point> ||
+    is_time_type_v<T> || std::same_as<T, bool> || std::integral<T> || std::floating_point<T> ||
+    is_formatted_numeric_type_v<T> || is_varchar_type_v<T> || is_text_type_v<T> || std::same_as<T, std::string>;
 
 // ===================================================================
 // check_id<"name">     — compile-time CHECK constraint name type.

@@ -1821,4 +1821,138 @@ suite<"Column Attribute Defaults Integration"> column_attr_defaults_suite = [] {
     };
 };
 
+// ===================================================================
+// sql_default and column-specific INSERT integration tests
+// ===================================================================
+
+struct sql_default_test_table {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(label, varchar_type<64>)
+    COLUMN_FIELD(status, varchar_type<20>, column_attr::default_value("active"))
+};
+
+suite<"sql_default INSERT Integration"> sql_default_insert_suite = [] {
+    "positional insert with sql_default for auto_increment"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto cleanup = scope_guard{[&] {
+            (void)(db->execute(drop_table(sql_default_test_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(sql_default_test_table{}).if_exists()).has_value());
+        expect(db->execute(create_table(sql_default_test_table{})).has_value());
+
+        // Positional insert with sql_default() for auto-increment id
+        auto result = db->execute(insert_into(sql_default_test_table{})
+                                      .values(sql_default(), sql_default_test_table::label{"hello"},
+                                              sql_default_test_table::status{"custom"}));
+        expect(result.has_value()) << "positional insert with sql_default should succeed";
+
+        auto const id1 = db->last_insert_id();
+        expect(id1 >= 1u) << "auto-increment should produce id >= 1";
+
+        // Verify the inserted row
+        auto rows = db->query(
+            select(sql_default_test_table::id{}, sql_default_test_table::label{}, sql_default_test_table::status{})
+                .from(sql_default_test_table{}));
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        auto const& [id, label, status] = rows->at(0);
+        expect(id == id1);
+        expect(std::string_view(label) == "hello");
+        expect(std::string_view(status) == "custom");
+    };
+
+    "positional insert with sql_default for default_value column"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto cleanup = scope_guard{[&] {
+            (void)(db->execute(drop_table(sql_default_test_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(sql_default_test_table{}).if_exists()).has_value());
+        expect(db->execute(create_table(sql_default_test_table{})).has_value());
+
+        // Both id and status use DEFAULT
+        auto result = db->execute(insert_into(sql_default_test_table{})
+                                      .values(sql_default(), sql_default_test_table::label{"test"}, sql_default()));
+        expect(result.has_value()) << "insert with multiple defaults should succeed";
+
+        auto rows = db->query(
+            select(sql_default_test_table::label{}, sql_default_test_table::status{}).from(sql_default_test_table{}));
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        auto const& [label, status] = rows->at(0);
+        expect(std::string_view(label) == "test");
+        expect(std::string_view(status) == "active") << "status should use default 'active'";
+    };
+
+    "column-specific insert omitting auto_increment column"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto cleanup = scope_guard{[&] {
+            (void)(db->execute(drop_table(sql_default_test_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(sql_default_test_table{}).if_exists()).has_value());
+        expect(db->execute(create_table(sql_default_test_table{})).has_value());
+
+        // Column-specific: only label and status, id auto-increments
+        auto result = db->execute(insert_into(sql_default_test_table{})
+                                      .columns(sql_default_test_table::label{}, sql_default_test_table::status{})
+                                      .values("col_specific", "pending"));
+        expect(result.has_value()) << "column-specific insert should succeed";
+
+        auto const id1 = db->last_insert_id();
+        expect(id1 >= 1u);
+
+        auto rows = db->query(
+            select(sql_default_test_table::label{}, sql_default_test_table::status{}).from(sql_default_test_table{}));
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        auto const& [label, status] = rows->at(0);
+        expect(std::string_view(label) == "col_specific");
+        expect(std::string_view(status) == "pending");
+    };
+
+    "column field assigned sql_default works in struct-based insert"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto cleanup = scope_guard{[&] {
+            (void)(db->execute(drop_table(sql_default_test_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(sql_default_test_table{}).if_exists()).has_value());
+        expect(db->execute(create_table(sql_default_test_table{})).has_value());
+
+        // Assign sql_default() to column fields, then use struct-based insert
+        sql_default_test_table row;
+        row.id_ = sql_default();
+        row.label_ = "assigned";
+        row.status_ = sql_default();
+        auto result = db->execute(insert_into(sql_default_test_table{}).values(row));
+        expect(result.has_value()) << "struct-based insert with sql_default fields should succeed";
+
+        auto rows = db->query(
+            select(sql_default_test_table::label{}, sql_default_test_table::status{}).from(sql_default_test_table{}));
+        expect(fatal(rows.has_value()));
+        expect(rows->size() == 1u);
+        auto const& [label, status] = rows->at(0);
+        expect(std::string_view(label) == "assigned");
+        expect(std::string_view(status) == "active") << "status should use default 'active'";
+    };
+};
+
 }  // namespace ds_mysql
