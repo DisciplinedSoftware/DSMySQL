@@ -20,7 +20,7 @@ namespace ds_mysql {
 namespace {
 
 struct trade {
-    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
     COLUMN_FIELD(account_id, std::optional<uint32_t>)
     COLUMN_FIELD(code, varchar_type<32>)
     COLUMN_FIELD(type, varchar_type<64>)
@@ -1449,7 +1449,7 @@ suite<"Typed Query Column Count Coverage"> typed_query_col_count_suite = [] {
 // ===================================================================
 
 struct auto_inc_row {
-    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
     COLUMN_FIELD(label, varchar_type<64>)
 };
 
@@ -1770,6 +1770,54 @@ suite<"prepared_statement Integration"> prepared_statement_integration_suite = [
         using row_t = std::tuple<uint64_t>;
         auto rows = stmt->query<row_t>();
         expect(!rows.has_value()) << "should fail with parameter mismatch";
+    };
+};
+
+// ===================================================================
+// Column attribute defaults integration
+// ===================================================================
+
+struct default_values_table {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(status, varchar_type<20>, column_attr::default_value("active"))
+    COLUMN_FIELD(counter, int32_t, column_attr::default_value(0))
+    COLUMN_FIELD(ratio, double, column_attr::default_value(1.5))
+    COLUMN_FIELD(created_at, datetime_type<>, column_attr::default_value(current_timestamp))
+    COLUMN_FIELD(updated_at, datetime_type<>, column_attr::default_value(current_timestamp),
+                 column_attr::on_update(current_timestamp))
+};
+
+suite<"Column Attribute Defaults Integration"> column_attr_defaults_suite = [] {
+    "create_table with typed defaults succeeds on live MySQL"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(default_values_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(default_values_table{}).if_exists()).has_value());
+        auto result = db->execute(create_table(default_values_table{}));
+        expect(result.has_value()) << "CREATE TABLE with defaults failed";
+    };
+
+    "validate_table accepts table created with typed defaults"_test = [] {
+        auto const config = mysql_config_from_env();
+        expect(fatal(config.has_value()));
+
+        auto const db = mysql_connection::connect(*config);
+        expect(fatal(db));
+        auto _ = scope_guard{[&] {
+            (void)(db->execute(drop_table(default_values_table{}).if_exists()));
+        }};
+
+        expect(db->execute(drop_table(default_values_table{}).if_exists()).has_value());
+        expect(db->execute(create_table(default_values_table{})).has_value());
+
+        auto validation = db->validate_table(default_values_table{});
+        expect(validation.has_value()) << "validate_table failed";
     };
 };
 

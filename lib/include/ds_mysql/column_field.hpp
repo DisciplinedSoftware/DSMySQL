@@ -16,6 +16,69 @@
 namespace ds_mysql {
 
 // ===================================================================
+// default_value type compatibility
+// ===================================================================
+
+namespace column_field_detail {
+
+// Strip std::optional wrapper to get the base column type.
+template <typename T>
+struct unwrap_optional_for_default {
+    using type = T;
+};
+template <typename T>
+struct unwrap_optional_for_default<std::optional<T>> {
+    using type = T;
+};
+template <typename T>
+using unwrap_optional_for_default_t = typename unwrap_optional_for_default<T>::type;
+
+// Check whether ValueType is a valid default / on_update value for ColumnType.
+template <typename ColumnType, typename ValueType>
+consteval bool is_compatible_column_value() {
+    using CT = unwrap_optional_for_default_t<ColumnType>;
+
+    if constexpr (std::is_same_v<ValueType, current_timestamp_t>) {
+        return std::is_same_v<CT, std::chrono::system_clock::time_point> || is_datetime_type_v<CT> ||
+               is_timestamp_type_v<CT>;
+    } else if constexpr (std::is_integral_v<CT>) {
+        return std::is_integral_v<ValueType>;
+    } else if constexpr (std::is_floating_point_v<CT>) {
+        return std::is_arithmetic_v<ValueType>;
+    } else if constexpr (requires { typename CT::underlying_type; }) {
+        // Formatted numeric types (int_type, decimal_type, etc.)
+        return is_compatible_column_value<typename CT::underlying_type, ValueType>();
+    } else if constexpr (is_varchar_type_v<CT> || is_text_type_v<CT> || std::is_same_v<CT, std::string>) {
+        return is_fixed_string_v<ValueType>;
+    } else {
+        return false;
+    }
+}
+
+// Validate that all typed attrs in the pack are type-compatible with ColumnType.
+template <typename ColumnType, auto... Attrs>
+struct attr_type_compat {
+    static constexpr bool value = true;
+};
+
+template <typename ColumnType, auto First, auto... Rest>
+struct attr_type_compat<ColumnType, First, Rest...> {
+    static constexpr bool value = [] {
+        if constexpr (is_default_value_attr_v<decltype(First)>) {
+            return is_compatible_column_value<ColumnType, decltype(First.val)>() &&
+                   attr_type_compat<ColumnType, Rest...>::value;
+        } else if constexpr (is_on_update_attr_v<decltype(First)>) {
+            return is_compatible_column_value<ColumnType, decltype(First.val)>() &&
+                   attr_type_compat<ColumnType, Rest...>::value;
+        } else {
+            return attr_type_compat<ColumnType, Rest...>::value;
+        }
+    }();
+};
+
+}  // namespace column_field_detail
+
+// ===================================================================
 // column_field<Name, T> — the only user-facing form
 // ===================================================================
 
@@ -23,9 +86,8 @@ namespace ds_mysql {
  * column_field<Name, T, Attrs...> — named column descriptor.
  *
  * Name is the SQL column name embedded directly as a string literal.
- * T is the stored value type. Attrs are optional typed DDL modifiers
- * (column_attr::*). All constructors and operators are inherited from the
- * internal base type (defined in the adapter headers).
+ * T is the stored value type. Attrs are optional instance-based DDL
+ * modifiers (column_attr::*, fk_attr::*) passed as NTTP values.
  *
  *   using id     = column_field<"id",     uint32_t>;
  *   using ticker = column_field<"ticker", varchar_type<32>>;
@@ -37,31 +99,44 @@ namespace ds_mysql {
  *
  * SQL column names: "id", "ticker", "sector"
  */
-template <fixed_string Name, typename T, typename... Attrs>
+template <fixed_string Name, typename T, auto... Attrs>
 struct column_field : column_field_detail::base<T> {
     using column_field_detail::base<T>::base;
     using column_field_detail::base<T>::operator=;
 
-    static constexpr bool ddl_primary_key = (std::same_as<Attrs, column_attr::primary_key> || ...);
-    static constexpr bool ddl_auto_increment = (std::same_as<Attrs, column_attr::auto_increment> || ...);
-    static constexpr bool ddl_unique = (std::same_as<Attrs, column_attr::unique> || ...);
-    static constexpr bool ddl_default_current_timestamp =
-        (std::same_as<Attrs, column_attr::default_current_timestamp> || ...);
-    static constexpr bool ddl_on_update_current_timestamp =
-        (std::same_as<Attrs, column_attr::on_update_current_timestamp> || ...);
-    static constexpr std::string_view ddl_comment = column_field_detail::comment_attr_value<Attrs...>::value;
-    static constexpr std::string_view ddl_collate = column_field_detail::collate_attr_value<Attrs...>::value;
+    static constexpr bool ddl_primary_key = (std::is_same_v<decltype(Attrs), column_attr::primary_key> || ...);
+    static constexpr bool ddl_auto_increment = (std::is_same_v<decltype(Attrs), column_attr::auto_increment> || ...);
+    static constexpr bool ddl_unique = (std::is_same_v<decltype(Attrs), column_attr::unique> || ...);
+
+    static constexpr bool ddl_has_default = (column_field_detail::is_default_value_attr_v<decltype(Attrs)> || ...);
+    static constexpr bool ddl_has_on_update = (column_field_detail::is_on_update_attr_v<decltype(Attrs)> || ...);
+
+    static_assert(column_field_detail::attr_type_compat<T, Attrs...>::value,
+                  "default_value / on_update type must match column value type");
+
+    [[nodiscard]] static std::string ddl_default_sql() {
+        return column_field_detail::default_value_sql<Attrs...>::get();
+    }
+
+    [[nodiscard]] static std::string ddl_on_update_sql() {
+        return column_field_detail::on_update_sql<Attrs...>::get();
+    }
+
+    static constexpr std::string_view ddl_comment =
+        column_field_detail::string_attr_value<column_attr::comment, Attrs...>::value;
+    static constexpr std::string_view ddl_collate =
+        column_field_detail::string_attr_value<column_attr::collate, Attrs...>::value;
 
     // Foreign key attributes — populated only when an fk_attr::references<> is present.
-    static constexpr bool ddl_has_fk = column_field_detail::fk_references_attr<Attrs...>::has_value;
-    using ddl_fk_ref_table = typename column_field_detail::fk_references_attr<Attrs...>::ref_table;
-    using ddl_fk_ref_column = typename column_field_detail::fk_references_attr<Attrs...>::ref_column;
-    static constexpr std::string_view ddl_fk_on_delete = column_field_detail::fk_on_delete_attr<Attrs...>::value;
-    static constexpr std::string_view ddl_fk_on_update = column_field_detail::fk_on_update_attr<Attrs...>::value;
+    static constexpr bool ddl_has_fk = column_field_detail::find_fk_ref<Attrs...>::has_value;
+    using ddl_fk_ref_table = typename column_field_detail::find_fk_ref<Attrs...>::ref_table;
+    using ddl_fk_ref_column = typename column_field_detail::find_fk_ref<Attrs...>::ref_column;
+    static constexpr std::string_view ddl_fk_on_delete = column_field_detail::fk_on_delete_value<Attrs...>::value;
+    static constexpr std::string_view ddl_fk_on_update = column_field_detail::fk_on_update_value<Attrs...>::value;
 
     template <typename Attr>
     [[nodiscard]] static consteval bool has_attribute() noexcept {
-        return (std::same_as<Attr, Attrs> || ...);
+        return (std::is_same_v<decltype(Attrs), Attr> || ...);
     }
 
     [[nodiscard]] static constexpr std::string_view column_name() noexcept {
@@ -79,7 +154,7 @@ struct column_field : column_field_detail::base<T> {
  *
  * Satisfied by named column descriptors (with or without typed attributes):
  *   using id = column_field<"id", uint32_t>;
- *   using id = column_field<"id", uint32_t, column_attr::auto_increment>;
+ *   using id = column_field<"id", uint32_t, column_attr::auto_increment{}>;
  */
 template <typename T>
 concept ColumnFieldType = std::derived_from<T, column_field_tag> && requires { typename T::value_type; };
@@ -113,7 +188,7 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
 // ===================================================================
 
 /**
- * tagged_column_field<Tag, T> — tag-struct based column descriptor.
+ * tagged_column_field<Tag, T, Attrs...> — tag-struct based column descriptor.
  *
  * The SQL column name is derived at compile time from the tag type name by
  * stripping a trailing "_tag" suffix.  Unlike a plain type alias, this is a
@@ -144,7 +219,7 @@ using unwrap_column_field_t = typename unwrap_column_field<T>::type;
  *
  * Both produce the SQL column name "id" (derived from the tag name).
  */
-template <typename Tag, typename T, typename... Attrs>
+template <typename Tag, typename T, auto... Attrs>
 struct tagged_column_field : column_field<detail::column_name_from_tag<Tag>(), T, Attrs...> {
     using tag_type = Tag;
 
@@ -160,7 +235,7 @@ public:
 
 /**
  * COLUMN_FIELD(tag, type[, attrs...]) — one-liner macro to declare a tagged
- * column field, optionally with typed DDL attribute tags.
+ * column field, optionally with instance-based DDL attribute values.
  *
  * Generates a nested tag struct, a type alias, and a member variable:
  *
@@ -172,8 +247,8 @@ public:
  *
  *   COLUMN_FIELD(created_at,
  *                ::ds_mysql::timestamp_type,
- *                ::ds_mysql::column_attr::default_current_timestamp,
- *                ::ds_mysql::column_attr::on_update_current_timestamp)
+ *                ::ds_mysql::column_attr::default_value(::ds_mysql::current_timestamp),
+ *                ::ds_mysql::column_attr::on_update(::ds_mysql::current_timestamp))
  *
  * The tag struct is nested inside the enclosing class, guaranteeing
  * per-table type uniqueness and satisfying the compile-time membership

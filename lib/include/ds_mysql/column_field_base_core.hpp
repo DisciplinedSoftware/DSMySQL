@@ -13,19 +13,80 @@ namespace ds_mysql {
  */
 struct column_field_tag {};
 
+// ===================================================================
+// is_fixed_string — type trait for fixed_string<N> detection
+// ===================================================================
+
+template <typename T>
+struct is_fixed_string : std::false_type {};
+
+template <std::size_t N>
+struct is_fixed_string<fixed_string<N>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_fixed_string_v = is_fixed_string<T>::value;
+
+/// Sentinel type for SQL CURRENT_TIMESTAMP keyword.
+struct current_timestamp_t {};
+inline constexpr current_timestamp_t current_timestamp{};
+
 namespace column_attr {
 
 struct primary_key {};
 struct auto_increment {};
 struct unique {};
-struct default_current_timestamp {};
-struct on_update_current_timestamp {};
 
-template <fixed_string Text>
-struct comment {};
+/**
+ * default_value<T> — typed column DEFAULT attribute.
+ *
+ * The value type must match the column's value type (or underlying type
+ * for wrapper types). String defaults use fixed_string via CTAD from
+ * string literals:
+ *
+ *   column_attr::default_value(0)                    // integral
+ *   column_attr::default_value(1.0)                  // floating-point
+ *   column_attr::default_value("active")             // string (auto-quoted in SQL)
+ *   default_value(ds_mysql::current_timestamp)    // temporal
+ */
+template <typename T>
+struct default_value {
+    T val;
+    consteval default_value(T v) : val(v) {
+    }
+};
 
-template <fixed_string Name>
-struct collate {};
+template <std::size_t N>
+default_value(char const (&)[N]) -> default_value<fixed_string<N>>;
+
+/**
+ * on_update<T> — typed column ON UPDATE attribute.
+ *
+ *   on_update(ds_mysql::current_timestamp)    // ON UPDATE CURRENT_TIMESTAMP
+ */
+template <typename T>
+struct on_update {
+    T val;
+    consteval on_update(T v) : val(v) {
+    }
+};
+
+template <std::size_t N>
+struct comment {
+    fixed_string<N> value;
+    consteval comment(char const (&str)[N]) : value(str) {
+    }
+};
+template <std::size_t N>
+comment(char const (&)[N]) -> comment<N>;
+
+template <std::size_t N>
+struct collate {
+    fixed_string<N> value;
+    consteval collate(char const (&str)[N]) : value(str) {
+    }
+};
+template <std::size_t N>
+collate(char const (&)[N]) -> collate<N>;
 
 }  // namespace column_attr
 
@@ -47,116 +108,209 @@ struct on_update_no_action {};
 }  // namespace fk_attr
 
 // ===================================================================
-// column_field_detail — internal base specializations (core)
+// column_field_detail — attribute extraction for auto... NTTP packs
 // ===================================================================
 
 namespace column_field_detail {
 
-template <typename... Attrs>
-struct comment_attr_value {
+// is_attr_instance — true when T is Tmpl<N> for some N.
+template <typename T, template <std::size_t> class Tmpl>
+struct is_attr_instance : std::false_type {};
+
+template <std::size_t N, template <std::size_t> class Tmpl>
+struct is_attr_instance<Tmpl<N>, Tmpl> : std::true_type {};
+
+// is_default_value_attr — true when T is column_attr::default_value<V> for some V.
+template <typename T>
+struct is_default_value_attr : std::false_type {};
+
+template <typename V>
+struct is_default_value_attr<column_attr::default_value<V>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_default_value_attr_v = is_default_value_attr<T>::value;
+
+// is_on_update_attr — true when T is column_attr::on_update<V> for some V.
+template <typename T>
+struct is_on_update_attr : std::false_type {};
+
+template <typename V>
+struct is_on_update_attr<column_attr::on_update<V>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_on_update_attr_v = is_on_update_attr<T>::value;
+
+// string_attr_value — extracts the string value from the first matching
+// value-carrying attribute (comment, collate) in an auto... pack.
+template <template <std::size_t> class AttrTmpl, auto... Attrs>
+struct string_attr_value {
     static constexpr std::string_view value = "";
 };
 
-template <fixed_string Text, typename... Rest>
-struct comment_attr_value<column_attr::comment<Text>, Rest...> {
-    static constexpr std::string_view value = Text;
+template <template <std::size_t> class AttrTmpl, auto First, auto... Rest>
+struct string_attr_value<AttrTmpl, First, Rest...> {
+    static constexpr std::string_view value = [] {
+        if constexpr (is_attr_instance<decltype(First), AttrTmpl>::value) {
+            return std::string_view(First.value);
+        } else {
+            return string_attr_value<AttrTmpl, Rest...>::value;
+        }
+    }();
 };
 
-template <typename First, typename... Rest>
-struct comment_attr_value<First, Rest...> {
-    static constexpr std::string_view value = comment_attr_value<Rest...>::value;
+// ===================================================================
+// default_value SQL literal formatting
+// ===================================================================
+
+template <typename T>
+    requires std::is_integral_v<T>
+std::string format_sql_default(T val) {
+    return std::to_string(val);
+}
+
+template <typename T>
+    requires std::is_floating_point_v<T>
+std::string format_sql_default(T val) {
+    auto s = std::to_string(val);
+    auto dot = s.find('.');
+    if (dot != std::string::npos) {
+        auto last = s.find_last_not_of('0');
+        if (last == dot)
+            last++;
+        s.erase(last + 1);
+    }
+    return s;
+}
+
+template <std::size_t N>
+std::string format_sql_default(fixed_string<N> const& val) {
+    std::string result = "'";
+    result += std::string_view(val);
+    result += "'";
+    return result;
+}
+
+inline std::string format_sql_default(current_timestamp_t) {
+    return "CURRENT_TIMESTAMP";
+}
+
+// default_value_sql — finds the default_value attr and formats its value as SQL.
+template <auto... Attrs>
+struct default_value_sql {
+    static std::string get() {
+        return "";
+    }
 };
 
-template <typename... Attrs>
-struct collate_attr_value {
-    static constexpr std::string_view value = "";
+template <auto First, auto... Rest>
+struct default_value_sql<First, Rest...> {
+    static std::string get() {
+        if constexpr (is_default_value_attr_v<decltype(First)>) {
+            return format_sql_default(First.val);
+        } else {
+            return default_value_sql<Rest...>::get();
+        }
+    }
 };
 
-template <fixed_string Name, typename... Rest>
-struct collate_attr_value<column_attr::collate<Name>, Rest...> {
-    static constexpr std::string_view value = Name;
+// on_update_sql — finds the on_update attr and formats its value as SQL.
+template <auto... Attrs>
+struct on_update_sql {
+    static std::string get() {
+        return "";
+    }
 };
 
-template <typename First, typename... Rest>
-struct collate_attr_value<First, Rest...> {
-    static constexpr std::string_view value = collate_attr_value<Rest...>::value;
+template <auto First, auto... Rest>
+struct on_update_sql<First, Rest...> {
+    static std::string get() {
+        if constexpr (is_on_update_attr_v<decltype(First)>) {
+            return format_sql_default(First.val);
+        } else {
+            return on_update_sql<Rest...>::get();
+        }
+    }
 };
 
-// fk_references_attr — detects fk_attr::references<RefTable, RefColumn> in Attrs.
-template <typename... Attrs>
-struct fk_references_attr {
+// ===================================================================
+// FK attribute extraction
+// ===================================================================
+
+// is_fk_references — true when T is fk_attr::references<RT, RC>.
+template <typename T>
+struct is_fk_references : std::false_type {};
+
+template <typename RT, typename RC>
+struct is_fk_references<fk_attr::references<RT, RC>> : std::true_type {};
+
+// fk_ref_from_type — extracts ref_table / ref_column from a references type.
+template <typename T>
+struct fk_ref_from_type {
     static constexpr bool has_value = false;
     using ref_table = void;
     using ref_column = void;
 };
 
-template <typename RefTable, typename RefColumn, typename... Rest>
-struct fk_references_attr<fk_attr::references<RefTable, RefColumn>, Rest...> {
+template <typename RT, typename RC>
+struct fk_ref_from_type<fk_attr::references<RT, RC>> {
     static constexpr bool has_value = true;
-    using ref_table = RefTable;
-    using ref_column = RefColumn;
+    using ref_table = RT;
+    using ref_column = RC;
 };
 
-template <typename First, typename... Rest>
-struct fk_references_attr<First, Rest...> : fk_references_attr<Rest...> {};
+// find_fk_ref — searches an auto... pack for an fk_attr::references<> instance.
+template <auto... Attrs>
+struct find_fk_ref : fk_ref_from_type<void> {};
 
-// fk_on_delete_attr — extracts the on_delete referential action string.
-template <typename... Attrs>
-struct fk_on_delete_attr {
+template <auto First, auto... Rest>
+struct find_fk_ref<First, Rest...> : std::conditional_t<is_fk_references<decltype(First)>::value,
+                                                        fk_ref_from_type<decltype(First)>, find_fk_ref<Rest...>> {};
+
+// fk_on_delete_value — extracts the ON DELETE action string from an auto... pack.
+template <auto... Attrs>
+struct fk_on_delete_value {
     static constexpr std::string_view value = "";
 };
 
-template <typename... Rest>
-struct fk_on_delete_attr<fk_attr::on_delete_restrict, Rest...> {
-    static constexpr std::string_view value = "RESTRICT";
+template <auto First, auto... Rest>
+struct fk_on_delete_value<First, Rest...> {
+    static constexpr std::string_view value = [] {
+        using FT = decltype(First);
+        if constexpr (std::is_same_v<FT, fk_attr::on_delete_restrict>)
+            return std::string_view("RESTRICT");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_delete_cascade>)
+            return std::string_view("CASCADE");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_delete_set_null>)
+            return std::string_view("SET NULL");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_delete_no_action>)
+            return std::string_view("NO ACTION");
+        else
+            return fk_on_delete_value<Rest...>::value;
+    }();
 };
 
-template <typename... Rest>
-struct fk_on_delete_attr<fk_attr::on_delete_cascade, Rest...> {
-    static constexpr std::string_view value = "CASCADE";
-};
-
-template <typename... Rest>
-struct fk_on_delete_attr<fk_attr::on_delete_set_null, Rest...> {
-    static constexpr std::string_view value = "SET NULL";
-};
-
-template <typename... Rest>
-struct fk_on_delete_attr<fk_attr::on_delete_no_action, Rest...> {
-    static constexpr std::string_view value = "NO ACTION";
-};
-
-template <typename First, typename... Rest>
-struct fk_on_delete_attr<First, Rest...> : fk_on_delete_attr<Rest...> {};
-
-// fk_on_update_attr — extracts the on_update referential action string.
-template <typename... Attrs>
-struct fk_on_update_attr {
+// fk_on_update_value — extracts the ON UPDATE action string from an auto... pack.
+template <auto... Attrs>
+struct fk_on_update_value {
     static constexpr std::string_view value = "";
 };
 
-template <typename... Rest>
-struct fk_on_update_attr<fk_attr::on_update_restrict, Rest...> {
-    static constexpr std::string_view value = "RESTRICT";
+template <auto First, auto... Rest>
+struct fk_on_update_value<First, Rest...> {
+    static constexpr std::string_view value = [] {
+        using FT = decltype(First);
+        if constexpr (std::is_same_v<FT, fk_attr::on_update_restrict>)
+            return std::string_view("RESTRICT");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_update_cascade>)
+            return std::string_view("CASCADE");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_update_set_null>)
+            return std::string_view("SET NULL");
+        else if constexpr (std::is_same_v<FT, fk_attr::on_update_no_action>)
+            return std::string_view("NO ACTION");
+        else
+            return fk_on_update_value<Rest...>::value;
+    }();
 };
-
-template <typename... Rest>
-struct fk_on_update_attr<fk_attr::on_update_cascade, Rest...> {
-    static constexpr std::string_view value = "CASCADE";
-};
-
-template <typename... Rest>
-struct fk_on_update_attr<fk_attr::on_update_set_null, Rest...> {
-    static constexpr std::string_view value = "SET NULL";
-};
-
-template <typename... Rest>
-struct fk_on_update_attr<fk_attr::on_update_no_action, Rest...> {
-    static constexpr std::string_view value = "NO ACTION";
-};
-
-template <typename First, typename... Rest>
-struct fk_on_update_attr<First, Rest...> : fk_on_update_attr<Rest...> {};
 
 // ===================================================================
 // Primary base<T> template and generic specializations

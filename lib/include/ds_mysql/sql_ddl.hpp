@@ -1033,17 +1033,17 @@ template <typename T, std::size_t I>
     if constexpr (requires { field_type::ddl_unique; } && field_type::ddl_unique) {
         col += " UNIQUE";
     }
-    if constexpr (requires { field_type::ddl_default_current_timestamp; } &&
-                  field_type::ddl_default_current_timestamp) {
-        col += " DEFAULT CURRENT_TIMESTAMP";
+    if constexpr (requires { field_type::ddl_has_default; } && field_type::ddl_has_default) {
+        col += " DEFAULT ";
+        col += field_type::ddl_default_sql();
     }
     if constexpr (requires { field_type::ddl_collate; } && !field_type::ddl_collate.empty()) {
         col += " COLLATE ";
         col += field_type::ddl_collate;
     }
-    if constexpr (requires { field_type::ddl_on_update_current_timestamp; } &&
-                  field_type::ddl_on_update_current_timestamp) {
-        col += " ON UPDATE CURRENT_TIMESTAMP";
+    if constexpr (requires { field_type::ddl_has_on_update; } && field_type::ddl_has_on_update) {
+        col += " ON UPDATE ";
+        col += field_type::ddl_on_update_sql();
     }
     if constexpr (requires { field_type::ddl_comment; } && !field_type::ddl_comment.empty()) {
         col += " COMMENT ";

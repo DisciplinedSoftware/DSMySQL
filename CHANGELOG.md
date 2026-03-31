@@ -14,6 +14,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `transaction_guard` — RAII scoped transaction helper; `transaction_guard::begin(conn)` disables autocommit, destructor auto-rolls-back unless `commit()` is called; also provides explicit `rollback()`
 - CTE fluent API — `with(cte("name", query)).select(...).from(cte_ref{"name"})` and `with(recursive(cte("name", sql))).select(...)` replace the old `with_cte()`/`with_recursive_cte()` builders
 - `sql_predicates.hpp` — predicates, operators, and `col_expr`/`col_ref` extracted from `sql_core.hpp` into their own header for readability
+- `column_attr::default_value(V)` — typed `DEFAULT` attribute for any column type; value type is validated at compile time against the column type (e.g. `default_value(0)` for `int32_t`, `default_value("active")` for `varchar_type<N>`, `default_value(current_timestamp)` for temporal types)
+- `column_attr::on_update(V)` — typed `ON UPDATE` attribute (e.g. `on_update(current_timestamp)`)
+- `current_timestamp` — sentinel value in `ds_mysql` namespace, used with `default_value` and `on_update` for temporal columns
 
 ### Changed
 
@@ -21,12 +24,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `column_traits<T>` removed — callers now use `T::column_name()` and `T::value_type` directly
 - `qual<Col>` now derives the table name from the tag type via compile-time reflection, replacing the old `col<T,I>` approach
 - `sql_core.hpp` reduced from ~1 035 to ~340 lines via the predicate extraction
+- Column attributes are now instance-based NTTPs (`auto... Attrs`) instead of type parameters (`typename... Attrs`) — marker attributes use `{}` syntax (e.g. `column_attr::primary_key{}`), parametric attributes use constructor syntax (e.g. `column_attr::comment("...")`, `column_attr::collate("...")`)
 
 ### Removed
 
 - `col<Table, Index>` (`col.hpp`) — index-based column descriptor removed; use `tagged_column_field` (or `COLUMN_FIELD` macro) instead
 - `col_of<&T::field>` — member-pointer column alias removed alongside `col<T,I>`
 - `cte_builder`, `with_cte()`, `with_recursive_cte()` — replaced by the new `with(cte(...))` fluent API
+- `column_attr::default_current_timestamp` and `column_attr::on_update_current_timestamp` — replaced by `default_value(current_timestamp)` and `on_update(current_timestamp)`
 
 ---
 

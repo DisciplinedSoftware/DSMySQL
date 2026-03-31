@@ -186,10 +186,10 @@ struct symbol_with_indexes {
 struct audit_log {
     COLUMN_FIELD(id, uint32_t)
     COLUMN_FIELD(event_type, varchar_type<64>)
-    COLUMN_FIELD(user_id, uint32_t, column_attr::comment<"User who triggered the event">)
+    COLUMN_FIELD(user_id, uint32_t, column_attr::comment("User who triggered the event"))
     COLUMN_FIELD(description, varchar_type<255>)
-    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_current_timestamp,
-                 column_attr::on_update_current_timestamp)
+    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_value(current_timestamp),
+                 column_attr::on_update(current_timestamp))
 };
 
 struct table_with_attrs {
@@ -198,8 +198,53 @@ struct table_with_attrs {
 };
 
 struct table_with_pk {
-    COLUMN_FIELD(id, uint32_t, column_attr::primary_key, column_attr::auto_increment)
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
     COLUMN_FIELD(name, varchar_type<255>)
+};
+
+struct table_with_defaults {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(status, varchar_type<20>, column_attr::default_value("active"))
+    COLUMN_FIELD(counter, int32_t, column_attr::default_value(0))
+    COLUMN_FIELD(ratio, double, column_attr::default_value(1.5))
+    COLUMN_FIELD(created_at, std::chrono::system_clock::time_point, column_attr::default_value(current_timestamp))
+    COLUMN_FIELD(updated_at, std::chrono::system_clock::time_point, column_attr::on_update(current_timestamp))
+};
+
+struct table_with_unique {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(email, varchar_type<255>, column_attr::unique{})
+};
+
+struct table_with_formatted_numeric_defaults {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(price, decimal_type<10, 2>, column_attr::default_value(0))
+    COLUMN_FIELD(score, float_type<>, column_attr::default_value(0.0f))
+    COLUMN_FIELD(factor, double_type<>, column_attr::default_value(1.0))
+};
+
+struct table_with_nullable_default {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(nickname, std::optional<varchar_type<64>>, column_attr::default_value("anonymous"))
+    COLUMN_FIELD(score, std::optional<int32_t>, column_attr::default_value(0))
+};
+
+struct table_with_bool_default {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(active, bool, column_attr::default_value(true))
+    COLUMN_FIELD(deleted, bool, column_attr::default_value(false))
+};
+
+struct table_with_collate {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(name, varchar_type<100>, column_attr::collate("utf8mb4_unicode_ci"))
+};
+
+struct table_with_temporal_defaults {
+    COLUMN_FIELD(id, uint32_t, column_attr::primary_key{}, column_attr::auto_increment{})
+    COLUMN_FIELD(started_at, datetime_type<>, column_attr::default_value(current_timestamp))
+    COLUMN_FIELD(recorded_at, timestamp_type<>, column_attr::default_value(current_timestamp),
+                 column_attr::on_update(current_timestamp))
 };
 }  // namespace
 
@@ -796,6 +841,63 @@ suite<"DDL"> ddl_suite = [] {
                "    description VARCHAR(255) NOT NULL,\n"
                "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP\n"
                ") DEFAULT CHARSET=utf8;\n"s)
+            << sql;
+    };
+
+    "create_table with default_value - emits DEFAULT for various types"_test = [] {
+        auto const sql = create_table(table_with_defaults{}).build_sql();
+        expect(sql ==
+               "CREATE TABLE table_with_defaults (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    status VARCHAR(20) NOT NULL DEFAULT 'active',\n"
+               "    counter INT NOT NULL DEFAULT 0,\n"
+               "    ratio DOUBLE NOT NULL DEFAULT 1.5,\n"
+               "    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+               "    updated_at DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_table - column_attr::unique emits UNIQUE"_test = [] {
+        auto const sql = create_table(table_with_unique{}).build_sql();
+        expect(sql ==
+               "CREATE TABLE table_with_unique (\n"
+               "    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,\n"
+               "    email VARCHAR(255) NOT NULL UNIQUE\n"
+               ");\n"s)
+            << sql;
+    };
+
+    "create_table with default_value - formatted numeric types"_test = [] {
+        auto const sql = create_table(table_with_formatted_numeric_defaults{}).build_sql();
+        expect(sql.contains("price DECIMAL(10,2) NOT NULL DEFAULT 0")) << sql;
+        expect(sql.contains("score FLOAT NOT NULL DEFAULT 0")) << sql;
+        expect(sql.contains("factor DOUBLE NOT NULL DEFAULT 1")) << sql;
+    };
+
+    "create_table with default_value - nullable columns"_test = [] {
+        auto const sql = create_table(table_with_nullable_default{}).build_sql();
+        expect(sql.contains("nickname VARCHAR(64) DEFAULT 'anonymous'")) << sql;
+        expect(sql.contains("score INT DEFAULT 0")) << sql;
+        // nullable columns omit NOT NULL
+        expect(!sql.contains("nickname VARCHAR(64) NOT NULL")) << sql;
+    };
+
+    "create_table with default_value - bool columns"_test = [] {
+        auto const sql = create_table(table_with_bool_default{}).build_sql();
+        expect(sql.contains("active BOOLEAN NOT NULL DEFAULT 1")) << sql;
+        expect(sql.contains("deleted BOOLEAN NOT NULL DEFAULT 0")) << sql;
+    };
+
+    "create_table with collate - emits COLLATE on column"_test = [] {
+        auto const sql = create_table(table_with_collate{}).build_sql();
+        expect(sql.contains("name VARCHAR(100) NOT NULL COLLATE utf8mb4_unicode_ci")) << sql;
+    };
+
+    "create_table with temporal defaults - datetime_type and timestamp_type"_test = [] {
+        auto const sql = create_table(table_with_temporal_defaults{}).build_sql();
+        expect(sql.contains("started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP")) << sql;
+        expect(sql.contains("recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
             << sql;
     };
 
@@ -1401,13 +1503,13 @@ struct parent_table {
 
 struct child_table {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{})
 };
 
 struct child_table_cascade {
     COLUMN_FIELD(id, uint32_t)
-    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>, fk_attr::on_delete_cascade,
-                 fk_attr::on_update_cascade)
+    COLUMN_FIELD(parent_id, uint32_t, fk_attr::references<parent_table, parent_table::id>{},
+                 fk_attr::on_delete_cascade{}, fk_attr::on_update_cascade{})
 };
 }  // namespace
 

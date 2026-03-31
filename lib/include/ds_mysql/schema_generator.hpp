@@ -336,9 +336,9 @@ template <typename T, std::size_t Index>
 //   struct child_table {
 //       COLUMN_FIELD(id, uint32_t)
 //       COLUMN_FIELD(parent_id, uint32_t,
-//                    fk_attr::references<parent_table, parent_table::id>,
-//                    fk_attr::on_delete_cascade,
-//                    fk_attr::on_update_cascade)
+//                    fk_attr::references<parent_table, parent_table::id>{},
+//                    fk_attr::on_delete_cascade{},
+//                    fk_attr::on_update_cascade{})
 //   };
 //
 // The SQL referenced table name is derived from table_name_for<RefTable>
