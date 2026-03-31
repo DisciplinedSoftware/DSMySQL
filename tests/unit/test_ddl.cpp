@@ -2264,3 +2264,133 @@ suite<"DDL triggers"> ddl_trigger_suite = [] {
         expect(sql == "DROP TRIGGER IF EXISTS trg_before_insert"s) << sql;
     };
 };
+
+// ===================================================================
+// DDL — Composition API: create(descriptor) / drop(descriptor)
+// ===================================================================
+
+suite<"DDL composition"> ddl_composition_suite = [] {
+    // --- create(table(...)) ---
+    "create(table) - equivalent to create_table"_test = [] {
+        auto const sql = create(table(test_table{})).build_sql();
+        auto const expected = create_table(test_table{}).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    "create(table).if_not_exists - chains correctly"_test = [] {
+        auto const sql = create(table(test_table{})).if_not_exists().build_sql();
+        auto const expected = create_table(test_table{}).if_not_exists().build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- create(view(...)) ---
+    "create(view) - equivalent to create_view"_test = [] {
+        auto const sql = create(view(new_table{})).as(select(test_table::id{}).from(test_table{})).build_sql();
+        auto const expected = create_view(new_table{}).as(select(test_table::id{}).from(test_table{})).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- create(database(...)) ---
+    "create(database) - equivalent to create_database"_test = [] {
+        auto const sql = create(database(test_db{})).build_sql();
+        auto const expected = create_database(test_db{}).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- create(procedure(...)) ---
+    "create(procedure) - equivalent to create_procedure"_test = [] {
+        auto const sql = create(procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;")).build_sql();
+        auto const expected =
+            create_procedure(procedure_id<"usp_add">{}, "IN a INT, IN b INT", "SELECT a + b;").build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- create(function(...)) ---
+    "create(function) - equivalent to create_function"_test = [] {
+        auto const sql = create(function(function_id<"fn_add">{}, "a INT, b INT", "INT", "RETURN a + b;")).build_sql();
+        auto const expected =
+            create_function(function_id<"fn_add">{}, "a INT, b INT", "INT", "RETURN a + b;").build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    "create(function).deterministic - chains correctly"_test = [] {
+        auto const sql = create(function(function_id<"fn_dbl">{}, "x INT", "INT", "RETURN x * 2;"))
+                             .deterministic()
+                             .build_sql();
+        auto const expected =
+            create_function(function_id<"fn_dbl">{}, "x INT", "INT", "RETURN x * 2;").deterministic().build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- create(trigger<T>(...)) ---
+    "create(trigger) - equivalent to create_trigger"_test = [] {
+        auto const sql =
+            create(trigger<test_table>(trigger_id<"trg_bi">{}, TriggerTiming::Before, TriggerEvent::Insert,
+                                       "SET NEW.name = UPPER(NEW.name);"))
+                .build_sql();
+        auto const expected = create_trigger<test_table>(trigger_id<"trg_bi">{}, TriggerTiming::Before,
+                                                          TriggerEvent::Insert, "SET NEW.name = UPPER(NEW.name);")
+                                  .build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- drop(table(...)) ---
+    "drop(table) - equivalent to drop_table"_test = [] {
+        auto const sql = drop(table(test_table{})).build_sql();
+        auto const expected = drop_table(test_table{}).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    "drop(table).if_exists - chains correctly"_test = [] {
+        auto const sql = drop(table(test_table{})).if_exists().build_sql();
+        auto const expected = drop_table(test_table{}).if_exists().build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- drop(view(...)) ---
+    "drop(view) - equivalent to drop_view"_test = [] {
+        auto const sql = drop(view(new_table{})).build_sql();
+        auto const expected = drop_view(new_table{}).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- drop(database(...)) ---
+    "drop(database) - equivalent to drop_database"_test = [] {
+        auto const sql = drop(database(test_db{})).build_sql();
+        auto const expected = drop_database(test_db{}).build_sql();
+        expect(sql == expected) << sql;
+    };
+
+    // --- drop(procedure_id) ---
+    "drop(procedure_id) - equivalent to drop_procedure"_test = [] {
+        auto const sql = drop(procedure_id<"usp_hello">{}).build_sql();
+        expect(sql == "DROP PROCEDURE usp_hello"s) << sql;
+    };
+
+    "drop(procedure_id).if_exists - chains correctly"_test = [] {
+        auto const sql = drop(procedure_id<"usp_hello">{}).if_exists().build_sql();
+        expect(sql == "DROP PROCEDURE IF EXISTS usp_hello"s) << sql;
+    };
+
+    // --- drop(function_id) ---
+    "drop(function_id) - equivalent to drop_function"_test = [] {
+        auto const sql = drop(function_id<"fn_hello">{}).build_sql();
+        expect(sql == "DROP FUNCTION fn_hello"s) << sql;
+    };
+
+    "drop(function_id).if_exists - chains correctly"_test = [] {
+        auto const sql = drop(function_id<"fn_hello">{}).if_exists().build_sql();
+        expect(sql == "DROP FUNCTION IF EXISTS fn_hello"s) << sql;
+    };
+
+    // --- drop(trigger_id) ---
+    "drop(trigger_id) - generates DROP TRIGGER"_test = [] {
+        auto const sql = drop(trigger_id<"trg_bi">{}).build_sql();
+        expect(sql == "DROP TRIGGER trg_bi"s) << sql;
+    };
+
+    "drop(trigger_id).if_exists - chains correctly"_test = [] {
+        auto const sql = drop(trigger_id<"trg_bi">{}).if_exists().build_sql();
+        expect(sql == "DROP TRIGGER IF EXISTS trg_bi"s) << sql;
+    };
+};

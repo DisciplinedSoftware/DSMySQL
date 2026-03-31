@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `function_id<"name">` — compile-time identifier for stored functions
 - `create_function(function_id<"name">{}, params, returns, body)` — type-safe CREATE FUNCTION builder with optional `.deterministic()`, `.no_sql()`, `.reads_sql_data()`, `.modifies_sql_data()` characteristics
 - `drop_function(function_id<"name">{})` — DROP FUNCTION builder with `.if_exists()` support
+- Composition API — `create(descriptor)` / `drop(descriptor)` alternative syntax that separates verb from object: `create(table(T{}))`, `create(view(T{}))`, `create(database(DB{}))`, `create(procedure(...))`, `create(function(...))`, `create(trigger<T>(...))`, and matching `drop()` overloads; all return the same builders as the `create_*`/`drop_*` functions
 
 ---
 

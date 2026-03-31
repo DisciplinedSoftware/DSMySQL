@@ -2861,4 +2861,161 @@ template <ValidTable T, fixed_string Name>
     return ddl_detail::drop_trigger_builder<Name, T>{id};
 }
 
+// ===================================================================
+// Composition API — create(descriptor) / drop(descriptor)
+//
+// Alternative syntax that separates the verb from the object:
+//   create(table(T{}))               ≡ create_table(T{})
+//   create(view(T{}))                ≡ create_view(T{})
+//   create(database(DB{}))           ≡ create_database(DB{})
+//   create(procedure(id, p, b))      ≡ create_procedure(id, p, b)
+//   create(function(id, p, r, b))    ≡ create_function(id, p, r, b)
+//   create(trigger<T>(id, t, e, b))  ≡ create_trigger<T>(id, t, e, b)
+//
+//   drop(table(T{}))                 ≡ drop_table(T{})
+//   drop(view(T{}))                  ≡ drop_view(T{})
+//   drop(database(DB{}))             ≡ drop_database(DB{})
+//   drop(procedure_id<"name">{})     ≡ drop_procedure(procedure_id<"name">{})
+//   drop(function_id<"name">{})      ≡ drop_function(function_id<"name">{})
+//   drop(trigger_id<"name">{})       ≡ drop_trigger<…>(trigger_id<"name">{})
+//
+// All returned builders are identical to those from the create_*/drop_*
+// functions, so .if_exists(), .if_not_exists(), .deterministic(), etc.
+// chain as usual.
+// ===================================================================
+
+namespace ddl_detail {
+
+template <typename T>
+struct table_desc {};
+
+template <typename T>
+struct view_desc {};
+
+template <typename T>
+struct database_desc {};
+
+template <fixed_string Name, typename T>
+struct trigger_desc {
+    TriggerTiming timing;
+    TriggerEvent event;
+    std::string body;
+};
+
+template <fixed_string Name>
+struct procedure_desc {
+    std::string params;
+    std::string body;
+};
+
+template <fixed_string Name>
+struct function_desc {
+    std::string params;
+    std::string returns;
+    std::string body;
+};
+
+}  // namespace ddl_detail
+
+// --- descriptor factories ---
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::table_desc<T> table(T const&) {
+    return {};
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::view_desc<T> view(T const&) {
+    return {};
+}
+
+template <Database T>
+[[nodiscard]] ddl_detail::database_desc<T> database(T const&) {
+    return {};
+}
+
+template <ValidTable T, fixed_string Name>
+[[nodiscard]] ddl_detail::trigger_desc<Name, T> trigger(trigger_id<Name> const&, TriggerTiming timing,
+                                                         TriggerEvent event, std::string body) {
+    return {timing, event, std::move(body)};
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::procedure_desc<Name> procedure(procedure_id<Name> const&, std::string params,
+                                                          std::string body) {
+    return {std::move(params), std::move(body)};
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::function_desc<Name> function(function_id<Name> const&, std::string params,
+                                                        std::string returns, std::string body) {
+    return {std::move(params), std::move(returns), std::move(body)};
+}
+
+// --- create() dispatchers ---
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::create_table_builder<T> create(ddl_detail::table_desc<T> const&) {
+    return create_table(T{});
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::create_view_builder<T> create(ddl_detail::view_desc<T> const&) {
+    return create_view(T{});
+}
+
+template <Database T>
+[[nodiscard]] ddl_detail::create_database_builder<T> create(ddl_detail::database_desc<T> const&) {
+    return create_database(T{});
+}
+
+template <fixed_string Name, typename T>
+[[nodiscard]] ddl_detail::create_trigger_builder<Name, T> create(ddl_detail::trigger_desc<Name, T> desc) {
+    return {trigger_id<Name>{}, desc.timing, desc.event, std::move(desc.body)};
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::create_procedure_builder<Name> create(ddl_detail::procedure_desc<Name> desc) {
+    return {procedure_id<Name>{}, std::move(desc.params), std::move(desc.body)};
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::create_function_builder<Name> create(ddl_detail::function_desc<Name> desc) {
+    return {function_id<Name>{}, std::move(desc.params), std::move(desc.returns), std::move(desc.body)};
+}
+
+// --- drop() dispatchers ---
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_table_builder<T> drop(ddl_detail::table_desc<T> const&) {
+    return drop_table(T{});
+}
+
+template <ValidTable T>
+[[nodiscard]] ddl_detail::drop_view_builder<T> drop(ddl_detail::view_desc<T> const&) {
+    return drop_view(T{});
+}
+
+template <Database T>
+[[nodiscard]] ddl_detail::drop_database_builder<T> drop(ddl_detail::database_desc<T> const&) {
+    return drop_database(T{});
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::drop_procedure_builder<Name> drop(procedure_id<Name> const& id) {
+    return drop_procedure(id);
+}
+
+template <fixed_string Name>
+[[nodiscard]] ddl_detail::drop_function_builder<Name> drop(function_id<Name> const& id) {
+    return drop_function(id);
+}
+
+template <fixed_string Name>
+[[nodiscard]] auto drop(trigger_id<Name> const& id) {
+    // DROP TRIGGER does not require the table type in SQL output.
+    struct phantom_table {};
+    return ddl_detail::drop_trigger_builder<Name, phantom_table>{id};
+}
+
 }  // namespace ds_mysql
