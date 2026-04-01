@@ -126,7 +126,7 @@ private:
 
     std::expected<void, std::string> bind_results() {
         [this]<std::size_t... Is>(std::index_sequence<Is...>) {
-            (setup_bind<std::tuple_element_t<Is, RowType>>(Is), ...);
+            (this->setup_bind<std::tuple_element_t<Is, RowType>>(Is), ...);
         }(std::make_index_sequence<N>{});
 
         if (mysql_stmt_bind_result(stmt_.get(), result_binds_.data())) {
